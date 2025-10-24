@@ -81,6 +81,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".OtpCopyReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

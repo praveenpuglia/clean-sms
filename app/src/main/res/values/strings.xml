@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Clean SMS</string>
+    <string name="notification_copy_otp">Copy OTP</string>
+    <string name="toast_otp_copied">OTP copied to clipboard</string>
 </resources>

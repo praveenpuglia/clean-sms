@@ -15,7 +15,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.TaskStackBuilder
 import android.app.PendingIntent
-
+import kotlin.math.absoluteValue
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.SpannableStringBuilder
+import android.text.style.StyleSpan
+import android.text.style.RelativeSizeSpan
+import android.graphics.Typeface
 
 
 class SmsDeliverReceiver : BroadcastReceiver() {
@@ -55,6 +61,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
 
         val threadId = findOrCreateThreadId(context, originatingAddress)
         val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
+        val otpCode = extractOtp(fullBody)
 
         postNotification(
             context = context,
@@ -63,7 +70,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             title = displayName,
             body = fullBody,
             photoUri = photoUri,
-            category = category
+            category = category,
+            otpCode = otpCode
         )
 
         // Refresh threads list UI
@@ -80,7 +88,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         title: String,
         body: String,
         photoUri: String?,
-        category: MessageCategory
+        category: MessageCategory,
+        otpCode: String?
     ) {
         val channelId = "incoming_sms"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -107,6 +116,35 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             .setContentText(body.take(120))
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
+
+        if (!otpCode.isNullOrEmpty()) {
+            val styledText = buildOtpStyledText(otpCode, body)
+            builder.setContentText("OTP: $otpCode")
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(styledText))
+
+            val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
+                action = OtpCopyReceiver.ACTION_COPY_OTP
+                putExtra(OtpCopyReceiver.EXTRA_OTP, otpCode)
+            }
+
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+
+            val copyPendingIntent = PendingIntent.getBroadcast(
+                context,
+                (otpCode.hashCode() xor address.hashCode()).absoluteValue,
+                copyIntent,
+                flags
+            )
+
+            builder.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_copy,
+                    context.getString(R.string.notification_copy_otp),
+                    copyPendingIntent
+                ).build()
+            )
+        }
         val bmp = loadBitmap(context, photoUri)
         if (bmp != null) builder.setLargeIcon(bmp)
         NotificationManagerCompat.from(context).notify(address.hashCode(), builder.build())
@@ -157,6 +195,31 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         }
 
         return Telephony.Threads.getOrCreateThreadId(context, setOf(address))
+    }
+
+    private fun extractOtp(body: String): String? {
+        val otpRegex = Regex("\\b\\d{4,8}\\b")
+        return otpRegex.find(body)?.value
+    }
+
+    private fun buildOtpStyledText(otp: String, body: String): CharSequence {
+        val builder = SpannableStringBuilder()
+        builder.append("OTP: ")
+
+        val otpSpan = SpannableString(otp).apply {
+            setSpan(StyleSpan(Typeface.BOLD), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(RelativeSizeSpan(1.4f), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        builder.append(otpSpan)
+
+        val snippet = body.trim()
+        if (snippet.isNotEmpty()) {
+            builder.append('\n')
+            builder.append(snippet.take(180))
+        }
+
+        return builder
     }
 
     private fun loadBitmap(context: Context, uriString: String?): android.graphics.Bitmap? {
