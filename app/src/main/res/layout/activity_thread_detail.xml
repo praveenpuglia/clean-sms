@@ -67,6 +67,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:layout_marginStart="12dp"
                 android:layout_marginEnd="8dp"
                 android:orientation="vertical">
 
@@ -94,12 +95,14 @@
 
             <ImageButton
                 android:id="@+id/call_button"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_call"
                 android:contentDescription="Call"
                 android:tint="?android:attr/textColorPrimary"
+                android:scaleType="centerInside"
+                android:padding="8dp"
                 android:visibility="gone" />
 
         </LinearLayout>

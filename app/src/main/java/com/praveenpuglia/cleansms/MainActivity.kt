@@ -349,6 +349,7 @@ class MainActivity : AppCompatActivity() {
             putExtra("CONTACT_NAME", threadItem.contactName)
             putExtra("CONTACT_ADDRESS", threadItem.nameOrAddress)
             putExtra("CONTACT_PHOTO_URI", threadItem.contactPhotoUri)
+            putExtra("CATEGORY", threadItem.category.name)
         }
         startActivity(intent)
     }

@@ -113,6 +113,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
     
     private fun setupHeaderText() {
+        android.util.Log.d("ThreadDetail", "=== setupHeaderText called ===")
         findViewById<TextView>(R.id.thread_contact_name).text = contactName ?: contactAddress ?: "Unknown"
         if (contactName != null && contactAddress != null) {
             findViewById<TextView>(R.id.thread_contact_number).text = contactAddress
