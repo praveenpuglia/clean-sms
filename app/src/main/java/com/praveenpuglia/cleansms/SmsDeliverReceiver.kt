@@ -17,7 +17,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.TaskStackBuilder
 import androidx.core.content.ContextCompat
+import android.app.UiModeManager
+import android.content.res.Configuration
 import kotlin.math.absoluteValue
+import com.praveenpuglia.cleansms.R
 
 
 class SmsDeliverReceiver : BroadcastReceiver() {
@@ -116,8 +119,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             .setContentIntent(contentIntent)
 
         if (!otpCode.isNullOrEmpty()) {
-            builder.setContentText(null)
-
+            // Don't override content text - keep the SMS body visible
+            
             val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
                 action = OtpCopyReceiver.ACTION_COPY_OTP
                 putExtra(OtpCopyReceiver.EXTRA_OTP, otpCode)
@@ -136,14 +139,9 @@ class SmsDeliverReceiver : BroadcastReceiver() {
 
             val remoteViews = RemoteViews(context.packageName, R.layout.notification_otp).apply {
                 setTextViewText(R.id.notification_otp_text, otpCode)
+                setTextViewText(R.id.notification_sender_text, title)
                 setOnClickPendingIntent(R.id.notification_copy_button, copyPendingIntent)
                 setImageViewResource(R.id.notification_copy_button, R.drawable.ic_copy)
-                val backgroundColor = ContextCompat.getColor(context, R.color.notification_otp_background)
-                val textColor = ContextCompat.getColor(context, R.color.notification_otp_text_color)
-                val iconTint = ContextCompat.getColor(context, R.color.notification_otp_icon_tint)
-                setInt(R.id.notification_root, "setBackgroundColor", backgroundColor)
-                setTextColor(R.id.notification_otp_text, textColor)
-                setInt(R.id.notification_copy_button, "setColorFilter", iconTint)
             }
 
             builder.setCustomContentView(remoteViews)
@@ -153,6 +151,17 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         val bmp = loadBitmap(context, photoUri)
         if (bmp != null) builder.setLargeIcon(bmp)
         NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+    }
+
+    private fun isNightMode(context: Context): Boolean {
+        val uiModeManager = context.getSystemService(UiModeManager::class.java)
+        return when (uiModeManager?.nightMode) {
+            UiModeManager.MODE_NIGHT_YES -> true
+            UiModeManager.MODE_NIGHT_NO -> false
+            UiModeManager.MODE_NIGHT_AUTO ->
+                (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+            else -> (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        }
     }
 
     private fun createThreadDetailPendingIntent(

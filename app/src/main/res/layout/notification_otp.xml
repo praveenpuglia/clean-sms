@@ -1,36 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/notification_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:paddingStart="16dp"
-    android:paddingEnd="8dp"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp"
-    android:background="@color/notification_otp_background">
+    android:orientation="vertical"
+    android:paddingStart="0dp"
+    android:paddingEnd="0dp"
+    android:paddingTop="0dp"
+    android:paddingBottom="0dp">
 
-    <TextView
-        android:id="@+id/notification_otp_text"
-        android:layout_width="0dp"
+    <!-- OTP and Copy Button Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        android:fontFamily="monospace"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:minHeight="48dp">
+
+        <TextView
+            android:id="@+id/notification_otp_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:paddingStart="0dp"
+            android:paddingEnd="8dp"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <ImageButton
+            android:id="@+id/notification_copy_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:scaleType="center"
+            android:contentDescription="@string/notification_copy_otp"
+            android:padding="12dp"
+            android:tint="?android:attr/textColorPrimary" />
+    </LinearLayout>
+
+    <!-- Sender Name -->
+    <TextView
+        android:id="@+id/notification_sender_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="@color/notification_otp_text_color" />
-
-    <ImageButton
-        android:id="@+id/notification_copy_button"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:background="@android:color/transparent"
-        android:scaleType="centerInside"
-        android:contentDescription="@string/notification_copy_otp"
-        android:padding="8dp"
-        android:tint="@color/notification_otp_icon_tint" />
+        android:paddingTop="4dp"
+        android:textColor="?android:attr/textColorSecondary" />
 
 </LinearLayout>
