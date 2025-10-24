@@ -62,4 +62,9 @@
     <color name="gray_100">#FFF5F5F5</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Notification specific colors -->
+    <color name="notification_otp_background">@color/md_theme_light_surface</color>
+    <color name="notification_otp_text_color">@color/md_theme_light_onSurface</color>
+    <color name="notification_otp_icon_tint">@color/md_theme_light_onSurface</color>
 </resources>

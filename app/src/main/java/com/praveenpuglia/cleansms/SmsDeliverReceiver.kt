@@ -106,6 +106,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             category = category
         )
 
+        val notificationId = address.hashCode()
+
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
@@ -119,6 +121,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
                 action = OtpCopyReceiver.ACTION_COPY_OTP
                 putExtra(OtpCopyReceiver.EXTRA_OTP, otpCode)
+                putExtra(OtpCopyReceiver.EXTRA_NOTIFICATION_ID, notificationId)
             }
 
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or
@@ -135,9 +138,12 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 setTextViewText(R.id.notification_otp_text, otpCode)
                 setOnClickPendingIntent(R.id.notification_copy_button, copyPendingIntent)
                 setImageViewResource(R.id.notification_copy_button, R.drawable.ic_copy)
-                val textColor = ContextCompat.getColor(context, android.R.color.white)
+                val backgroundColor = ContextCompat.getColor(context, R.color.notification_otp_background)
+                val textColor = ContextCompat.getColor(context, R.color.notification_otp_text_color)
+                val iconTint = ContextCompat.getColor(context, R.color.notification_otp_icon_tint)
+                setInt(R.id.notification_root, "setBackgroundColor", backgroundColor)
                 setTextColor(R.id.notification_otp_text, textColor)
-                setInt(R.id.notification_copy_button, "setColorFilter", textColor)
+                setInt(R.id.notification_copy_button, "setColorFilter", iconTint)
             }
 
             builder.setCustomContentView(remoteViews)
@@ -146,7 +152,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         }
         val bmp = loadBitmap(context, photoUri)
         if (bmp != null) builder.setLargeIcon(bmp)
-        NotificationManagerCompat.from(context).notify(address.hashCode(), builder.build())
+        NotificationManagerCompat.from(context).notify(notificationId, builder.build())
     }
 
     private fun createThreadDetailPendingIntent(

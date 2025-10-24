@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/notification_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -7,7 +8,8 @@
     android:paddingStart="16dp"
     android:paddingEnd="8dp"
     android:paddingTop="10dp"
-    android:paddingBottom="10dp">
+    android:paddingBottom="10dp"
+    android:background="@color/notification_otp_background">
 
     <TextView
         android:id="@+id/notification_otp_text"
@@ -18,7 +20,8 @@
         android:textStyle="bold"
         android:fontFamily="monospace"
         android:maxLines="1"
-        android:ellipsize="end" />
+        android:ellipsize="end"
+        android:textColor="@color/notification_otp_text_color" />
 
     <ImageButton
         android:id="@+id/notification_copy_button"
@@ -27,6 +30,7 @@
         android:background="@android:color/transparent"
         android:scaleType="centerInside"
         android:contentDescription="@string/notification_copy_otp"
-        android:padding="8dp" />
+        android:padding="8dp"
+        android:tint="@color/notification_otp_icon_tint" />
 
 </LinearLayout>

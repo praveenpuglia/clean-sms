@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="notification_otp_background">@color/md_theme_dark_surface</color>
+    <color name="notification_otp_text_color">@color/md_theme_dark_onSurface</color>
+    <color name="notification_otp_icon_tint">@color/md_theme_dark_onSurface</color>
+</resources>
