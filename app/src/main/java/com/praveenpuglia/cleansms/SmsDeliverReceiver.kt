@@ -11,17 +11,13 @@ import android.app.NotificationManager
 import android.os.Build
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.app.PendingIntent
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.TaskStackBuilder
-import android.app.PendingIntent
+import androidx.core.content.ContextCompat
 import kotlin.math.absoluteValue
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.SpannableStringBuilder
-import android.text.style.StyleSpan
-import android.text.style.RelativeSizeSpan
-import android.graphics.Typeface
 
 
 class SmsDeliverReceiver : BroadcastReceiver() {
@@ -118,9 +114,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             .setContentIntent(contentIntent)
 
         if (!otpCode.isNullOrEmpty()) {
-            val styledText = buildOtpStyledText(otpCode, body)
-            builder.setContentText("OTP: $otpCode")
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(styledText))
+            builder.setContentText(null)
 
             val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
                 action = OtpCopyReceiver.ACTION_COPY_OTP
@@ -137,13 +131,18 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 flags
             )
 
-            builder.addAction(
-                NotificationCompat.Action.Builder(
-                    R.drawable.ic_copy,
-                    context.getString(R.string.notification_copy_otp),
-                    copyPendingIntent
-                ).build()
-            )
+            val remoteViews = RemoteViews(context.packageName, R.layout.notification_otp).apply {
+                setTextViewText(R.id.notification_otp_text, otpCode)
+                setOnClickPendingIntent(R.id.notification_copy_button, copyPendingIntent)
+                setImageViewResource(R.id.notification_copy_button, R.drawable.ic_copy)
+                val textColor = ContextCompat.getColor(context, android.R.color.white)
+                setTextColor(R.id.notification_otp_text, textColor)
+                setInt(R.id.notification_copy_button, "setColorFilter", textColor)
+            }
+
+            builder.setCustomContentView(remoteViews)
+            builder.setCustomBigContentView(remoteViews)
+            builder.setStyle(NotificationCompat.DecoratedCustomViewStyle())
         }
         val bmp = loadBitmap(context, photoUri)
         if (bmp != null) builder.setLargeIcon(bmp)
@@ -200,26 +199,6 @@ class SmsDeliverReceiver : BroadcastReceiver() {
     private fun extractOtp(body: String): String? {
         val otpRegex = Regex("\\b\\d{4,8}\\b")
         return otpRegex.find(body)?.value
-    }
-
-    private fun buildOtpStyledText(otp: String, body: String): CharSequence {
-        val builder = SpannableStringBuilder()
-        builder.append("OTP: ")
-
-        val otpSpan = SpannableString(otp).apply {
-            setSpan(StyleSpan(Typeface.BOLD), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            setSpan(RelativeSizeSpan(1.4f), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
-
-        builder.append(otpSpan)
-
-        val snippet = body.trim()
-        if (snippet.isNotEmpty()) {
-            builder.append('\n')
-            builder.append(snippet.take(180))
-        }
-
-        return builder
     }
 
     private fun loadBitmap(context: Context, uriString: String?): android.graphics.Bitmap? {
