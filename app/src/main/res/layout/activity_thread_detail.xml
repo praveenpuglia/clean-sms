@@ -30,7 +30,7 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:src="@drawable/ic_arrow_back"
                 android:contentDescription="Back"
                 android:tint="?android:attr/textColorPrimary" />
 
@@ -98,7 +98,7 @@
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_call"
+                android:src="@drawable/ic_call"
                 android:contentDescription="Call"
                 android:tint="?android:attr/textColorPrimary"
                 android:scaleType="centerInside"
@@ -151,7 +151,7 @@
             app:boxCornerRadiusBottomStart="24dp"
             app:boxCornerRadiusBottomEnd="24dp"
             app:boxStrokeWidth="1dp"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/message_input"
@@ -169,7 +169,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             app:fabSize="mini"
-            android:src="@android:drawable/ic_menu_send"
+            android:src="@drawable/ic_send"
             android:contentDescription="Send" />
 
     </LinearLayout>
