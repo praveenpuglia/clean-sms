@@ -2,7 +2,9 @@ package com.praveenpuglia.cleansms
 
 import android.Manifest
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Telephony
 import android.telephony.SmsManager
@@ -27,6 +29,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var contactName: String? = null
     private var contactAddress: String? = null
     private var contactPhotoUri: String? = null
+    private var messageCategory: MessageCategory = MessageCategory.UNKNOWN
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +39,14 @@ class ThreadDetailActivity : AppCompatActivity() {
         contactName = intent.getStringExtra("CONTACT_NAME")
         contactAddress = intent.getStringExtra("CONTACT_ADDRESS")
         contactPhotoUri = intent.getStringExtra("CONTACT_PHOTO_URI")
+        
+        // Get category from intent
+        val categoryName = intent.getStringExtra("CATEGORY")
+        messageCategory = try {
+            if (categoryName != null) MessageCategory.valueOf(categoryName) else MessageCategory.UNKNOWN
+        } catch (e: IllegalArgumentException) {
+            MessageCategory.UNKNOWN
+        }
 
         if (threadId == -1L) {
             finish()
@@ -70,6 +81,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         } else {
             setAvatarInitials(avatarText, avatarImage)
         }
+        
+        setupHeaderText()
     }
     
     private fun setAvatarInitials(avatarText: TextView, avatarImage: ImageView) {
@@ -97,12 +110,31 @@ class ThreadDetailActivity : AppCompatActivity() {
         avatarText.text = "#"
         avatarText.visibility = android.view.View.VISIBLE
         avatarImage.visibility = android.view.View.GONE
-        
+    }
+    
+    private fun setupHeaderText() {
         findViewById<TextView>(R.id.thread_contact_name).text = contactName ?: contactAddress ?: "Unknown"
         if (contactName != null && contactAddress != null) {
             findViewById<TextView>(R.id.thread_contact_number).text = contactAddress
         } else {
             findViewById<TextView>(R.id.thread_contact_number).visibility = android.view.View.GONE
+        }
+        
+        // Show call button only for PERSONAL category
+        val callButton = findViewById<ImageButton>(R.id.call_button)
+        android.util.Log.d("ThreadDetail", "Category: $messageCategory, Address: $contactAddress")
+        if (messageCategory == MessageCategory.PERSONAL && !contactAddress.isNullOrEmpty()) {
+            android.util.Log.d("ThreadDetail", "Showing call button")
+            callButton.visibility = android.view.View.VISIBLE
+            callButton.setOnClickListener {
+                val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+                    data = Uri.parse("tel:$contactAddress")
+                }
+                startActivity(dialIntent)
+            }
+        } else {
+            android.util.Log.d("ThreadDetail", "Hiding call button")
+            callButton.visibility = android.view.View.GONE
         }
     }
 
