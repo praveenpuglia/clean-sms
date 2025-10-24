@@ -41,6 +41,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation("androidx.recyclerview:recyclerview:1.3.1")
+    // libphonenumber for robust phone number parsing/matching
+    implementation("com.googlecode.libphonenumber:libphonenumber:8.13.22")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
