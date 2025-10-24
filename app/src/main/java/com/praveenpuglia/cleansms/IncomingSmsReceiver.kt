@@ -3,16 +3,18 @@ package com.praveenpuglia.cleansms
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.TaskStackBuilder
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.role.RoleManager
 import android.graphics.Bitmap
 import android.net.Uri
+import android.app.PendingIntent
+import android.os.Build
 import java.io.InputStream
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import java.util.Locale
@@ -40,7 +42,10 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         val displayName = enriched?.first
         val photoUri = enriched?.second
 
-        showNotification(context, originatingAddress, displayName, photoUri, fullBody)
+        val threadId = findOrCreateThreadId(context, originatingAddress)
+        val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
+
+        showNotification(context, threadId, originatingAddress, displayName, photoUri, fullBody, category)
 
         // Notify activity to refresh threads list
         MainActivity.refreshThreadsIfActive()
@@ -48,10 +53,12 @@ class IncomingSmsReceiver : BroadcastReceiver() {
 
     private fun showNotification(
         context: Context,
+        threadId: Long,
         address: String,
         name: String?,
         photoUri: String?,
-        body: String
+        body: String,
+        category: MessageCategory
     ) {
         val channelId = "incoming_sms"
         ensureChannel(context, channelId)
@@ -59,16 +66,76 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         val title = name ?: address
         val content = body.take(120)
 
+        val contentIntent = createThreadDetailPendingIntent(
+            context = context,
+            threadId = threadId,
+            address = address,
+            displayName = name,
+            photoUri = photoUri,
+            category = category
+        )
+
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(content)
             .setAutoCancel(true)
+            .setContentIntent(contentIntent)
 
         val largeIcon = loadBitmap(context, photoUri)
         if (largeIcon != null) builder.setLargeIcon(largeIcon)
 
         NotificationManagerCompat.from(context).notify(address.hashCode(), builder.build())
+    }
+
+    private fun createThreadDetailPendingIntent(
+        context: Context,
+        threadId: Long,
+        address: String,
+        displayName: String?,
+        photoUri: String?,
+        category: MessageCategory
+    ): PendingIntent {
+        val detailIntent = Intent(context, ThreadDetailActivity::class.java).apply {
+            putExtra("THREAD_ID", threadId)
+            putExtra("CONTACT_NAME", displayName)
+            putExtra("CONTACT_ADDRESS", address)
+            putExtra("CONTACT_PHOTO_URI", photoUri)
+            putExtra("CATEGORY", category.name)
+        }
+
+        val mainIntent = Intent(context, MainActivity::class.java)
+
+        val stackBuilder = TaskStackBuilder.create(context).apply {
+            addNextIntent(mainIntent)
+            addNextIntent(detailIntent)
+        }
+
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+
+        val requestCode = (threadId xor address.hashCode().toLong()).toInt()
+        return stackBuilder.getPendingIntent(requestCode, flags)
+            ?: PendingIntent.getActivity(context, requestCode, detailIntent, flags)
+    }
+
+    private fun findOrCreateThreadId(context: Context, address: String): Long {
+        val uri = Telephony.Sms.CONTENT_URI
+        context.contentResolver.query(
+            uri,
+            arrayOf("thread_id"),
+            "address = ?",
+            arrayOf(address),
+            "date DESC LIMIT 1"
+        )?.use { cursor ->
+            val idx = cursor.getColumnIndex("thread_id")
+            if (idx >= 0 && cursor.moveToFirst()) {
+                val threadId = cursor.getLong(idx)
+                if (threadId > 0) return threadId
+            }
+        }
+
+        return Telephony.Threads.getOrCreateThreadId(context, setOf(address))
     }
 
     private fun ensureChannel(context: Context, channelId: String) {
