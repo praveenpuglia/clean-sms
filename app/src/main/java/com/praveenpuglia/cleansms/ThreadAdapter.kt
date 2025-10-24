@@ -12,6 +12,40 @@ import androidx.core.net.toUri
 
 class ThreadAdapter(private var items: List<ThreadItem>) : RecyclerView.Adapter<ThreadAdapter.VH>() {
 
+    private fun formatHumanReadableDate(timestamp: Long): String {
+        val now = Calendar.getInstance()
+        val msgTime = Calendar.getInstance().apply { timeInMillis = timestamp }
+        
+        val daysDiff = ((now.timeInMillis - msgTime.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
+        
+        return when {
+            daysDiff == 0 && now.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR) -> {
+                // Today - show only time
+                String.format("%02d:%02d %s", 
+                    if (msgTime.get(Calendar.HOUR) == 0) 12 else msgTime.get(Calendar.HOUR),
+                    msgTime.get(Calendar.MINUTE),
+                    if (msgTime.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM")
+            }
+            daysDiff == 1 || (now.get(Calendar.DAY_OF_YEAR) - msgTime.get(Calendar.DAY_OF_YEAR) == 1) -> {
+                // Yesterday
+                "Yesterday"
+            }
+            daysDiff < 7 -> {
+                // Within last week - show day name
+                val dayNames = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                dayNames[msgTime.get(Calendar.DAY_OF_WEEK) - 1]
+            }
+            else -> {
+                // Older - show date like "20 Oct"
+                val monthNames = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+                val day = msgTime.get(Calendar.DAY_OF_MONTH)
+                val month = monthNames[msgTime.get(Calendar.MONTH)]
+                "$day $month"
+            }
+        }
+    }
+
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val avatarImage: ImageView = itemView.findViewById(R.id.thread_avatar_image)
         val avatarText: TextView = itemView.findViewById(R.id.thread_avatar_text)
@@ -28,8 +62,7 @@ class ThreadAdapter(private var items: List<ThreadItem>) : RecyclerView.Adapter<
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
         holder.name.text = item.contactName ?: item.nameOrAddress
-        val df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-        holder.date.text = df.format(Date(item.date))
+        holder.date.text = formatHumanReadableDate(item.date)
         holder.snippet.text = item.snippet
 
         // If MainActivity enriched with photoUri/name, use them
