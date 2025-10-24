@@ -32,7 +32,19 @@ class MainActivity : AppCompatActivity() {
             activeInstance?.refreshThreadsAsync()
         }
         // Static helpers for receiver enrichment
-        fun isMobileNumberCandidateStatic(raw: String): Boolean = activeInstance?.isMobileNumberCandidate(raw) ?: false
+        fun isMobileNumberCandidateStatic(raw: String): Boolean {
+            val inst = activeInstance
+            if (inst != null) return inst.isMobileNumberCandidate(raw)
+            // Fallback heuristic when activity not active (cold start). Mirror main logic in simplified form.
+            if (raw.isBlank()) return false
+            if (raw.any { it.isLetter() }) return false
+            val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(raw)
+                .ifEmpty { raw.replace(Regex("\\s+"), "") }
+            val digits = normalized.filter { it.isDigit() }
+            if (digits.length < 7) return false
+            // Treat >=10 digits as likely mobile to allow enrichment attempts, else rely on PhoneLookup directly.
+            return digits.length >= 7
+        }
         fun lookupFromCache(raw: String): Pair<String?, String?>? {
             val inst = activeInstance ?: return null
             val keys = inst.candidateKeysForAddress(raw)

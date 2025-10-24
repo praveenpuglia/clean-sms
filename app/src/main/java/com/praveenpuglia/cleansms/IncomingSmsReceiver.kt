@@ -16,6 +16,7 @@ import android.net.Uri
 import java.io.InputStream
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import java.util.Locale
+import android.provider.ContactsContract
 
 class IncomingSmsReceiver : BroadcastReceiver() {
 
@@ -115,14 +116,15 @@ object ContactEnrichment {
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
 
     fun enrich(context: Context, rawAddress: String): Pair<String?, String?>? {
-        if (!MainActivity.isMobileNumberCandidateStatic(rawAddress)) return null
-        // Try cache and index from MainActivity if available
+        // Allow enrichment even in cold start: use simplified heuristic
+        val candidate = MainActivity.isMobileNumberCandidateStatic(rawAddress)
+        // Try cache/index only if activity is active
         val fromCache = MainActivity.lookupFromCache(rawAddress)
         if (fromCache != null) return fromCache
         val fromIndex = MainActivity.lookupFromIndex(rawAddress)
         if (fromIndex != null) return fromIndex
-        // Fallback: lightweight parse attempt + PhoneLookup only (no deep scans)
-        return quickPhoneLookup(context, rawAddress)
+        // Attempt direct PhoneLookup even if heuristic returns false; may still resolve name/photo (e.g., short codes not desired though)
+        return if (candidate) quickPhoneLookup(context, rawAddress) else quickPhoneLookup(context, rawAddress)
     }
 
     private fun quickPhoneLookup(context: Context, raw: String): Pair<String?, String?>? {
@@ -142,14 +144,28 @@ object ContactEnrichment {
 
         for (c in candidates) {
             try {
-                val lookupUri = android.net.Uri.withAppendedPath(android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI, android.net.Uri.encode(c))
-                val proj = arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME, android.provider.ContactsContract.PhoneLookup.PHOTO_URI)
+                val lookupUri = android.net.Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, android.net.Uri.encode(c))
+                val proj = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup.PHOTO_URI, ContactsContract.PhoneLookup._ID)
                 context.contentResolver.query(lookupUri, proj, null, null, null)?.use { cur ->
                     if (cur.moveToFirst()) {
-                        val idxName = cur.getColumnIndex(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME)
-                        val idxPhoto = cur.getColumnIndex(android.provider.ContactsContract.PhoneLookup.PHOTO_URI)
+                        val idxName = cur.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                        val idxPhoto = cur.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+                        val idxId = cur.getColumnIndex(ContactsContract.PhoneLookup._ID)
                         val name = if (idxName >= 0) cur.getString(idxName) else null
-                        val photo = if (idxPhoto >= 0) cur.getString(idxPhoto) else null
+                        var photo = if (idxPhoto >= 0) cur.getString(idxPhoto) else null
+                        val contactId = if (idxId >= 0) cur.getLong(idxId) else null
+                        if (photo.isNullOrEmpty() && contactId != null) {
+                            try {
+                                val contactUri = android.net.Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, contactId.toString())
+                                val p = arrayOf(ContactsContract.Contacts.PHOTO_URI)
+                                context.contentResolver.query(contactUri, p, null, null, null)?.use { c2 ->
+                                    if (c2.moveToFirst()) {
+                                        val idxP = c2.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
+                                        photo = if (idxP >= 0) c2.getString(idxP) else photo
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                        }
                         return Pair(name, photo)
                     }
                 }
