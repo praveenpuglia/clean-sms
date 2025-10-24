@@ -64,10 +64,9 @@
             </FrameLayout>
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
                 android:layout_marginEnd="8dp"
                 android:orientation="vertical">
 
@@ -100,7 +99,8 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_call"
                 android:contentDescription="Call"
-                android:tint="?android:attr/textColorPrimary" />
+                android:tint="?android:attr/textColorPrimary"
+                android:visibility="gone" />
 
         </LinearLayout>
 
