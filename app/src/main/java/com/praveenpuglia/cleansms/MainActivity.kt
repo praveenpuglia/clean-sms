@@ -183,7 +183,9 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 val recycler = findViewById<RecyclerView>(R.id.threads_recycler)
                 (recycler.adapter as? ThreadAdapter)?.updateItems(enriched) ?: run {
-                    recycler.adapter = ThreadAdapter(enriched)
+                    recycler.adapter = ThreadAdapter(enriched) { threadItem ->
+                        openThreadDetail(threadItem)
+                    }
                 }
             }
         }.start()
@@ -279,9 +281,20 @@ class MainActivity : AppCompatActivity() {
             } else threads
 
             runOnUiThread {
-                recycler.adapter = ThreadAdapter(enriched)
+                recycler.adapter = ThreadAdapter(enriched) { threadItem ->
+                    openThreadDetail(threadItem)
+                }
             }
         }.start()
+    }
+
+    private fun openThreadDetail(threadItem: ThreadItem) {
+        val intent = Intent(this, ThreadDetailActivity::class.java).apply {
+            putExtra("THREAD_ID", threadItem.threadId)
+            putExtra("CONTACT_NAME", threadItem.contactName)
+            putExtra("CONTACT_ADDRESS", threadItem.nameOrAddress)
+        }
+        startActivity(intent)
     }
 
     private fun cacheKeyForAddress(rawAddress: String): String {

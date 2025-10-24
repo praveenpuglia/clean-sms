@@ -43,6 +43,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ThreadDetailActivity" android:exported="false" />
+
         <service
             android:name=".RespondViaMessageService"
             android:exported="true"

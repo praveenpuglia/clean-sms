@@ -10,7 +10,10 @@ import java.text.DateFormat
 import java.util.*
 import androidx.core.net.toUri
 
-class ThreadAdapter(private var items: List<ThreadItem>) : RecyclerView.Adapter<ThreadAdapter.VH>() {
+class ThreadAdapter(
+    private var items: List<ThreadItem>,
+    private val onItemClick: (ThreadItem) -> Unit
+) : RecyclerView.Adapter<ThreadAdapter.VH>() {
 
     private fun formatHumanReadableDate(timestamp: Long): String {
         val now = Calendar.getInstance()
@@ -61,6 +64,10 @@ class ThreadAdapter(private var items: List<ThreadItem>) : RecyclerView.Adapter<
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
+        
+        holder.itemView.setOnClickListener {
+            onItemClick(item)
+        }
         holder.name.text = item.contactName ?: item.nameOrAddress
         holder.date.text = formatHumanReadableDate(item.date)
         holder.snippet.text = item.snippet
