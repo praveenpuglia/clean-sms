@@ -8,6 +8,7 @@ import android.provider.Telephony
 import android.telephony.SmsManager
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -25,6 +26,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var threadId: Long = -1
     private var contactName: String? = null
     private var contactAddress: String? = null
+    private var contactPhotoUri: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +35,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         threadId = intent.getLongExtra("THREAD_ID", -1)
         contactName = intent.getStringExtra("CONTACT_NAME")
         contactAddress = intent.getStringExtra("CONTACT_ADDRESS")
+        contactPhotoUri = intent.getStringExtra("CONTACT_PHOTO_URI")
 
         if (threadId == -1L) {
             finish()
@@ -49,6 +52,52 @@ class ThreadDetailActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.back_button).setOnClickListener {
             finish()
         }
+        
+        // Set up avatar - reuse same logic as ThreadAdapter
+        val avatarImage = findViewById<ImageView>(R.id.thread_detail_avatar_image)
+        val avatarText = findViewById<TextView>(R.id.thread_detail_avatar_text)
+        
+        val photoUri = contactPhotoUri
+        if (!photoUri.isNullOrEmpty()) {
+            try {
+                avatarImage.setImageURI(photoUri.toUri())
+                avatarImage.visibility = android.view.View.VISIBLE
+                avatarText.visibility = android.view.View.GONE
+            } catch (_: Exception) {
+                // Fall through to initials
+                setAvatarInitials(avatarText, avatarImage)
+            }
+        } else {
+            setAvatarInitials(avatarText, avatarImage)
+        }
+    }
+    
+    private fun setAvatarInitials(avatarText: TextView, avatarImage: ImageView) {
+        // Use contact name if available
+        if (!contactName.isNullOrEmpty()) {
+            val initial = contactName!!.trim().firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
+            avatarText.text = initial
+            avatarText.visibility = android.view.View.VISIBLE
+            avatarImage.visibility = android.view.View.GONE
+            return
+        }
+
+        // Fallback: if address contains letters (alphanumeric sender ID), show first letter
+        val raw = contactAddress ?: ""
+        val hasLetters = raw.any { it.isLetter() }
+        if (hasLetters) {
+            val firstLetter = raw.trim().firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
+            avatarText.text = firstLetter
+            avatarText.visibility = android.view.View.VISIBLE
+            avatarImage.visibility = android.view.View.GONE
+            return
+        }
+
+        // Final fallback for phone numbers
+        avatarText.text = "#"
+        avatarText.visibility = android.view.View.VISIBLE
+        avatarImage.visibility = android.view.View.GONE
+        
         findViewById<TextView>(R.id.thread_contact_name).text = contactName ?: contactAddress ?: "Unknown"
         if (contactName != null && contactAddress != null) {
             findViewById<TextView>(R.id.thread_contact_number).text = contactAddress

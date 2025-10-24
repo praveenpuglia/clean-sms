@@ -348,6 +348,7 @@ class MainActivity : AppCompatActivity() {
             putExtra("THREAD_ID", threadItem.threadId)
             putExtra("CONTACT_NAME", threadItem.contactName)
             putExtra("CONTACT_ADDRESS", threadItem.nameOrAddress)
+            putExtra("CONTACT_PHOTO_URI", threadItem.contactPhotoUri)
         }
         startActivity(intent)
     }
