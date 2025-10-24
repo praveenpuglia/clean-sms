@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/md_theme_dark_secondaryContainer" />
+    <solid android:color="@color/pill_background_color" />
     <corners android:radius="16dp" />
-    <stroke android:width="2dp" android:color="@color/md_theme_dark_secondary" />
+    <stroke android:width="2dp" android:color="@color/pill_selected_outline_color" />
 </shape>
