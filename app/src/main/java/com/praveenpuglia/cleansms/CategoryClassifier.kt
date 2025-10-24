@@ -11,8 +11,11 @@ object CategoryClassifier {
     // X = TSP, Y = Service Area, ABCDEF = Header Name (6 chars), G = Suffix (S/P/T/G)
     private val traiPattern = Pattern.compile("^([A-Z]{2})-([A-Z0-9]{6})-([A-Z])$", Pattern.CASE_INSENSITIVE)
     
-    // Phone number patterns (with or without country code)
-    private val phonePattern = Pattern.compile("^\\+?[1-9]\\d{1,14}$")
+    // Short code pattern: 3-8 digits (service messages from companies, banks, etc.)
+    private val shortCodePattern = Pattern.compile("^\\d{3,8}$")
+    
+    // Full phone number patterns (with or without country code, typically 10+ digits)
+    private val phonePattern = Pattern.compile("^\\+?[1-9]\\d{9,14}$")
 
     /**
      * Categorize a sender address based on TRAI format or phone number
@@ -30,7 +33,12 @@ object CategoryClassifier {
             }
         }
 
-        // Check if it's a phone number
+        // Check if it's a short code (e.g., 57575, 59099) - categorize as Service
+        if (shortCodePattern.matcher(cleaned).matches()) {
+            return MessageCategory.SERVICE
+        }
+
+        // Check if it's a full phone number (10+ digits)
         if (phonePattern.matcher(cleaned).matches()) {
             return MessageCategory.PERSONAL
         }

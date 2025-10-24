@@ -6,9 +6,23 @@ import android.content.SharedPreferences
 object CategoryStorage {
     private const val PREF_NAME = "thread_categories"
     private const val KEY_PREFIX = "thread_"
+    private const val KEY_VERSION = "categorization_version"
+    private const val CURRENT_VERSION = 2 // Increment when categorization logic changes
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    }
+
+    /**
+     * Check version and clear cache if outdated
+     */
+    private fun checkVersion(context: Context) {
+        val prefs = getPrefs(context)
+        val savedVersion = prefs.getInt(KEY_VERSION, 0)
+        if (savedVersion < CURRENT_VERSION) {
+            // Clear all cached categories
+            prefs.edit().clear().putInt(KEY_VERSION, CURRENT_VERSION).apply()
+        }
     }
 
     /**
@@ -38,6 +52,9 @@ object CategoryStorage {
      * Get or compute category for an address/thread
      */
     fun getCategoryOrCompute(context: Context, address: String, threadId: Long): MessageCategory {
+        // Check version and clear cache if needed
+        checkVersion(context)
+        
         // Check if we have a saved category
         val saved = getCategory(context, address)
         if (saved != null) return saved
