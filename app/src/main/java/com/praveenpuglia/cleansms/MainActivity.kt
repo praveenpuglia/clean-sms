@@ -85,6 +85,10 @@ class MainActivity : AppCompatActivity() {
     private var bulkContactsIndex: Map<String, Pair<String?, String?>>? = null
     private val phoneUtil = PhoneNumberUtil.getInstance()
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
+    
+    // Category filtering state
+    private var selectedCategory: MessageCategory = MessageCategory.PERSONAL
+    private var allThreads: List<ThreadItem> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -240,6 +244,9 @@ class MainActivity : AppCompatActivity() {
         recycler.layoutManager = LinearLayoutManager(this)
         recycler.clipToPadding = false
 
+        // Setup category filter pills
+        setupCategoryPills()
+
         // Load threads and enrich contacts off the main thread to avoid jank
         Thread {
             val threads = loadSmsThreads()
@@ -275,17 +282,65 @@ class MainActivity : AppCompatActivity() {
                     }
                     if (hit != null) {
                         val (name, photo) = hit
-                        if (name != null || photo != null) ThreadItem(t.threadId, t.nameOrAddress, t.date, t.snippet, name, photo) else t
+                        if (name != null || photo != null) ThreadItem(t.threadId, t.nameOrAddress, t.date, t.snippet, name, photo, t.category) else t
                     } else t // Skip expensive fallback entirely for non-matching numbers
                 }
             } else threads
 
             runOnUiThread {
-                recycler.adapter = ThreadAdapter(enriched) { threadItem ->
-                    openThreadDetail(threadItem)
-                }
+                allThreads = enriched
+                displayFilteredThreads()
             }
         }.start()
+    }
+
+    private fun setupCategoryPills() {
+        val pillPersonal = findViewById<TextView>(R.id.pill_personal)
+        val pillTransactions = findViewById<TextView>(R.id.pill_transactions)
+        val pillService = findViewById<TextView>(R.id.pill_service)
+        val pillPromotions = findViewById<TextView>(R.id.pill_promotions)
+        val pillGovernment = findViewById<TextView>(R.id.pill_government)
+
+        val pills = listOf(
+            Pair(pillPersonal, MessageCategory.PERSONAL),
+            Pair(pillTransactions, MessageCategory.TRANSACTIONAL),
+            Pair(pillService, MessageCategory.SERVICE),
+            Pair(pillPromotions, MessageCategory.PROMOTIONAL),
+            Pair(pillGovernment, MessageCategory.GOVERNMENT)
+        )
+
+        pills.forEach { (pill, category) ->
+            pill.setOnClickListener {
+                selectedCategory = category
+                updatePillSelection(pills)
+                displayFilteredThreads()
+            }
+        }
+
+        // Set initial selection
+        updatePillSelection(pills)
+    }
+
+    private fun updatePillSelection(pills: List<Pair<TextView, MessageCategory>>) {
+        pills.forEach { (pill, category) ->
+            if (category == selectedCategory) {
+                pill.setBackgroundResource(R.drawable.pill_background_selected)
+                pill.setTextAppearance(android.R.style.TextAppearance_Small)
+                pill.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                pill.setBackgroundResource(R.drawable.pill_background)
+                pill.setTextAppearance(android.R.style.TextAppearance_Small)
+                pill.setTypeface(null, android.graphics.Typeface.NORMAL)
+            }
+        }
+    }
+
+    private fun displayFilteredThreads() {
+        val filtered = allThreads.filter { it.category == selectedCategory }
+        val recycler = findViewById<RecyclerView>(R.id.threads_recycler)
+        recycler.adapter = ThreadAdapter(filtered) { threadItem ->
+            openThreadDetail(threadItem)
+        }
     }
 
     private fun openThreadDetail(threadItem: ThreadItem) {
@@ -425,7 +480,11 @@ class MainActivity : AppCompatActivity() {
                     val address = if (idxAddress >= 0) c.getString(idxAddress) ?: "Unknown" else "Unknown"
                     val date = if (idxDate >= 0) c.getLong(idxDate) else 0L
                     val body = if (idxBody >= 0) c.getString(idxBody) ?: "" else ""
-                    map[threadId] = ThreadItem(threadId, address, date, body)
+                    
+                    // Categorize the thread
+                    val category = CategoryStorage.getCategoryOrCompute(this, address, threadId)
+                    
+                    map[threadId] = ThreadItem(threadId, address, date, body, category = category)
                 }
             }
         }

@@ -6,5 +6,6 @@ data class ThreadItem(
     val date: Long,
     val snippet: String,
     val contactName: String? = null,
-    val contactPhotoUri: String? = null
+    val contactPhotoUri: String? = null,
+    val category: MessageCategory = MessageCategory.UNKNOWN
 )
