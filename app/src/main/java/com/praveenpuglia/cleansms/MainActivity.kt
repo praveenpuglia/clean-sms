@@ -180,17 +180,15 @@ class MainActivity : AppCompatActivity() {
                     }
                     if (hit != null) {
                         val (name, photo) = hit
-                        if (name != null || photo != null) ThreadItem(t.threadId, t.nameOrAddress, t.date, t.snippet, name, photo) else t
+                        if (name != null || photo != null) {
+                            t.copy(contactName = name, contactPhotoUri = photo)
+                        } else t
                     } else t
                 }
             } else threads
             runOnUiThread {
-                val recycler = findViewById<RecyclerView>(R.id.threads_recycler)
-                (recycler.adapter as? ThreadAdapter)?.updateItems(enriched) ?: run {
-                    recycler.adapter = ThreadAdapter(enriched) { threadItem ->
-                        openThreadDetail(threadItem)
-                    }
-                }
+                allThreads = enriched
+                displayFilteredThreads()
             }
         }.start()
     }
