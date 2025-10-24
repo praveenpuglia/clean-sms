@@ -6,6 +6,13 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import android.content.ContentValues
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import android.graphics.BitmapFactory
+import android.net.Uri
 
 
 class SmsDeliverReceiver : BroadcastReceiver() {
@@ -18,10 +25,10 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             return
         }
 
-        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-        if (messages.isEmpty()) return
-        val fullBody = messages.joinToString(separator = "") { it.displayMessageBody ?: it.messageBody ?: "" }
-        val originatingAddress = messages.first().originatingAddress ?: return
+    val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+    if (messages.isEmpty()) return
+    val fullBody = messages.joinToString(separator = "") { it.displayMessageBody ?: it.messageBody ?: "" }
+    val originatingAddress = messages.first().originatingAddress ?: return
 
         // Insert into SMS provider (Inbox)
         try {
@@ -38,7 +45,51 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             Log.e("SmsDeliver", "Failed inserting SMS", e)
         }
 
-        // Trigger UI refresh (threads list) and let IncomingSmsReceiver handle notification via SMS_RECEIVED broadcast
+        // Enrich for notification
+        val enriched = ContactEnrichment.enrich(context, originatingAddress)
+        val displayName = enriched?.first ?: originatingAddress
+        val photoUri = enriched?.second
+
+        postNotification(context, originatingAddress, displayName, fullBody, photoUri)
+
+        // Refresh threads list UI
         MainActivity.refreshThreadsIfActive()
+
+        // Prevent other apps from also handling (ordered broadcast); default app can abort
+        abortBroadcast()
+    }
+
+    private fun postNotification(
+        context: Context,
+        address: String,
+        title: String,
+        body: String,
+        photoUri: String?
+    ) {
+        val channelId = "incoming_sms"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(NotificationManager::class.java)
+            if (nm.getNotificationChannel(channelId) == null) {
+                val ch = NotificationChannel(channelId, "Incoming SMS", NotificationManager.IMPORTANCE_DEFAULT)
+                ch.description = "Notifications for received SMS messages"
+                nm.createNotificationChannel(ch)
+            }
+        }
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(body.take(120))
+            .setAutoCancel(true)
+        val bmp = loadBitmap(context, photoUri)
+        if (bmp != null) builder.setLargeIcon(bmp)
+        NotificationManagerCompat.from(context).notify(address.hashCode(), builder.build())
+    }
+
+    private fun loadBitmap(context: Context, uriString: String?): android.graphics.Bitmap? {
+        if (uriString.isNullOrBlank()) return null
+        return try {
+            val uri = Uri.parse(uriString)
+            context.contentResolver.openInputStream(uri)?.use { input -> BitmapFactory.decodeStream(input) }
+        } catch (_: Exception) { null }
     }
 }

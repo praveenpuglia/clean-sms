@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
     <uses-permission android:name="android.permission.SEND_RESPOND_VIA_MESSAGE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -56,14 +57,7 @@
             </intent-filter>
         </service>
 
-        <receiver
-            android:name=".IncomingSmsReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter>
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </receiver>
+        <!-- IncomingSmsReceiver removed from manifest to avoid duplicate notifications; we rely on SMS_DELIVER -->
 
         <receiver
             android:name=".SmsDeliverReceiver"
