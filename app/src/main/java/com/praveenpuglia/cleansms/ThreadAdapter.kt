@@ -10,7 +10,7 @@ import java.text.DateFormat
 import java.util.*
 import androidx.core.net.toUri
 
-class ThreadAdapter(private val items: List<ThreadItem>) : RecyclerView.Adapter<ThreadAdapter.VH>() {
+class ThreadAdapter(private var items: List<ThreadItem>) : RecyclerView.Adapter<ThreadAdapter.VH>() {
 
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val avatarImage: ImageView = itemView.findViewById(R.id.thread_avatar_image)
@@ -73,4 +73,9 @@ class ThreadAdapter(private val items: List<ThreadItem>) : RecyclerView.Adapter<
     }
 
     override fun getItemCount(): Int = items.size
+
+    fun updateItems(newItems: List<ThreadItem>) {
+        items = newItems
+        notifyDataSetChanged()
+    }
 }

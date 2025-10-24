@@ -13,6 +13,21 @@
         android:visibility="gone"
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
+    <TextView
+        android:id="@+id/default_sms_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="This app is not set as the default SMS app."
+        android:visibility="gone"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <Button
+        android:id="@+id/set_default_sms_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Set as Default SMS"
+        android:visibility="gone" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/threads_recycler"
         android:layout_width="match_parent"

@@ -2,6 +2,9 @@ package com.praveenpuglia.cleansms
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
+import android.provider.Telephony
+import android.app.role.RoleManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
@@ -21,6 +24,39 @@ import java.util.LinkedHashMap
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        // Weak-ish reference for receiver to trigger refresh without leaking context
+        private var activeInstance: MainActivity? = null
+
+        fun refreshThreadsIfActive() {
+            activeInstance?.refreshThreadsAsync()
+        }
+        // Static helpers for receiver enrichment
+        fun isMobileNumberCandidateStatic(raw: String): Boolean = activeInstance?.isMobileNumberCandidate(raw) ?: false
+        fun lookupFromCache(raw: String): Pair<String?, String?>? {
+            val inst = activeInstance ?: return null
+            val keys = inst.candidateKeysForAddress(raw)
+            for (k in keys) {
+                val c = inst.contactLookupCache[k]
+                if (c != null) return c
+            }
+            return null
+        }
+        fun lookupFromIndex(raw: String): Pair<String?, String?>? {
+            val inst = activeInstance ?: return null
+            val idx = inst.bulkContactsIndex ?: return null
+            val keys = inst.candidateKeysForAddress(raw)
+            for (k in keys) {
+                val c = idx[k]
+                if (c != null) return c
+            }
+            return null
+        }
+    }
+    private val requestSmsRoleLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { _ ->
+        // Re-evaluate default status after user interaction
+        setupDefaultSmsUi()
+    }
 
     private val PERMISSION_REQUEST_CODE = 100
 
@@ -41,6 +77,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        setupDefaultSmsUi()
 
         if (hasReadPermission()) {
             showThreadsUi()
@@ -48,6 +85,96 @@ class MainActivity : AppCompatActivity() {
             showInstructionsUi()
             ActivityCompat.requestPermissions(this, requestedPermissions, PERMISSION_REQUEST_CODE)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        activeInstance = this
+        // Re-check after potential default change
+        setupDefaultSmsUi()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (activeInstance === this) activeInstance = null
+    }
+
+    private fun setupDefaultSmsUi() {
+        val telephonyDefault = Telephony.Sms.getDefaultSmsPackage(this)
+        val roleManager = getSystemService(RoleManager::class.java)
+        val roleHeld = try { roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true && roleManager.isRoleHeld(RoleManager.ROLE_SMS) } catch (_: Exception) { false }
+        val isDefault = DefaultSmsHelper.isDefaultSmsApp(this)
+        Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName}")
+        val defaultStatus = findViewById<TextView>(R.id.default_sms_status)
+        val setDefaultBtn = findViewById<View>(R.id.set_default_sms_button)
+        if (!isDefault) {
+            // Show prompt, hide threads until default is set
+            defaultStatus.visibility = View.VISIBLE
+            setDefaultBtn.visibility = View.VISIBLE
+            findViewById<RecyclerView>(R.id.threads_recycler).visibility = View.GONE
+            findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
+            defaultStatus.text = "This app is not the default SMS app. Tap below to set it as default."
+            setDefaultBtn.setOnClickListener {
+                try {
+                    val roleManager = getSystemService(RoleManager::class.java)
+                    if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
+                        val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
+                        requestSmsRoleLauncher.launch(intent)
+                    } else {
+                        val legacy = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+                        legacy.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+                        requestSmsRoleLauncher.launch(legacy)
+                    }
+                } catch (e: Exception) {
+                    Log.w("DefaultSms", "Role request failed: ${e.message}")
+                }
+            }
+        } else {
+            defaultStatus.visibility = View.GONE
+            setDefaultBtn.visibility = View.GONE
+            // Proceed with permission check/display
+            if (hasReadPermission()) {
+                showThreadsUi()
+            } else {
+                showInstructionsUi()
+                ActivityCompat.requestPermissions(this, requestedPermissions, PERMISSION_REQUEST_CODE)
+            }
+        }
+    }
+
+    private fun refreshThreadsAsync() {
+        // Lightweight refresh: reload threads and reapply enrichment; adapter swap on UI thread
+        Thread {
+            val threads = loadSmsThreads()
+            val index = bulkContactsIndex
+            val enriched = if (hasContactsPermission() && index != null) {
+                threads.map { t ->
+                    if (!isMobileNumberCandidate(t.nameOrAddress)) return@map t
+                    val candidateKeys = candidateKeysForAddress(t.nameOrAddress)
+                    var hit: Pair<String?, String?>? = null
+                    for (k in candidateKeys) {
+                        val cached = contactLookupCache[k]
+                        if (cached != null) { hit = cached; break }
+                        val idxHit = index[k]
+                        if (idxHit != null) {
+                            contactLookupCache[k] = idxHit
+                            hit = idxHit
+                            break
+                        }
+                    }
+                    if (hit != null) {
+                        val (name, photo) = hit
+                        if (name != null || photo != null) ThreadItem(t.threadId, t.nameOrAddress, t.date, t.snippet, name, photo) else t
+                    } else t
+                }
+            } else threads
+            runOnUiThread {
+                val recycler = findViewById<RecyclerView>(R.id.threads_recycler)
+                (recycler.adapter as? ThreadAdapter)?.updateItems(enriched) ?: run {
+                    recycler.adapter = ThreadAdapter(enriched)
+                }
+            }
+        }.start()
     }
 
     // Build a simple in-memory index mapping normalized keys to (name, photoUri)
