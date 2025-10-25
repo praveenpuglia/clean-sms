@@ -18,8 +18,12 @@ import java.util.Calendar
 class OtpMessageAdapter(
     private var items: List<OtpMessageItem>,
     private val onItemClick: (OtpMessageItem) -> Unit,
-    private val onAvatarClick: (OtpMessageItem) -> Unit
+    private val onAvatarClick: (OtpMessageItem) -> Unit,
+    private val onAvatarLongPress: (OtpMessageItem) -> Unit
 ) : RecyclerView.Adapter<OtpMessageAdapter.VH>() {
+
+    private var selectionMode: Boolean = false
+    private var selectedMessageIds: Set<Long> = emptySet()
 
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val avatarImage: ImageView = itemView.findViewById(R.id.otp_avatar_image)
@@ -31,6 +35,7 @@ class OtpMessageAdapter(
         val codeContainer: View = itemView.findViewById(R.id.otp_code_container)
         val otpCode: TextView = itemView.findViewById(R.id.otp_code)
         val divider: View = itemView.findViewById(R.id.otp_divider)
+        val selectionIcon: ImageView = itemView.findViewById(R.id.otp_avatar_selection_icon)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -42,8 +47,15 @@ class OtpMessageAdapter(
         val item = items[position]
 
         holder.itemView.setOnClickListener { onItemClick(item) }
+        val longPressListener = View.OnLongClickListener {
+            onAvatarLongPress(item)
+            true
+        }
+        holder.itemView.setOnLongClickListener(longPressListener)
+        holder.avatarText.setOnLongClickListener(longPressListener)
+        holder.avatarImage.setOnLongClickListener(longPressListener)
         holder.senderName.text = item.contactName ?: item.address
-    holder.senderName.setTypeface(null, if (item.isUnread) Typeface.BOLD else Typeface.NORMAL)
+        holder.senderName.setTypeface(null, if (item.isUnread) Typeface.BOLD else Typeface.NORMAL)
         holder.messageDate.text = formatHumanReadableDate(item.date)
         val preview = item.body.trim()
         holder.messagePreview.text = preview
@@ -54,8 +66,16 @@ class OtpMessageAdapter(
         holder.otpCode.visibility = if (hasCode) View.VISIBLE else View.GONE
         holder.codeContainer.visibility = if (hasCode) View.VISIBLE else View.GONE
         holder.unreadDot.visibility = if (item.isUnread) View.VISIBLE else View.GONE
-        holder.otpCode.isEnabled = hasCode
+    val codeEnabled = hasCode && !selectionMode
+    holder.otpCode.isEnabled = codeEnabled
+    holder.otpCode.isClickable = codeEnabled
+    holder.otpCode.isFocusable = codeEnabled
+    holder.codeContainer.isEnabled = !selectionMode
         holder.otpCode.setOnClickListener {
+            if (selectionMode) {
+                onItemClick(item)
+                return@setOnClickListener
+            }
             if (!hasCode) return@setOnClickListener
             val context = holder.itemView.context
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
@@ -64,21 +84,28 @@ class OtpMessageAdapter(
         }
 
         val canOpenContact = item.hasSavedContact
-        if (canOpenContact) {
-            val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
+        val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
+        if (selectionMode || canOpenContact) {
             holder.avatarText.setOnClickListener(avatarClickListener)
             holder.avatarImage.setOnClickListener(avatarClickListener)
         } else {
             holder.avatarText.setOnClickListener(null)
             holder.avatarImage.setOnClickListener(null)
         }
-        holder.avatarText.isClickable = canOpenContact
-        holder.avatarText.isFocusable = canOpenContact
-        holder.avatarImage.isClickable = canOpenContact
-        holder.avatarImage.isFocusable = canOpenContact
+        holder.avatarText.isClickable = selectionMode || canOpenContact
+        holder.avatarText.isFocusable = selectionMode || canOpenContact
+        holder.avatarImage.isClickable = selectionMode || canOpenContact
+        holder.avatarImage.isFocusable = selectionMode || canOpenContact
         holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
 
         bindAvatar(holder, item)
+
+        val isSelected = selectionMode && selectedMessageIds.contains(item.messageId)
+        val avatarAlpha = if (isSelected) 0.35f else 1f
+        holder.avatarImage.alpha = avatarAlpha
+        holder.avatarText.alpha = avatarAlpha
+        holder.selectionIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
+        holder.itemView.isActivated = isSelected
     }
 
     override fun getItemCount(): Int = items.size
@@ -86,6 +113,13 @@ class OtpMessageAdapter(
     fun updateItems(newItems: List<OtpMessageItem>) {
         items = newItems
         notifyDataSetChanged()
+    }
+
+    fun updateSelectionState(enabled: Boolean, selectedIds: Set<Long>) {
+        val changed = selectionMode != enabled || selectedMessageIds != selectedIds
+        selectionMode = enabled
+        selectedMessageIds = selectedIds.toSet()
+        if (changed) notifyDataSetChanged()
     }
 
     private fun bindAvatar(holder: VH, item: OtpMessageItem) {

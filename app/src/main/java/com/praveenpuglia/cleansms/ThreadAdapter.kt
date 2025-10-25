@@ -8,13 +8,18 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.net.toUri
 import androidx.recyclerview.widget.RecyclerView
+import com.praveenpuglia.cleansms.R
 import java.util.Calendar
 
 class ThreadAdapter(
     private var items: List<ThreadItem>,
     private val onItemClick: (ThreadItem) -> Unit,
-    private val onAvatarClick: (ThreadItem) -> Unit
+    private val onAvatarClick: (ThreadItem) -> Unit,
+    private val onAvatarLongPress: (ThreadItem) -> Unit
 ) : RecyclerView.Adapter<ThreadAdapter.VH>() {
+
+    private var selectionMode: Boolean = false
+    private var selectedThreadIds: Set<Long> = emptySet()
 
     private fun formatHumanReadableDate(timestamp: Long): String {
         val now = Calendar.getInstance()
@@ -59,6 +64,7 @@ class ThreadAdapter(
         val divider: View = itemView.findViewById(R.id.thread_divider)
         val unreadDot: View = itemView.findViewById(R.id.thread_unread_dot)
         val unreadBadge: TextView = itemView.findViewById(R.id.thread_unread_badge)
+        val selectionIcon: ImageView = itemView.findViewById(R.id.thread_avatar_selection_icon)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -70,6 +76,13 @@ class ThreadAdapter(
         val item = items[position]
 
         holder.itemView.setOnClickListener { onItemClick(item) }
+        val longPressListener = View.OnLongClickListener {
+            onAvatarLongPress(item)
+            true
+        }
+        holder.itemView.setOnLongClickListener(longPressListener)
+        holder.avatarText.setOnLongClickListener(longPressListener)
+        holder.avatarImage.setOnLongClickListener(longPressListener)
         holder.name.text = item.contactName ?: item.nameOrAddress
         holder.date.text = formatHumanReadableDate(item.date)
         holder.snippet.text = item.snippet
@@ -108,18 +121,25 @@ class ThreadAdapter(
         }
 
         val canOpenContact = item.hasSavedContact
-        if (canOpenContact) {
-            val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
+        val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
+        if (selectionMode || canOpenContact) {
             holder.avatarText.setOnClickListener(avatarClickListener)
             holder.avatarImage.setOnClickListener(avatarClickListener)
         } else {
             holder.avatarText.setOnClickListener(null)
             holder.avatarImage.setOnClickListener(null)
         }
-        holder.avatarText.isClickable = canOpenContact
-        holder.avatarText.isFocusable = canOpenContact
-        holder.avatarImage.isClickable = canOpenContact
-        holder.avatarImage.isFocusable = canOpenContact
+        holder.avatarText.isClickable = selectionMode || canOpenContact
+        holder.avatarText.isFocusable = selectionMode || canOpenContact
+        holder.avatarImage.isClickable = selectionMode || canOpenContact
+        holder.avatarImage.isFocusable = selectionMode || canOpenContact
+
+        val isSelected = selectionMode && selectedThreadIds.contains(item.threadId)
+    val avatarAlpha = if (isSelected) 0.35f else 1f
+    holder.avatarText.alpha = avatarAlpha
+    holder.avatarImage.alpha = avatarAlpha
+    holder.itemView.isActivated = isSelected
+    holder.selectionIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
     }
 
     override fun getItemCount(): Int = items.size
@@ -127,6 +147,13 @@ class ThreadAdapter(
     fun updateItems(newItems: List<ThreadItem>) {
         items = newItems
         notifyDataSetChanged()
+    }
+
+    fun updateSelectionState(enabled: Boolean, selectedIds: Set<Long>) {
+        val changed = selectionMode != enabled || selectedThreadIds != selectedIds
+        selectionMode = enabled
+        selectedThreadIds = selectedIds.toSet()
+        if (changed) notifyDataSetChanged()
     }
 
     private fun resolveAvatarLabel(contactName: String?, fallbackIdentifier: String): Pair<String, String> {

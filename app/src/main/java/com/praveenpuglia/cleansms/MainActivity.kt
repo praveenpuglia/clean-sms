@@ -3,6 +3,7 @@ package com.praveenpuglia.cleansms
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
+import android.content.ContentUris
 import android.provider.Telephony
 import android.app.role.RoleManager
 import android.database.Cursor
@@ -12,6 +13,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -28,6 +30,7 @@ import com.google.i18n.phonenumbers.NumberParseException
 import android.provider.ContactsContract
 import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import java.util.LinkedHashMap
@@ -109,6 +112,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var categoryTabs: TabLayout
     private lateinit var threadsPager: ViewPager2
     private lateinit var threadsPagerAdapter: ThreadCategoryPagerAdapter
+    private lateinit var headerTitle: TextView
+    private lateinit var deleteButton: ImageButton
     private var tabLayoutMediator: TabLayoutMediator? = null
     private val categories = listOf(
         MessageCategory.PERSONAL,
@@ -128,19 +133,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var selectionMode: Boolean = false
+    private val selectedThreadIds = LinkedHashSet<Long>()
+    private val selectedMessageIds = LinkedHashSet<Long>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         categoryTabs = findViewById(R.id.category_tabs)
         threadsPager = findViewById(R.id.threads_pager)
+        headerTitle = findViewById(R.id.header_title)
+        deleteButton = findViewById(R.id.header_delete_button)
         // TODO: Prevent initial OTP tab flicker during first load.
         threadsPagerAdapter = ThreadCategoryPagerAdapter(
             pagerPages,
-            onThreadClick = { threadItem -> openThreadDetail(threadItem) },
-            onThreadAvatarClick = { threadItem -> openContactFromThread(threadItem) },
-            onOtpClick = { otpItem -> openThreadDetailFromOtp(otpItem) },
-            onOtpAvatarClick = { otpItem -> openContactFromOtp(otpItem) }
+            onThreadClick = { threadItem -> handleThreadClick(threadItem) },
+            onThreadAvatarClick = { threadItem -> handleThreadAvatarClick(threadItem) },
+            onThreadAvatarLongPress = { threadItem -> startThreadSelection(threadItem) },
+            onOtpClick = { otpItem -> handleOtpClick(otpItem) },
+            onOtpAvatarClick = { otpItem -> handleOtpAvatarClick(otpItem) },
+            onOtpAvatarLongPress = { otpItem -> startOtpSelection(otpItem) }
         )
         threadsPager.adapter = threadsPagerAdapter
         threadsPager.registerOnPageChangeCallback(pageChangeCallback)
@@ -148,6 +161,9 @@ class MainActivity : AppCompatActivity() {
             tab.text = labelForPage(pagerPages[position])
         }.also { it.attach() }
         categoryTabs.visibility = View.GONE
+
+        deleteButton.setOnClickListener { confirmDeleteSelection() }
+        updateSelectionUi()
 
         setupDefaultSmsUi()
 
@@ -172,6 +188,14 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         if (activeInstance === this) activeInstance = null
+    }
+
+    override fun onBackPressed() {
+        if (selectionMode) {
+            exitSelectionMode()
+        } else {
+            super.onBackPressed()
+        }
     }
 
     override fun onDestroy() {
@@ -360,10 +384,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePagerContent(restorePageIndex: Int?) {
+        pruneSelection()
         val grouped = categories.associateWith { category ->
             allThreads.filter { it.category == category }
         }
         threadsPagerAdapter.updateAll(otpMessages, grouped)
+        updateSelectionUi()
         updateTabBadges()
         val restoreIndex = restorePageIndex
         if (restoreIndex != null && restoreIndex in pagerPages.indices) {
@@ -484,6 +510,198 @@ class MainActivity : AppCompatActivity() {
         openThreadDetail(threadItem, item.messageId)
     }
 
+    private fun handleThreadClick(item: ThreadItem) {
+        if (selectionMode) {
+            toggleThreadSelection(item)
+        } else {
+            openThreadDetail(item)
+        }
+    }
+
+    private fun handleThreadAvatarClick(item: ThreadItem) {
+        if (selectionMode) {
+            toggleThreadSelection(item)
+            return
+        }
+        if (item.hasSavedContact) {
+            openContactFromThread(item)
+        }
+    }
+
+    private fun handleOtpClick(item: OtpMessageItem) {
+        if (selectionMode) {
+            toggleOtpSelection(item)
+        } else {
+            openThreadDetailFromOtp(item)
+        }
+    }
+
+    private fun handleOtpAvatarClick(item: OtpMessageItem) {
+        if (selectionMode) {
+            toggleOtpSelection(item)
+            return
+        }
+        if (item.hasSavedContact) {
+            openContactFromOtp(item)
+        }
+    }
+
+    private fun startThreadSelection(item: ThreadItem) {
+        if (!selectionMode) {
+            selectionMode = true
+            selectedThreadIds.clear()
+            selectedMessageIds.clear()
+        }
+        selectedThreadIds.add(item.threadId)
+        updateSelectionUi()
+    }
+
+    private fun startOtpSelection(item: OtpMessageItem) {
+        if (!selectionMode) {
+            selectionMode = true
+            selectedThreadIds.clear()
+            selectedMessageIds.clear()
+        }
+        selectedMessageIds.add(item.messageId)
+        updateSelectionUi()
+    }
+
+    private fun toggleThreadSelection(item: ThreadItem) {
+        if (!selectionMode) {
+            startThreadSelection(item)
+            return
+        }
+        if (!selectedThreadIds.add(item.threadId)) {
+            selectedThreadIds.remove(item.threadId)
+        }
+        if (selectionMode && selectionCount() == 0) {
+            exitSelectionMode()
+        } else {
+            updateSelectionUi()
+        }
+    }
+
+    private fun toggleOtpSelection(item: OtpMessageItem) {
+        if (!selectionMode) {
+            startOtpSelection(item)
+            return
+        }
+        if (!selectedMessageIds.add(item.messageId)) {
+            selectedMessageIds.remove(item.messageId)
+        }
+        if (selectionMode && selectionCount() == 0) {
+            exitSelectionMode()
+        } else {
+            updateSelectionUi()
+        }
+    }
+
+    private fun selectionCount(): Int = selectedThreadIds.size + selectedMessageIds.size
+
+    private fun updateSelectionUi() {
+        if (!::headerTitle.isInitialized || !::deleteButton.isInitialized) return
+        val count = selectionCount()
+        if (selectionMode) {
+            headerTitle.text = getString(R.string.selection_count, count)
+            deleteButton.visibility = View.VISIBLE
+            deleteButton.isEnabled = count > 0
+        } else {
+            headerTitle.text = getString(R.string.header_messages)
+            deleteButton.visibility = View.GONE
+            deleteButton.isEnabled = false
+        }
+        if (::threadsPagerAdapter.isInitialized) {
+            threadsPagerAdapter.updateSelectionState(selectionMode, selectedThreadIds, selectedMessageIds)
+        }
+    }
+
+    private fun exitSelectionMode() {
+        if (!selectionMode && selectedThreadIds.isEmpty() && selectedMessageIds.isEmpty()) return
+        selectionMode = false
+        selectedThreadIds.clear()
+        selectedMessageIds.clear()
+        updateSelectionUi()
+    }
+
+    private fun confirmDeleteSelection() {
+        val totalSelected = selectionCount()
+        if (totalSelected == 0) {
+            exitSelectionMode()
+            return
+        }
+        val message = if (totalSelected == 1) {
+            getString(R.string.dialog_delete_message_single)
+        } else {
+            getString(R.string.dialog_delete_message_multiple, totalSelected)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_delete_title)
+            .setMessage(message)
+            .setNegativeButton(R.string.dialog_delete_negative, null)
+            .setPositiveButton(R.string.dialog_delete_positive) { _, _ -> performDeletion() }
+            .show()
+    }
+
+    private fun performDeletion() {
+        val threadIds = selectedThreadIds.toSet()
+        val messageIds = selectedMessageIds.toSet()
+        if (threadIds.isEmpty() && messageIds.isEmpty()) {
+            exitSelectionMode()
+            return
+        }
+        val messageToThread = otpMessages.associate { it.messageId to it.threadId }
+        val filteredMessageIds = messageIds.filter { id ->
+            val threadId = messageToThread[id]
+            threadId == null || !threadIds.contains(threadId)
+        }
+
+        Thread {
+            var deletedCount = 0
+            val resolver = contentResolver
+            threadIds.forEach { threadId ->
+                try {
+                    val uri = ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, threadId)
+                    val rows = resolver.delete(uri, null, null)
+                    if (rows > 0) deletedCount += rows
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Failed to delete thread $threadId: ${e.message}")
+                }
+            }
+            filteredMessageIds.forEach { messageId ->
+                try {
+                    val uri = ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, messageId)
+                    val rows = resolver.delete(uri, null, null)
+                    if (rows > 0) deletedCount += rows
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Failed to delete message $messageId: ${e.message}")
+                }
+            }
+            runOnUiThread {
+                val success = deletedCount > 0
+                exitSelectionMode()
+                if (success) {
+                    Toast.makeText(this, getString(R.string.toast_messages_deleted), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.toast_messages_delete_failed), Toast.LENGTH_SHORT).show()
+                }
+                refreshThreadsAsync()
+            }
+        }.start()
+    }
+
+    private fun pruneSelection(): Boolean {
+        var changed = false
+        val validThreadIds = allThreads.map { it.threadId }.toSet()
+        val validMessageIds = otpMessages.map { it.messageId }.toSet()
+        if (selectedThreadIds.retainAll(validThreadIds)) changed = true
+        if (selectedMessageIds.retainAll(validMessageIds)) changed = true
+        if (selectionMode && selectionCount() == 0) {
+            exitSelectionMode()
+            return true
+        }
+        return changed
+    }
+
     private fun openContactFromThread(item: ThreadItem) {
         if (!hasContactsPermission() || item.contactName.isNullOrBlank()) return
         openContactForAddress(item.contactLookupUri, item.nameOrAddress, item.contactName, item.contactPhotoUri)
@@ -592,6 +810,7 @@ class MainActivity : AppCompatActivity() {
             val parsed = phoneUtil.parse(rawAddress, defaultRegion)
             val e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
             if (e164.isNotBlank()) keys += e164
+
         } catch (_: Exception) {}
         val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(rawAddress).ifEmpty { rawAddress.replace(Regex("\\s+"), "") }
         if (normalized.isNotBlank()) keys += normalized
@@ -681,8 +900,10 @@ class MainActivity : AppCompatActivity() {
         private val pages: List<InboxPage>,
         private val onThreadClick: (ThreadItem) -> Unit,
         private val onThreadAvatarClick: (ThreadItem) -> Unit,
+        private val onThreadAvatarLongPress: (ThreadItem) -> Unit,
         private val onOtpClick: (OtpMessageItem) -> Unit,
-        private val onOtpAvatarClick: (OtpMessageItem) -> Unit
+        private val onOtpAvatarClick: (OtpMessageItem) -> Unit,
+        private val onOtpAvatarLongPress: (OtpMessageItem) -> Unit
     ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
         private val itemsByCategory = pages
@@ -692,10 +913,13 @@ class MainActivity : AppCompatActivity() {
         private var otpItems: List<OtpMessageItem> = emptyList()
         private val viewTypeOtp = 0
         private val viewTypeCategory = 1
+        private var selectionMode: Boolean = false
+        private var selectedThreadIds: Set<Long> = emptySet()
+        private var selectedOtpIds: Set<Long> = emptySet()
 
         private inner class CategoryPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val recycler: RecyclerView = itemView.findViewById(R.id.category_recycler)
-            private val adapter = ThreadAdapter(emptyList(), onThreadClick, onThreadAvatarClick)
+            private val adapter = ThreadAdapter(emptyList(), onThreadClick, onThreadAvatarClick, onThreadAvatarLongPress)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
             init {
@@ -717,12 +941,13 @@ class MainActivity : AppCompatActivity() {
 
             fun bind(category: MessageCategory) {
                 adapter.updateItems(itemsByCategory[category] ?: emptyList())
+                adapter.updateSelectionState(selectionMode, selectedThreadIds)
             }
         }
 
         private inner class OtpPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val recycler: RecyclerView = itemView.findViewById(R.id.otp_recycler)
-            private val adapter = OtpMessageAdapter(emptyList(), onOtpClick, onOtpAvatarClick)
+            private val adapter = OtpMessageAdapter(emptyList(), onOtpClick, onOtpAvatarClick, onOtpAvatarLongPress)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
             init {
@@ -744,6 +969,7 @@ class MainActivity : AppCompatActivity() {
 
             fun bind(items: List<OtpMessageItem>) {
                 adapter.updateItems(items)
+                adapter.updateSelectionState(selectionMode, selectedOtpIds)
             }
         }
 
@@ -781,6 +1007,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             notifyDataSetChanged()
+        }
+
+        fun updateSelectionState(selectionEnabled: Boolean, threadIds: Set<Long>, otpIds: Set<Long>) {
+            val threadCopy = threadIds.toSet()
+            val otpCopy = otpIds.toSet()
+            val changed = selectionMode != selectionEnabled || selectedThreadIds != threadCopy || selectedOtpIds != otpCopy
+            selectionMode = selectionEnabled
+            selectedThreadIds = threadCopy
+            selectedOtpIds = otpCopy
+            if (changed) notifyDataSetChanged()
         }
     }
 
