@@ -16,9 +16,6 @@ import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.TaskStackBuilder
-import androidx.core.content.ContextCompat
-import android.app.UiModeManager
-import android.content.res.Configuration
 import kotlin.math.absoluteValue
 import com.praveenpuglia.cleansms.R
 
@@ -54,9 +51,10 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         }
 
         // Enrich for notification
-    val enriched = ContactEnrichment.enrich(context, originatingAddress)
-    val displayName = enriched?.name ?: originatingAddress
-    val photoUri = enriched?.photoUri
+        val enriched = ContactEnrichment.enrich(context, originatingAddress)
+        val displayName = enriched?.name ?: originatingAddress
+        val photoUri = enriched?.photoUri
+        val lookupUri = enriched?.lookupUri
 
         val threadId = findOrCreateThreadId(context, originatingAddress)
         val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
@@ -69,6 +67,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             title = displayName,
             body = fullBody,
             photoUri = photoUri,
+            lookupUri = lookupUri,
             category = category,
             otpCode = otpCode
         )
@@ -87,6 +86,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         title: String,
         body: String,
         photoUri: String?,
+        lookupUri: String?,
         category: MessageCategory,
         otpCode: String?
     ) {
@@ -106,7 +106,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             address = address,
             displayName = title,
             photoUri = photoUri,
-            category = category
+            category = category,
+            lookupUri = lookupUri
         )
 
         val notificationId = address.hashCode()
@@ -153,24 +154,14 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         NotificationManagerCompat.from(context).notify(notificationId, builder.build())
     }
 
-    private fun isNightMode(context: Context): Boolean {
-        val uiModeManager = context.getSystemService(UiModeManager::class.java)
-        return when (uiModeManager?.nightMode) {
-            UiModeManager.MODE_NIGHT_YES -> true
-            UiModeManager.MODE_NIGHT_NO -> false
-            UiModeManager.MODE_NIGHT_AUTO ->
-                (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-            else -> (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        }
-    }
-
     private fun createThreadDetailPendingIntent(
         context: Context,
         threadId: Long,
         address: String,
         displayName: String?,
         photoUri: String?,
-        category: MessageCategory
+        category: MessageCategory,
+        lookupUri: String?
     ): PendingIntent {
         val detailIntent = Intent(context, ThreadDetailActivity::class.java).apply {
             putExtra("THREAD_ID", threadId)
@@ -178,6 +169,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             putExtra("CONTACT_ADDRESS", address)
             putExtra("CONTACT_PHOTO_URI", photoUri)
             putExtra("CATEGORY", category.name)
+            putExtra("CONTACT_LOOKUP_URI", lookupUri)
         }
 
         val stackBuilder = TaskStackBuilder.create(context).apply {

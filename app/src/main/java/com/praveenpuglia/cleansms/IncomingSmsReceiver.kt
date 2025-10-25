@@ -41,11 +41,12 @@ class IncomingSmsReceiver : BroadcastReceiver() {
     val enriched = ContactEnrichment.enrich(context, originatingAddress)
     val displayName = enriched?.name
     val photoUri = enriched?.photoUri
+    val lookupUri = enriched?.lookupUri
 
         val threadId = findOrCreateThreadId(context, originatingAddress)
         val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
 
-        showNotification(context, threadId, originatingAddress, displayName, photoUri, fullBody, category)
+    showNotification(context, threadId, originatingAddress, displayName, photoUri, lookupUri, fullBody, category)
 
         // Notify activity to refresh threads list
         MainActivity.refreshThreadsIfActive()
@@ -57,6 +58,7 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         address: String,
         name: String?,
         photoUri: String?,
+        lookupUri: String?,
         body: String,
         category: MessageCategory
     ) {
@@ -72,7 +74,8 @@ class IncomingSmsReceiver : BroadcastReceiver() {
             address = address,
             displayName = name,
             photoUri = photoUri,
-            category = category
+            category = category,
+            lookupUri = lookupUri
         )
 
         val builder = NotificationCompat.Builder(context, channelId)
@@ -94,6 +97,7 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         address: String,
         displayName: String?,
         photoUri: String?,
+        lookupUri: String?,
         category: MessageCategory
     ): PendingIntent {
         val detailIntent = Intent(context, ThreadDetailActivity::class.java).apply {
@@ -102,6 +106,7 @@ class IncomingSmsReceiver : BroadcastReceiver() {
             putExtra("CONTACT_ADDRESS", address)
             putExtra("CONTACT_PHOTO_URI", photoUri)
             putExtra("CATEGORY", category.name)
+            putExtra("CONTACT_LOOKUP_URI", lookupUri)
         }
 
         val mainIntent = Intent(context, MainActivity::class.java)

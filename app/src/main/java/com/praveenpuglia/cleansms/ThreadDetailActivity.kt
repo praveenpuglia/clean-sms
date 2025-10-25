@@ -32,10 +32,14 @@ class ThreadDetailActivity : AppCompatActivity() {
     private lateinit var messageInput: EditText
     private lateinit var sendButton: ImageButton
     private lateinit var composeBarContainer: View
+    private lateinit var avatarContainer: View
+    private lateinit var avatarImage: ImageView
+    private lateinit var avatarText: TextView
     private var threadId: Long = -1
     private var contactName: String? = null
     private var contactAddress: String? = null
     private var contactPhotoUri: String? = null
+    private var contactLookupUri: String? = null
     private var messageCategory: MessageCategory = MessageCategory.UNKNOWN
     private var targetMessageId: Long? = null
 
@@ -46,7 +50,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         threadId = intent.getLongExtra("THREAD_ID", -1)
         contactName = intent.getStringExtra("CONTACT_NAME")
         contactAddress = intent.getStringExtra("CONTACT_ADDRESS")
-        contactPhotoUri = intent.getStringExtra("CONTACT_PHOTO_URI")
+    contactPhotoUri = intent.getStringExtra("CONTACT_PHOTO_URI")
+    contactLookupUri = intent.getStringExtra("CONTACT_LOOKUP_URI")
         
         // Get category from intent
         val categoryName = intent.getStringExtra("CATEGORY")
@@ -80,30 +85,27 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         
         // Set up avatar - reuse same logic as ThreadAdapter
-        val avatarImage = findViewById<ImageView>(R.id.thread_detail_avatar_image)
-        val avatarText = findViewById<TextView>(R.id.thread_detail_avatar_text)
+        avatarContainer = findViewById(R.id.thread_detail_avatar_container)
+        avatarImage = findViewById(R.id.thread_detail_avatar_image)
+        avatarText = findViewById(R.id.thread_detail_avatar_text)
+
+        avatarContainer.setOnClickListener { openContactFromHeader() }
         
-        val photoUri = contactPhotoUri
-        if (!photoUri.isNullOrEmpty()) {
-            try {
-                avatarImage.setImageURI(photoUri.toUri())
-                avatarImage.visibility = android.view.View.VISIBLE
-                avatarText.visibility = android.view.View.GONE
-            } catch (_: Exception) {
-                // Fall through to initials
-                setAvatarInitials(avatarText, avatarImage)
-            }
-        } else {
-            setAvatarInitials(avatarText, avatarImage)
-        }
+        refreshAvatar()
         
         setupHeaderText()
     }
 
-    private fun setAvatarInitials(avatarText: TextView, avatarImage: ImageView) {
+    private fun setAvatarInitials() {
+        val label = when {
+            !contactName.isNullOrBlank() -> contactName!!.trim()
+            !contactAddress.isNullOrBlank() -> contactAddress!!.trim()
+            else -> "#"
+        }
+        val initial = label.firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
+        AvatarColorResolver.applyTo(avatarText, label)
         // Use contact name if available
         if (!contactName.isNullOrEmpty()) {
-            val initial = contactName!!.trim().firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
             avatarText.text = initial
             avatarText.visibility = android.view.View.VISIBLE
             avatarImage.visibility = android.view.View.GONE
@@ -122,7 +124,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
 
         // Final fallback for phone numbers
-        avatarText.text = "#"
+        avatarText.text = initial
         avatarText.visibility = android.view.View.VISIBLE
         avatarImage.visibility = android.view.View.GONE
     }
@@ -161,6 +163,80 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         messageAdapter = MessageAdapter(emptyList())
         messagesRecycler.adapter = messageAdapter
+    }
+
+    private fun hasContactsPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun openContactFromHeader() {
+        val address = contactAddress
+        if (address.isNullOrBlank()) {
+            Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!hasContactsPermission()) {
+            Toast.makeText(this, getString(R.string.toast_contact_permission_required), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val existingUri = contactLookupUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        if (existingUri != null) {
+            launchContactIntent(existingUri)
+            return
+        }
+
+        val cachedInfo = MainActivity.lookupFromCache(address)
+            ?: MainActivity.lookupFromIndex(address)
+            ?: ContactEnrichment.enrich(this, address)
+
+        if (cachedInfo != null) {
+            var shouldRefreshAvatar = false
+            if (!cachedInfo.name.isNullOrBlank() && cachedInfo.name != contactName) {
+                contactName = cachedInfo.name
+                setupHeaderText()
+                shouldRefreshAvatar = true
+            }
+            if (!cachedInfo.photoUri.isNullOrBlank() && cachedInfo.photoUri != contactPhotoUri) {
+                contactPhotoUri = cachedInfo.photoUri
+                shouldRefreshAvatar = true
+            }
+            if (shouldRefreshAvatar) {
+                refreshAvatar()
+            }
+        }
+
+        val resolvedUri = cachedInfo?.lookupUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        if (resolvedUri != null) {
+            contactLookupUri = resolvedUri.toString()
+            launchContactIntent(resolvedUri)
+        } else {
+            Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun refreshAvatar() {
+        val photoUri = contactPhotoUri
+        if (!photoUri.isNullOrEmpty()) {
+            try {
+                avatarImage.setImageURI(photoUri.toUri())
+                avatarImage.visibility = View.VISIBLE
+                avatarText.visibility = View.GONE
+                return
+            } catch (_: Exception) {
+                // Ignore and fall back to initials
+            }
+        }
+        setAvatarInitials()
+    }
+
+    private fun launchContactIntent(contactUri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, contactUri)
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun setupComposeBar() {

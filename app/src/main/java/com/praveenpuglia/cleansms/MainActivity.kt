@@ -451,6 +451,7 @@ class MainActivity : AppCompatActivity() {
             putExtra("CONTACT_NAME", threadItem.contactName)
             putExtra("CONTACT_ADDRESS", threadItem.nameOrAddress)
             putExtra("CONTACT_PHOTO_URI", threadItem.contactPhotoUri)
+            putExtra("CONTACT_LOOKUP_URI", threadItem.contactLookupUri)
             putExtra("CATEGORY", threadItem.category.name)
             if (targetMessageId != null) {
                 putExtra("TARGET_MESSAGE_ID", targetMessageId)
