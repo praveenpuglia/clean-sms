@@ -11,7 +11,8 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:elevation="4dp"
+        android:background="?android:attr/colorBackground"
+        android:elevation="3dp"
         android:fitsSystemWindows="true">
 
         <LinearLayout
@@ -106,6 +107,12 @@
                 android:visibility="gone" />
 
         </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_gravity="bottom"
+            android:background="?attr/colorOutlineVariant" />
 
     </FrameLayout>
 

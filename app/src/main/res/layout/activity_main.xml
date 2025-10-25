@@ -12,7 +12,8 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:elevation="4dp"
+        android:background="?android:attr/colorBackground"
+        android:elevation="3dp"
         android:fitsSystemWindows="false">
 
         <LinearLayout
@@ -30,6 +31,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.015"
+                android:paddingStart="8dp"
                 android:text="Messages"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textSize="28sp"
@@ -49,6 +51,12 @@
                 app:tabMode="scrollable" />
 
         </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_gravity="bottom"
+            android:background="?attr/colorOutlineVariant" />
     </FrameLayout>
 
     <!-- Content Area -->
