@@ -12,6 +12,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.net.toUri
 import androidx.recyclerview.widget.RecyclerView
+import com.praveenpuglia.cleansms.R
 import java.util.Calendar
 
 class OtpMessageAdapter(
@@ -22,10 +23,11 @@ class OtpMessageAdapter(
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val avatarImage: ImageView = itemView.findViewById(R.id.otp_avatar_image)
         val avatarText: TextView = itemView.findViewById(R.id.otp_avatar_text)
+        val unreadDot: View = itemView.findViewById(R.id.otp_unread_dot)
         val senderName: TextView = itemView.findViewById(R.id.otp_sender_name)
         val messageDate: TextView = itemView.findViewById(R.id.otp_message_date)
         val messagePreview: TextView = itemView.findViewById(R.id.otp_message_preview)
-    val codeContainer: View = itemView.findViewById(R.id.otp_code_container)
+        val codeContainer: View = itemView.findViewById(R.id.otp_code_container)
         val otpCode: TextView = itemView.findViewById(R.id.otp_code)
         val copyButton: ImageButton = itemView.findViewById(R.id.otp_copy_button)
         val divider: View = itemView.findViewById(R.id.otp_divider)
@@ -52,6 +54,7 @@ class OtpMessageAdapter(
         holder.copyButton.visibility = if (hasCode) View.VISIBLE else View.GONE
         holder.copyButton.isEnabled = hasCode
         holder.codeContainer.visibility = if (hasCode) View.VISIBLE else View.GONE
+        holder.unreadDot.visibility = if (item.isUnread) View.VISIBLE else View.GONE
         holder.copyButton.setOnClickListener {
             if (!hasCode) return@setOnClickListener
             val context = holder.itemView.context

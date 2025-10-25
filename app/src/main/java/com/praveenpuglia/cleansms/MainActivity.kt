@@ -25,6 +25,8 @@ import androidx.viewpager2.widget.ViewPager2
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import com.google.i18n.phonenumbers.NumberParseException
 import android.provider.ContactsContract
+import com.google.android.material.badge.BadgeDrawable
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import java.util.LinkedHashMap
@@ -157,7 +159,10 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         activeInstance = this
         // Re-check after potential default change
-    setupDefaultSmsUi()
+        setupDefaultSmsUi()
+        if (hasReadPermission()) {
+            refreshThreadsAsync()
+        }
     }
 
     override fun onPause() {
@@ -342,6 +347,7 @@ class MainActivity : AppCompatActivity() {
             allThreads.filter { it.category == category }
         }
         threadsPagerAdapter.updateAll(otpMessages, grouped)
+        updateTabBadges()
         val restoreIndex = restorePageIndex
         if (restoreIndex != null && restoreIndex in pagerPages.indices) {
             if (threadsPager.currentItem != restoreIndex) {
@@ -381,6 +387,32 @@ class MainActivity : AppCompatActivity() {
             threadsPager.setCurrentItem(desiredIndex, false)
         }
         initialPageApplied = true
+    }
+
+    private fun updateTabBadges() {
+        if (categoryTabs.tabCount != pagerPages.size) return
+        for (index in pagerPages.indices) {
+            val tab = categoryTabs.getTabAt(index) ?: continue
+            val hasUnread = when (val page = pagerPages[index]) {
+                is InboxPage.Otp -> otpMessages.any { it.isUnread }
+                is InboxPage.CategoryPage -> allThreads.any { it.category == page.category && it.hasUnread }
+            }
+            if (hasUnread) {
+                val badge = tab.orCreateBadge
+                val fallbackColor = ContextCompat.getColor(this, R.color.md_theme_light_error)
+                val badgeColor = MaterialColors.getColor(
+                    categoryTabs,
+                    com.google.android.material.R.attr.colorError,
+                    fallbackColor
+                )
+                badge.backgroundColor = badgeColor
+                if (badge.hasNumber()) badge.clearNumber()
+                badge.badgeGravity = BadgeDrawable.TOP_END
+                badge.isVisible = true
+            } else {
+                tab.removeBadge()
+            }
+        }
     }
 
     private fun labelForCategory(category: MessageCategory): String = when (category) {
@@ -650,16 +682,18 @@ class MainActivity : AppCompatActivity() {
      */
     private fun loadSmsThreads(): List<ThreadItem> {
         val uri: Uri = "content://sms".toUri()
-        val projection = arrayOf("thread_id", "address", "date", "body")
+        val projection = arrayOf("thread_id", "address", "date", "body", "read")
         val sortOrder = "date DESC"
         val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
         val map = LinkedHashMap<Long, ThreadItem>()
+        val unreadCounts = mutableMapOf<Long, Int>()
 
         cursor?.use { c ->
             val idxThread = c.getColumnIndex("thread_id")
             val idxAddress = c.getColumnIndex("address")
             val idxDate = c.getColumnIndex("date")
             val idxBody = c.getColumnIndex("body")
+            val idxRead = c.getColumnIndex("read")
 
             while (c.moveToNext()) {
                 val threadId = if (idxThread >= 0) c.getLong(idxThread) else -1L
@@ -673,15 +707,22 @@ class MainActivity : AppCompatActivity() {
                     
                     map[threadId] = ThreadItem(threadId, address, date, body, category = category)
                 }
+                val isUnread = idxRead >= 0 && c.getInt(idxRead) == 0
+                if (isUnread) {
+                    unreadCounts[threadId] = (unreadCounts[threadId] ?: 0) + 1
+                }
             }
         }
 
-        return map.values.toList()
+        return map.values.map { item ->
+            val unread = unreadCounts[item.threadId] ?: 0
+            if (unread > 0) item.copy(unreadCount = unread) else item
+        }
     }
 
     private fun loadOtpMessages(): List<OtpMessageItem> {
         val uri: Uri = "content://sms".toUri()
-        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type")
+    val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read")
         val selection = "type = ?"
         val selectionArgs = arrayOf("1") // Inbox / received messages
         val sortOrder = "date DESC"
@@ -694,6 +735,7 @@ class MainActivity : AppCompatActivity() {
             val idxAddress = cursor.getColumnIndex("address")
             val idxBody = cursor.getColumnIndex("body")
             val idxDate = cursor.getColumnIndex("date")
+            val idxRead = cursor.getColumnIndex("read")
 
             while (cursor.moveToNext() && results.size < otpFetchLimit) {
                 val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
@@ -705,6 +747,7 @@ class MainActivity : AppCompatActivity() {
                         cursor.getString(idxAddress)?.takeIf { it.isNotBlank() } ?: "Unknown"
                     } else "Unknown"
                     val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
+                    val isRead = idxRead >= 0 && cursor.getInt(idxRead) != 0
                     if (messageId != -1L && threadId != -1L) {
                         results.add(
                             OtpMessageItem(
@@ -713,7 +756,8 @@ class MainActivity : AppCompatActivity() {
                                 address = address,
                                 body = body,
                                 date = date,
-                                otpCode = otpCode
+                                otpCode = otpCode,
+                                isRead = isRead
                             )
                         )
                     }

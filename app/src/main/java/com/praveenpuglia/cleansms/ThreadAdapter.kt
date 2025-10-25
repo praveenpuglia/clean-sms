@@ -56,6 +56,8 @@ class ThreadAdapter(
         val date: TextView = itemView.findViewById(R.id.thread_date)
         val snippet: TextView = itemView.findViewById(R.id.thread_snippet)
         val divider: View = itemView.findViewById(R.id.thread_divider)
+        val unreadDot: View = itemView.findViewById(R.id.thread_unread_dot)
+        val unreadBadge: TextView = itemView.findViewById(R.id.thread_unread_badge)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -73,6 +75,16 @@ class ThreadAdapter(
         holder.date.text = formatHumanReadableDate(item.date)
         holder.snippet.text = item.snippet
     holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
+
+        val unreadCount = item.unreadCount
+        val hasUnread = unreadCount > 0
+        holder.unreadDot.visibility = if (hasUnread) View.VISIBLE else View.GONE
+        if (hasUnread) {
+            holder.unreadBadge.visibility = View.VISIBLE
+            holder.unreadBadge.text = unreadCount.toString()
+        } else {
+            holder.unreadBadge.visibility = View.GONE
+        }
 
         // If MainActivity enriched with photoUri/name, use them
         val photo = item.contactPhotoUri

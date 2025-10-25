@@ -233,6 +233,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private fun loadMessages() {
         Thread {
             val messages = queryMessagesForThread(threadId)
+            markThreadAsRead(threadId)
             runOnUiThread {
                 messageAdapter.updateMessages(messages)
                 val targetId = targetMessageId
@@ -323,5 +324,22 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
         return messages
+    }
+
+    private fun markThreadAsRead(threadId: Long) {
+        try {
+            val values = ContentValues().apply {
+                put(Telephony.Sms.READ, 1)
+            }
+            contentResolver.update(
+                Telephony.Sms.Inbox.CONTENT_URI,
+                values,
+                "thread_id = ? AND read = 0",
+                arrayOf(threadId.toString())
+            )
+            MainActivity.refreshThreadsIfActive()
+        } catch (e: Exception) {
+            android.util.Log.w("ThreadDetailActivity", "Failed to mark thread read: ${e.message}")
+        }
     }
 }

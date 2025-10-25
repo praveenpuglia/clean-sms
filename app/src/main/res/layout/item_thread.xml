@@ -37,6 +37,16 @@
             android:background="@drawable/avatar_bg"
             android:visibility="visible" />
 
+        <View
+            android:id="@+id/thread_unread_dot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_gravity="top|end"
+            android:layout_marginEnd="2dp"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/bg_unread_dot"
+            android:visibility="gone" />
+
     </FrameLayout>
 
     <LinearLayout
@@ -71,14 +81,39 @@
 
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/thread_snippet"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="?android:attr/textColorSecondary"
-            android:ellipsize="end"
-            android:maxLines="2" />
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/thread_snippet"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:textColor="?android:attr/textColorSecondary"
+                android:ellipsize="end"
+                android:maxLines="2" />
+
+            <TextView
+                android:id="@+id/thread_unread_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_unread_pill"
+                android:paddingStart="8dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="2dp"
+                android:textColor="?attr/colorOnErrorContainer"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

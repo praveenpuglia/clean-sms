@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/windowBackground"
@@ -33,7 +34,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Back"
                 android:src="@drawable/ic_arrow_back"
-                android:tint="?android:attr/textColorPrimary" />
+                app:tint="?android:attr/textColorPrimary" />
 
             <FrameLayout
                 android:layout_width="40dp"
@@ -103,8 +104,8 @@
                 android:padding="8dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_call"
-                android:tint="?android:attr/textColorPrimary"
-                android:visibility="gone" />
+                android:visibility="gone"
+                app:tint="?android:attr/textColorPrimary" />
 
         </LinearLayout>
 
@@ -168,7 +169,8 @@
                     android:layout_height="wrap_content"
                     android:inputType="textCapSentences|textMultiLine"
                     android:maxLines="4"
-                    android:textSize="16sp" />
+                    android:textSize="16sp"
+                    tools:ignore="VisualLintTextFieldSize" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
