@@ -9,19 +9,24 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import com.google.i18n.phonenumbers.NumberParseException
 import android.provider.ContactsContract
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import java.util.LinkedHashMap
 import java.util.Locale
 
@@ -92,9 +97,42 @@ class MainActivity : AppCompatActivity() {
     private var selectedCategory: MessageCategory = MessageCategory.PERSONAL
     private var allThreads: List<ThreadItem> = emptyList()
 
+    private lateinit var categoryTabs: TabLayout
+    private lateinit var threadsPager: ViewPager2
+    private lateinit var threadsPagerAdapter: ThreadCategoryPagerAdapter
+    private var tabLayoutMediator: TabLayoutMediator? = null
+    private val categories = listOf(
+        MessageCategory.PERSONAL,
+        MessageCategory.TRANSACTIONAL,
+        MessageCategory.SERVICE,
+        MessageCategory.PROMOTIONAL,
+        MessageCategory.GOVERNMENT
+    )
+    private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            super.onPageSelected(position)
+            selectedCategory = categories.getOrElse(position) { MessageCategory.PERSONAL }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        categoryTabs = findViewById(R.id.category_tabs)
+        threadsPager = findViewById(R.id.threads_pager)
+        threadsPagerAdapter = ThreadCategoryPagerAdapter(categories) { threadItem ->
+            openThreadDetail(threadItem)
+        }
+        threadsPager.adapter = threadsPagerAdapter
+        threadsPager.registerOnPageChangeCallback(pageChangeCallback)
+        tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager) { tab, position ->
+            tab.text = labelForCategory(categories[position])
+        }.also { it.attach() }
+        val initialIndex = categories.indexOf(selectedCategory).coerceAtLeast(0)
+        threadsPager.setCurrentItem(initialIndex, false)
+        categoryTabs.visibility = View.GONE
+
         setupDefaultSmsUi()
 
         if (hasReadPermission()) {
@@ -117,6 +155,12 @@ class MainActivity : AppCompatActivity() {
         if (activeInstance === this) activeInstance = null
     }
 
+    override fun onDestroy() {
+        tabLayoutMediator?.detach()
+        threadsPager.unregisterOnPageChangeCallback(pageChangeCallback)
+        super.onDestroy()
+    }
+
     private fun setupDefaultSmsUi() {
         val telephonyDefault = Telephony.Sms.getDefaultSmsPackage(this)
         val roleManager = getSystemService(RoleManager::class.java)
@@ -129,7 +173,8 @@ class MainActivity : AppCompatActivity() {
             // Show prompt, hide threads until default is set
             defaultStatus.visibility = View.VISIBLE
             setDefaultBtn.visibility = View.VISIBLE
-            findViewById<RecyclerView>(R.id.threads_recycler).visibility = View.GONE
+            categoryTabs.visibility = View.GONE
+            threadsPager.visibility = View.GONE
             findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
             defaultStatus.text = "This app is not the default SMS app. Tap below to set it as default."
             setDefaultBtn.setOnClickListener {
@@ -190,7 +235,7 @@ class MainActivity : AppCompatActivity() {
             } else threads
             runOnUiThread {
                 allThreads = enriched
-                displayFilteredThreads()
+                updateCategoryPages()
             }
         }.start()
     }
@@ -239,25 +284,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun showThreadsUi() {
         findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
-        val recycler = findViewById<RecyclerView>(R.id.threads_recycler)
-        recycler.visibility = View.VISIBLE
-        recycler.layoutManager = LinearLayoutManager(this)
-        recycler.clipToPadding = false
-        val baseBottomPadding = resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
-        ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(
-                view.paddingLeft,
-                view.paddingTop,
-                view.paddingRight,
-                baseBottomPadding + systemBars.bottom
-            )
-            insets
-        }
-        ViewCompat.requestApplyInsets(recycler)
-
-        // Setup category filter pills
-        setupCategoryPills()
+        categoryTabs.visibility = View.VISIBLE
+        threadsPager.visibility = View.VISIBLE
+        ViewCompat.requestApplyInsets(threadsPager)
 
         // Load threads and enrich contacts off the main thread to avoid jank
         Thread {
@@ -301,58 +330,29 @@ class MainActivity : AppCompatActivity() {
 
             runOnUiThread {
                 allThreads = enriched
-                displayFilteredThreads()
+                updateCategoryPages()
             }
         }.start()
     }
 
-    private fun setupCategoryPills() {
-        val pillPersonal = findViewById<TextView>(R.id.pill_personal)
-        val pillTransactions = findViewById<TextView>(R.id.pill_transactions)
-        val pillService = findViewById<TextView>(R.id.pill_service)
-        val pillPromotions = findViewById<TextView>(R.id.pill_promotions)
-        val pillGovernment = findViewById<TextView>(R.id.pill_government)
-
-        val pills = listOf(
-            Pair(pillPersonal, MessageCategory.PERSONAL),
-            Pair(pillTransactions, MessageCategory.TRANSACTIONAL),
-            Pair(pillService, MessageCategory.SERVICE),
-            Pair(pillPromotions, MessageCategory.PROMOTIONAL),
-            Pair(pillGovernment, MessageCategory.GOVERNMENT)
-        )
-
-        pills.forEach { (pill, category) ->
-            pill.setOnClickListener {
-                selectedCategory = category
-                updatePillSelection(pills)
-                displayFilteredThreads()
-            }
+    private fun updateCategoryPages() {
+        val grouped = categories.associateWith { category ->
+            allThreads.filter { it.category == category }
         }
-
-        // Set initial selection
-        updatePillSelection(pills)
-    }
-
-    private fun updatePillSelection(pills: List<Pair<TextView, MessageCategory>>) {
-        pills.forEach { (pill, category) ->
-            if (category == selectedCategory) {
-                pill.setBackgroundResource(R.drawable.pill_background_selected)
-                pill.setTextAppearance(android.R.style.TextAppearance_Small)
-                pill.setTypeface(null, android.graphics.Typeface.BOLD)
-            } else {
-                pill.setBackgroundResource(R.drawable.pill_background)
-                pill.setTextAppearance(android.R.style.TextAppearance_Small)
-                pill.setTypeface(null, android.graphics.Typeface.NORMAL)
-            }
+        threadsPagerAdapter.updateAll(grouped)
+        val desiredIndex = categories.indexOf(selectedCategory).coerceAtLeast(0)
+        if (threadsPager.currentItem != desiredIndex) {
+            threadsPager.setCurrentItem(desiredIndex, false)
         }
     }
 
-    private fun displayFilteredThreads() {
-        val filtered = allThreads.filter { it.category == selectedCategory }
-        val recycler = findViewById<RecyclerView>(R.id.threads_recycler)
-        recycler.adapter = ThreadAdapter(filtered) { threadItem ->
-            openThreadDetail(threadItem)
-        }
+    private fun labelForCategory(category: MessageCategory): String = when (category) {
+        MessageCategory.PERSONAL -> getString(R.string.category_personal)
+        MessageCategory.TRANSACTIONAL -> getString(R.string.category_transactions)
+        MessageCategory.SERVICE -> getString(R.string.category_service)
+        MessageCategory.PROMOTIONAL -> getString(R.string.category_promotions)
+        MessageCategory.GOVERNMENT -> getString(R.string.category_government)
+        MessageCategory.UNKNOWN -> getString(R.string.category_unknown)
     }
 
     private fun openThreadDetail(threadItem: ThreadItem) {
@@ -448,7 +448,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showInstructionsUi() {
         findViewById<TextView>(R.id.permission_instructions).visibility = View.VISIBLE
-        findViewById<RecyclerView>(R.id.threads_recycler).visibility = View.GONE
+        categoryTabs.visibility = View.GONE
+        threadsPager.visibility = View.GONE
     }
 
     private fun hasReadPermission(): Boolean {
@@ -467,6 +468,61 @@ class MainActivity : AppCompatActivity() {
             } else {
                 showInstructionsUi()
             }
+        }
+    }
+
+    private inner class ThreadCategoryPagerAdapter(
+        private val categories: List<MessageCategory>,
+        private val onItemClick: (ThreadItem) -> Unit
+    ) : RecyclerView.Adapter<ThreadCategoryPagerAdapter.PageViewHolder>() {
+
+        private val itemsByCategory = categories.associateWith { emptyList<ThreadItem>() }.toMutableMap()
+
+        inner class PageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+            private val recycler: RecyclerView = itemView.findViewById(R.id.category_recycler)
+            private val adapter = ThreadAdapter(emptyList(), onItemClick)
+            private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
+
+            init {
+                recycler.layoutManager = LinearLayoutManager(itemView.context)
+                recycler.adapter = adapter
+                recycler.clipToPadding = false
+                ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
+                    val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                    view.setPadding(
+                        view.paddingLeft,
+                        view.paddingTop,
+                        view.paddingRight,
+                        baseBottomPadding + systemInsets.bottom
+                    )
+                    insets
+                }
+                ViewCompat.requestApplyInsets(recycler)
+            }
+
+            fun bind(category: MessageCategory) {
+                adapter.updateItems(itemsByCategory[category] ?: emptyList())
+            }
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.page_thread_list, parent, false)
+            return PageViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: PageViewHolder, position: Int) {
+            holder.bind(categories[position])
+        }
+
+        override fun getItemCount(): Int = categories.size
+
+        fun updateAll(grouped: Map<MessageCategory, List<ThreadItem>>) {
+            grouped.forEach { (category, items) ->
+                if (categories.contains(category)) {
+                    itemsByCategory[category] = items
+                }
+            }
+            notifyDataSetChanged()
         }
     }
 
