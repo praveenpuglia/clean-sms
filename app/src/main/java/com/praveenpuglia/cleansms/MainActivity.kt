@@ -130,6 +130,7 @@ class MainActivity : AppCompatActivity() {
 
         categoryTabs = findViewById(R.id.category_tabs)
         threadsPager = findViewById(R.id.threads_pager)
+        // TODO: Prevent initial OTP tab flicker during first load.
         threadsPagerAdapter = ThreadCategoryPagerAdapter(
             pagerPages,
             onThreadClick = { threadItem -> openThreadDetail(threadItem) },
@@ -140,10 +141,6 @@ class MainActivity : AppCompatActivity() {
         tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager) { tab, position ->
             tab.text = labelForPage(pagerPages[position])
         }.also { it.attach() }
-        val initialIndex = pagerPages.indexOfFirst { page ->
-            page is InboxPage.CategoryPage && page.category == selectedCategory
-        }.takeIf { it >= 0 } ?: 0
-        threadsPager.setCurrentItem(initialIndex, false)
         categoryTabs.visibility = View.GONE
 
         setupDefaultSmsUi()
@@ -223,6 +220,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun reloadInboxData() {
+        val restorePageIndex = if (initialPageApplied) threadsPager.currentItem else null
         Thread {
             val threads = loadSmsThreads()
             val otpRaw = loadOtpMessages()
@@ -265,7 +263,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 allThreads = enrichedThreads
                 otpMessages = enrichedOtp
-                updatePagerContent()
+                updatePagerContent(restorePageIndex)
                 applyInitialPageIfNeeded()
             }
         }.start()
@@ -336,15 +334,24 @@ class MainActivity : AppCompatActivity() {
         categoryTabs.visibility = View.VISIBLE
         threadsPager.visibility = View.VISIBLE
         ViewCompat.requestApplyInsets(threadsPager)
-        initialPageApplied = false
         reloadInboxData()
     }
 
-    private fun updatePagerContent() {
+    private fun updatePagerContent(restorePageIndex: Int?) {
         val grouped = categories.associateWith { category ->
             allThreads.filter { it.category == category }
         }
         threadsPagerAdapter.updateAll(otpMessages, grouped)
+        val restoreIndex = restorePageIndex
+        if (restoreIndex != null && restoreIndex in pagerPages.indices) {
+            if (threadsPager.currentItem != restoreIndex) {
+                threadsPager.setCurrentItem(restoreIndex, false)
+            }
+            return
+        }
+        if (!initialPageApplied) {
+            return
+        }
         val desiredIndex = pagerPages.indexOfFirst { page ->
             page is InboxPage.CategoryPage && page.category == selectedCategory
         }
