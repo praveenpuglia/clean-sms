@@ -92,10 +92,13 @@ class MainActivity : AppCompatActivity() {
     private var bulkContactsIndex: Map<String, Pair<String?, String?>>? = null
     private val phoneUtil = PhoneNumberUtil.getInstance()
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
+    private val otpRegex = Regex("\\b\\d{4,8}\\b")
+    private val otpFetchLimit = 200
     
     // Category filtering state
     private var selectedCategory: MessageCategory = MessageCategory.PERSONAL
     private var allThreads: List<ThreadItem> = emptyList()
+    private var otpMessages: List<OtpMessageItem> = emptyList()
 
     private lateinit var categoryTabs: TabLayout
     private lateinit var threadsPager: ViewPager2
@@ -108,10 +111,14 @@ class MainActivity : AppCompatActivity() {
         MessageCategory.PROMOTIONAL,
         MessageCategory.GOVERNMENT
     )
+    private val pagerPages: List<InboxPage> = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) }
     private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
             super.onPageSelected(position)
-            selectedCategory = categories.getOrElse(position) { MessageCategory.PERSONAL }
+            val page = pagerPages.getOrNull(position)
+            if (page is InboxPage.CategoryPage) {
+                selectedCategory = page.category
+            }
         }
     }
 
@@ -121,15 +128,19 @@ class MainActivity : AppCompatActivity() {
 
         categoryTabs = findViewById(R.id.category_tabs)
         threadsPager = findViewById(R.id.threads_pager)
-        threadsPagerAdapter = ThreadCategoryPagerAdapter(categories) { threadItem ->
-            openThreadDetail(threadItem)
-        }
+        threadsPagerAdapter = ThreadCategoryPagerAdapter(
+            pagerPages,
+            onThreadClick = { threadItem -> openThreadDetail(threadItem) },
+            onOtpClick = { otpItem -> openThreadDetailFromOtp(otpItem) }
+        )
         threadsPager.adapter = threadsPagerAdapter
         threadsPager.registerOnPageChangeCallback(pageChangeCallback)
         tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager) { tab, position ->
-            tab.text = labelForCategory(categories[position])
+            tab.text = labelForPage(pagerPages[position])
         }.also { it.attach() }
-        val initialIndex = categories.indexOf(selectedCategory).coerceAtLeast(0)
+        val initialIndex = pagerPages.indexOfFirst { page ->
+            page is InboxPage.CategoryPage && page.category == selectedCategory
+        }.takeIf { it >= 0 } ?: 0
         threadsPager.setCurrentItem(initialIndex, false)
         categoryTabs.visibility = View.GONE
 
@@ -206,25 +217,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshThreadsAsync() {
-        // Lightweight refresh: reload threads and reapply enrichment; adapter swap on UI thread
+        reloadInboxData()
+    }
+
+    private fun reloadInboxData() {
         Thread {
             val threads = loadSmsThreads()
+            val otpRaw = loadOtpMessages()
+
+            if (hasContactsPermission() && bulkContactsIndex == null) {
+                try {
+                    bulkContactsIndex = buildContactsIndex()
+                    Log.d("ContactLookup", "Built bulk contacts index with ${bulkContactsIndex?.size ?: 0} entries")
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "failed to build contacts index: ${e.message}")
+                }
+            }
+
             val index = bulkContactsIndex
-            val enriched = if (hasContactsPermission() && index != null) {
+
+            val enrichedThreads = if (hasContactsPermission()) {
                 threads.map { t ->
-                    if (!isMobileNumberCandidate(t.nameOrAddress)) return@map t
-                    val candidateKeys = candidateKeysForAddress(t.nameOrAddress)
-                    var hit: Pair<String?, String?>? = null
-                    for (k in candidateKeys) {
-                        val cached = contactLookupCache[k]
-                        if (cached != null) { hit = cached; break }
-                        val idxHit = index[k]
-                        if (idxHit != null) {
-                            contactLookupCache[k] = idxHit
-                            hit = idxHit
-                            break
-                        }
-                    }
+                    val hit = resolveContactFromCache(t.nameOrAddress, index)
                     if (hit != null) {
                         val (name, photo) = hit
                         if (name != null || photo != null) {
@@ -233,11 +247,43 @@ class MainActivity : AppCompatActivity() {
                     } else t
                 }
             } else threads
+
+            val enrichedOtp = if (hasContactsPermission()) {
+                otpRaw.map { item ->
+                    val hit = resolveContactFromCache(item.address, index)
+                    if (hit != null) {
+                        val (name, photo) = hit
+                        if (name != null || photo != null) {
+                            item.copy(contactName = name, contactPhotoUri = photo)
+                        } else item
+                    } else item
+                }
+            } else otpRaw
+
             runOnUiThread {
-                allThreads = enriched
-                updateCategoryPages()
+                allThreads = enrichedThreads
+                otpMessages = enrichedOtp
+                updatePagerContent()
             }
         }.start()
+    }
+
+    private fun resolveContactFromCache(
+        rawAddress: String,
+        index: Map<String, Pair<String?, String?>>?
+    ): Pair<String?, String?>? {
+        if (!isMobileNumberCandidate(rawAddress)) return null
+        val candidateKeys = candidateKeysForAddress(rawAddress)
+        for (key in candidateKeys) {
+            val cached = contactLookupCache[key]
+            if (cached != null) return cached
+            val idxHit = index?.get(key)
+            if (idxHit != null) {
+                contactLookupCache[key] = idxHit
+                return idxHit
+            }
+        }
+        return null
     }
 
     // Build a simple in-memory index mapping normalized keys to (name, photoUri)
@@ -287,63 +333,28 @@ class MainActivity : AppCompatActivity() {
         categoryTabs.visibility = View.VISIBLE
         threadsPager.visibility = View.VISIBLE
         ViewCompat.requestApplyInsets(threadsPager)
-
-        // Load threads and enrich contacts off the main thread to avoid jank
-        Thread {
-            val threads = loadSmsThreads()
-
-            // Build a bulk in-memory index of phone number -> (name, photoUri) once to avoid many queries
-            if (hasContactsPermission() && bulkContactsIndex == null) {
-                try {
-                    bulkContactsIndex = buildContactsIndex()
-                    Log.d("ContactLookup", "Built bulk contacts index with ${bulkContactsIndex?.size ?: 0} entries")
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "failed to build contacts index: ${e.message}")
-                }
-            }
-
-            val enriched = if (hasContactsPermission()) {
-                val index = bulkContactsIndex
-                threads.map { t ->
-                    // Only attempt contact matching for likely mobile numbers.
-                    // Skip short codes, alphanumeric senders and service addresses.
-                    if (!isMobileNumberCandidate(t.nameOrAddress)) return@map t
-                    // Generate candidate keys and attempt only fast hashmap lookups.
-                    val candidateKeys = candidateKeysForAddress(t.nameOrAddress)
-                    var hit: Pair<String?, String?>? = null
-                    for (k in candidateKeys) {
-                        val cached = contactLookupCache[k]
-                        if (cached != null) { hit = cached; break }
-                        val idxHit = index?.get(k)
-                        if (idxHit != null) {
-                            contactLookupCache[k] = idxHit
-                            hit = idxHit
-                            break
-                        }
-                    }
-                    if (hit != null) {
-                        val (name, photo) = hit
-                        if (name != null || photo != null) ThreadItem(t.threadId, t.nameOrAddress, t.date, t.snippet, name, photo, t.category) else t
-                    } else t // Skip expensive fallback entirely for non-matching numbers
-                }
-            } else threads
-
-            runOnUiThread {
-                allThreads = enriched
-                updateCategoryPages()
-            }
-        }.start()
+        reloadInboxData()
     }
 
-    private fun updateCategoryPages() {
+    private fun updatePagerContent() {
         val grouped = categories.associateWith { category ->
             allThreads.filter { it.category == category }
         }
-        threadsPagerAdapter.updateAll(grouped)
-        val desiredIndex = categories.indexOf(selectedCategory).coerceAtLeast(0)
-        if (threadsPager.currentItem != desiredIndex) {
-            threadsPager.setCurrentItem(desiredIndex, false)
+        threadsPagerAdapter.updateAll(otpMessages, grouped)
+        val desiredIndex = pagerPages.indexOfFirst { page ->
+            page is InboxPage.CategoryPage && page.category == selectedCategory
         }
+        if (desiredIndex >= 0) {
+            val currentPage = pagerPages.getOrNull(threadsPager.currentItem)
+            if (currentPage is InboxPage.CategoryPage && threadsPager.currentItem != desiredIndex) {
+                threadsPager.setCurrentItem(desiredIndex, false)
+            }
+        }
+    }
+
+    private fun labelForPage(page: InboxPage): String = when (page) {
+        InboxPage.Otp -> getString(R.string.tab_otp)
+        is InboxPage.CategoryPage -> labelForCategory(page.category)
     }
 
     private fun labelForCategory(category: MessageCategory): String = when (category) {
@@ -355,15 +366,40 @@ class MainActivity : AppCompatActivity() {
         MessageCategory.UNKNOWN -> getString(R.string.category_unknown)
     }
 
-    private fun openThreadDetail(threadItem: ThreadItem) {
+    private fun openThreadDetail(threadItem: ThreadItem, targetMessageId: Long? = null) {
         val intent = Intent(this, ThreadDetailActivity::class.java).apply {
             putExtra("THREAD_ID", threadItem.threadId)
             putExtra("CONTACT_NAME", threadItem.contactName)
             putExtra("CONTACT_ADDRESS", threadItem.nameOrAddress)
             putExtra("CONTACT_PHOTO_URI", threadItem.contactPhotoUri)
             putExtra("CATEGORY", threadItem.category.name)
+            if (targetMessageId != null) {
+                putExtra("TARGET_MESSAGE_ID", targetMessageId)
+            }
         }
         startActivity(intent)
+    }
+
+    private fun openThreadDetailFromOtp(item: OtpMessageItem) {
+        val existingThread = allThreads.firstOrNull { it.threadId == item.threadId }
+        val threadItem = if (existingThread != null) {
+            existingThread.copy(
+                contactName = existingThread.contactName ?: item.contactName,
+                contactPhotoUri = existingThread.contactPhotoUri ?: item.contactPhotoUri
+            )
+        } else {
+            val category = CategoryStorage.getCategoryOrCompute(this, item.address, item.threadId)
+            ThreadItem(
+                threadId = item.threadId,
+                nameOrAddress = item.address,
+                date = item.date,
+                snippet = item.body,
+                contactName = item.contactName,
+                contactPhotoUri = item.contactPhotoUri,
+                category = category
+            )
+        }
+        openThreadDetail(threadItem, item.messageId)
     }
 
     private fun cacheKeyForAddress(rawAddress: String): String {
@@ -471,16 +507,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private sealed class InboxPage {
+        object Otp : InboxPage()
+        data class CategoryPage(val category: MessageCategory) : InboxPage()
+    }
+
     private inner class ThreadCategoryPagerAdapter(
-        private val categories: List<MessageCategory>,
-        private val onItemClick: (ThreadItem) -> Unit
-    ) : RecyclerView.Adapter<ThreadCategoryPagerAdapter.PageViewHolder>() {
+        private val pages: List<InboxPage>,
+        private val onThreadClick: (ThreadItem) -> Unit,
+        private val onOtpClick: (OtpMessageItem) -> Unit
+    ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-        private val itemsByCategory = categories.associateWith { emptyList<ThreadItem>() }.toMutableMap()
+        private val itemsByCategory = pages
+            .filterIsInstance<InboxPage.CategoryPage>()
+            .associate { it.category to emptyList<ThreadItem>() }
+            .toMutableMap()
+        private var otpItems: List<OtpMessageItem> = emptyList()
+        private val viewTypeOtp = 0
+        private val viewTypeCategory = 1
 
-        inner class PageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private inner class CategoryPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val recycler: RecyclerView = itemView.findViewById(R.id.category_recycler)
-            private val adapter = ThreadAdapter(emptyList(), onItemClick)
+            private val adapter = ThreadAdapter(emptyList(), onThreadClick)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
             init {
@@ -505,20 +553,63 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageViewHolder {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.page_thread_list, parent, false)
-            return PageViewHolder(view)
+        private inner class OtpPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+            private val recycler: RecyclerView = itemView.findViewById(R.id.otp_recycler)
+            private val adapter = OtpMessageAdapter(emptyList(), onOtpClick)
+            private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
+
+            init {
+                recycler.layoutManager = LinearLayoutManager(itemView.context)
+                recycler.adapter = adapter
+                recycler.clipToPadding = false
+                ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
+                    val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                    view.setPadding(
+                        view.paddingLeft,
+                        view.paddingTop,
+                        view.paddingRight,
+                        baseBottomPadding + systemInsets.bottom
+                    )
+                    insets
+                }
+                ViewCompat.requestApplyInsets(recycler)
+            }
+
+            fun bind(items: List<OtpMessageItem>) {
+                adapter.updateItems(items)
+            }
         }
 
-        override fun onBindViewHolder(holder: PageViewHolder, position: Int) {
-            holder.bind(categories[position])
+        override fun getItemViewType(position: Int): Int {
+            return when (pages[position]) {
+                is InboxPage.Otp -> viewTypeOtp
+                is InboxPage.CategoryPage -> viewTypeCategory
+            }
         }
 
-        override fun getItemCount(): Int = categories.size
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+            return if (viewType == viewTypeOtp) {
+                val view = LayoutInflater.from(parent.context).inflate(R.layout.page_otp_list, parent, false)
+                OtpPageViewHolder(view)
+            } else {
+                val view = LayoutInflater.from(parent.context).inflate(R.layout.page_thread_list, parent, false)
+                CategoryPageViewHolder(view)
+            }
+        }
 
-        fun updateAll(grouped: Map<MessageCategory, List<ThreadItem>>) {
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            when (val page = pages[position]) {
+                is InboxPage.Otp -> (holder as OtpPageViewHolder).bind(otpItems)
+                is InboxPage.CategoryPage -> (holder as CategoryPageViewHolder).bind(page.category)
+            }
+        }
+
+        override fun getItemCount(): Int = pages.size
+
+        fun updateAll(otp: List<OtpMessageItem>, grouped: Map<MessageCategory, List<ThreadItem>>) {
+            otpItems = otp
             grouped.forEach { (category, items) ->
-                if (categories.contains(category)) {
+                if (itemsByCategory.containsKey(category)) {
                     itemsByCategory[category] = items
                 }
             }
@@ -562,8 +653,58 @@ class MainActivity : AppCompatActivity() {
         return map.values.toList()
     }
 
+    private fun loadOtpMessages(): List<OtpMessageItem> {
+        val uri: Uri = "content://sms".toUri()
+        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type")
+        val selection = "type = ?"
+        val selectionArgs = arrayOf("1") // Inbox / received messages
+        val sortOrder = "date DESC"
+
+        val results = mutableListOf<OtpMessageItem>()
+
+        contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
+            val idxId = cursor.getColumnIndex("_id")
+            val idxThread = cursor.getColumnIndex("thread_id")
+            val idxAddress = cursor.getColumnIndex("address")
+            val idxBody = cursor.getColumnIndex("body")
+            val idxDate = cursor.getColumnIndex("date")
+
+            while (cursor.moveToNext() && results.size < otpFetchLimit) {
+                val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
+                val otpCode = extractOtpFromBody(body)
+                if (otpCode != null) {
+                    val messageId = if (idxId >= 0) cursor.getLong(idxId) else -1L
+                    val threadId = if (idxThread >= 0) cursor.getLong(idxThread) else -1L
+                    val address = if (idxAddress >= 0) {
+                        cursor.getString(idxAddress)?.takeIf { it.isNotBlank() } ?: "Unknown"
+                    } else "Unknown"
+                    val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
+                    if (messageId != -1L && threadId != -1L) {
+                        results.add(
+                            OtpMessageItem(
+                                messageId = messageId,
+                                threadId = threadId,
+                                address = address,
+                                body = body,
+                                date = date,
+                                otpCode = otpCode
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        return results
+    }
+
     // Helper: digits only
     private fun digitsOnly(s: String): String = s.filter { it.isDigit() }
+
+    private fun extractOtpFromBody(body: String?): String? {
+        if (body.isNullOrBlank()) return null
+        return otpRegex.find(body)?.value
+    }
 
     /**
      * Robust contact lookup. Returns Pair(displayName?, photoUri?). Strategies used:

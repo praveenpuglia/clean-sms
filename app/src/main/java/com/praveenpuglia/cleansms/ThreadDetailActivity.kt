@@ -30,6 +30,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var contactAddress: String? = null
     private var contactPhotoUri: String? = null
     private var messageCategory: MessageCategory = MessageCategory.UNKNOWN
+    private var targetMessageId: Long? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +48,9 @@ class ThreadDetailActivity : AppCompatActivity() {
         } catch (e: IllegalArgumentException) {
             MessageCategory.UNKNOWN
         }
+
+        val targetId = intent.getLongExtra("TARGET_MESSAGE_ID", -1L)
+        targetMessageId = if (targetId != -1L) targetId else null
 
         if (threadId == -1L) {
             finish()
@@ -208,8 +212,16 @@ class ThreadDetailActivity : AppCompatActivity() {
             val messages = queryMessagesForThread(threadId)
             runOnUiThread {
                 messageAdapter.updateMessages(messages)
-                // Scroll to bottom after loading
-                if (messages.isNotEmpty()) {
+                val targetId = targetMessageId
+                if (targetId != null) {
+                    val index = messages.indexOfFirst { it.id == targetId }
+                    if (index >= 0) {
+                        messagesRecycler.scrollToPosition(index)
+                    } else if (messages.isNotEmpty()) {
+                        messagesRecycler.scrollToPosition(messages.size - 1)
+                    }
+                    targetMessageId = null
+                } else if (messages.isNotEmpty()) {
                     messagesRecycler.scrollToPosition(messages.size - 1)
                 }
             }
