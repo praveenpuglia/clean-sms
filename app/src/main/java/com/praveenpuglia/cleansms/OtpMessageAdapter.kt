@@ -7,7 +7,6 @@ import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -30,7 +29,6 @@ class OtpMessageAdapter(
         val messagePreview: TextView = itemView.findViewById(R.id.otp_message_preview)
         val codeContainer: View = itemView.findViewById(R.id.otp_code_container)
         val otpCode: TextView = itemView.findViewById(R.id.otp_code)
-        val copyButton: ImageButton = itemView.findViewById(R.id.otp_copy_button)
         val divider: View = itemView.findViewById(R.id.otp_divider)
     }
 
@@ -53,11 +51,10 @@ class OtpMessageAdapter(
         holder.otpCode.text = code
         val hasCode = code.isNotBlank()
         holder.otpCode.visibility = if (hasCode) View.VISIBLE else View.GONE
-        holder.copyButton.visibility = if (hasCode) View.VISIBLE else View.GONE
-        holder.copyButton.isEnabled = hasCode
         holder.codeContainer.visibility = if (hasCode) View.VISIBLE else View.GONE
         holder.unreadDot.visibility = if (item.isUnread) View.VISIBLE else View.GONE
-        holder.copyButton.setOnClickListener {
+        holder.otpCode.isEnabled = hasCode
+        holder.otpCode.setOnClickListener {
             if (!hasCode) return@setOnClickListener
             val context = holder.itemView.context
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
@@ -110,12 +107,6 @@ class OtpMessageAdapter(
         val fallbackLetter = trimmedFallback.firstOrNull { it.isLetter() }
         if (fallbackLetter != null) {
             val label = fallbackLetter.uppercaseChar().toString()
-            return label to fallbackIdentifier
-        }
-
-        val digits = fallbackIdentifier.filter { it.isDigit() }
-        if (digits.isNotEmpty()) {
-            val label = digits.takeLast(2)
             return label to fallbackIdentifier
         }
 

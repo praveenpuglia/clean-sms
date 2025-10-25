@@ -2,4 +2,6 @@
 <resources>
     <dimen name="thread_list_bottom_padding">24dp</dimen>
     <dimen name="message_bubble_corner_radius">16dp</dimen>
+    <dimen name="tab_badge_horizontal_offset">6dp</dimen>
+    <dimen name="tab_badge_vertical_offset">2dp</dimen>
 </resources>

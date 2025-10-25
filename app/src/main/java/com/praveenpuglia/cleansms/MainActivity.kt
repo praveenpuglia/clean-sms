@@ -408,6 +408,10 @@ class MainActivity : AppCompatActivity() {
                 badge.backgroundColor = badgeColor
                 if (badge.hasNumber()) badge.clearNumber()
                 badge.badgeGravity = BadgeDrawable.TOP_END
+                val horizontalOffset = resources.getDimensionPixelOffset(R.dimen.tab_badge_horizontal_offset)
+                val verticalOffset = resources.getDimensionPixelOffset(R.dimen.tab_badge_vertical_offset)
+                badge.horizontalOffset = horizontalOffset
+                badge.verticalOffset = -verticalOffset
                 badge.isVisible = true
             } else {
                 tab.removeBadge()

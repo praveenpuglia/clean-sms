@@ -129,12 +129,6 @@ class ThreadAdapter(
             return label to fallbackIdentifier
         }
 
-        val digits = fallbackIdentifier.filter { it.isDigit() }
-        if (digits.isNotEmpty()) {
-            val label = digits.takeLast(2)
-            return label to fallbackIdentifier
-        }
-
         return "#" to fallbackIdentifier
     }
 }
