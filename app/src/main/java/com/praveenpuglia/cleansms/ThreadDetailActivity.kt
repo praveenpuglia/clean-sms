@@ -1,6 +1,9 @@
 package com.praveenpuglia.cleansms
 
 import android.Manifest
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -8,6 +11,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -15,9 +19,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.core.net.toUri
+import com.google.android.material.color.MaterialColors
 
 class ThreadDetailActivity : AppCompatActivity() {
 
@@ -25,6 +31,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private lateinit var messageAdapter: MessageAdapter
     private lateinit var messageInput: EditText
     private lateinit var sendButton: ImageButton
+    private lateinit var composeBarContainer: View
     private var threadId: Long = -1
     private var contactName: String? = null
     private var contactAddress: String? = null
@@ -59,7 +66,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
         setupHeader()
         setupRecyclerView()
-        setupComposeBar()
+    setupComposeBar()
         loadMessages()
     }
 
@@ -157,6 +164,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun setupComposeBar() {
+        composeBarContainer = findViewById(R.id.compose_bar)
         messageInput = findViewById(R.id.message_input)
         sendButton = findViewById(R.id.send_button)
 
@@ -166,6 +174,21 @@ class ThreadDetailActivity : AppCompatActivity() {
                 sendMessage(contactAddress!!, messageText)
             }
         }
+
+        updateComposeBarVisibility()
+    }
+
+    private fun updateComposeBarVisibility() {
+        val showComposer = shouldShowComposer()
+        composeBarContainer.visibility = if (showComposer) View.VISIBLE else View.GONE
+    }
+
+    private fun shouldShowComposer(): Boolean {
+        if (messageCategory == MessageCategory.PERSONAL) return true
+        val address = contactAddress?.trim().orEmpty()
+        if (address.isEmpty()) return false
+        val hasLetter = address.any { it.isLetter() }
+        return !hasLetter
     }
 
     private fun sendMessage(address: String, messageText: String) {
@@ -217,16 +240,60 @@ class ThreadDetailActivity : AppCompatActivity() {
                     val index = messages.indexOfFirst { it.id == targetId }
                     if (index >= 0) {
                         messagesRecycler.scrollToPosition(index)
+                        highlightMessage(index)
                     } else if (messages.isNotEmpty()) {
-                        messagesRecycler.scrollToPosition(messages.size - 1)
+                        val lastIndex = messages.size - 1
+                        messagesRecycler.scrollToPosition(lastIndex)
+                        highlightMessage(lastIndex)
                     }
                     targetMessageId = null
                 } else if (messages.isNotEmpty()) {
-                    messagesRecycler.scrollToPosition(messages.size - 1)
+                    val lastIndex = messages.size - 1
+                    messagesRecycler.scrollToPosition(lastIndex)
                 }
             }
         }.start()
     }
+
+    private fun highlightMessage(position: Int) {
+        messagesRecycler.post { highlightMessageInternal(position, 0) }
+    }
+
+    private fun highlightMessageInternal(position: Int, attempt: Int) {
+        val holder = messagesRecycler.findViewHolderForAdapterPosition(position)
+        if (holder == null) {
+            if (attempt < 5) {
+                messagesRecycler.postDelayed({ highlightMessageInternal(position, attempt + 1) }, 48)
+            }
+            return
+        }
+        val targetView = holder.itemView.findViewById<android.view.View>(R.id.message_container) ?: holder.itemView
+        val fallbackColor = ContextCompat.getColor(this, R.color.md_theme_light_primaryContainer)
+        val highlightColor = MaterialColors.getColor(targetView, com.google.android.material.R.attr.colorPrimaryContainer, fallbackColor)
+        val cornerRadius = targetView.resources.getDimension(R.dimen.message_bubble_corner_radius)
+        val overlay = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setCornerRadius(cornerRadius)
+            setColor(highlightColor)
+            alpha = 0
+            setBounds(0, 0, targetView.width, targetView.height)
+        }
+        targetView.overlay.add(overlay)
+        val animator = ValueAnimator.ofInt(0, 220).apply {
+            duration = 420
+            startDelay = 80
+            repeatCount = 1
+            repeatMode = ValueAnimator.REVERSE
+            addUpdateListener { overlay.alpha = it.animatedValue as Int }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    targetView.overlay.remove(overlay)
+                }
+            })
+        }
+        animator.start()
+    }
+
 
     private fun queryMessagesForThread(threadId: Long): List<Message> {
         val uri = "content://sms".toUri()

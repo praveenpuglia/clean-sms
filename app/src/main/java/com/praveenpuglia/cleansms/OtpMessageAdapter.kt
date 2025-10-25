@@ -1,10 +1,15 @@
 package com.praveenpuglia.cleansms
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.net.toUri
 import androidx.recyclerview.widget.RecyclerView
 import java.util.Calendar
@@ -20,7 +25,9 @@ class OtpMessageAdapter(
         val senderName: TextView = itemView.findViewById(R.id.otp_sender_name)
         val messageDate: TextView = itemView.findViewById(R.id.otp_message_date)
         val messagePreview: TextView = itemView.findViewById(R.id.otp_message_preview)
+    val codeContainer: View = itemView.findViewById(R.id.otp_code_container)
         val otpCode: TextView = itemView.findViewById(R.id.otp_code)
+        val copyButton: ImageButton = itemView.findViewById(R.id.otp_copy_button)
         val divider: View = itemView.findViewById(R.id.otp_divider)
     }
 
@@ -35,13 +42,24 @@ class OtpMessageAdapter(
         holder.itemView.setOnClickListener { onItemClick(item) }
         holder.senderName.text = item.contactName ?: item.address
         holder.messageDate.text = formatHumanReadableDate(item.date)
-    val preview = item.body.trim()
-    holder.messagePreview.text = preview
-    holder.messagePreview.visibility = if (preview.isNotEmpty()) View.VISIBLE else View.GONE
-    val code = item.otpCode.trim()
-    holder.otpCode.text = code
-    holder.otpCode.visibility = if (code.isNotBlank()) View.VISIBLE else View.GONE
-    holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
+        val preview = item.body.trim()
+        holder.messagePreview.text = preview
+        holder.messagePreview.visibility = if (preview.isNotEmpty()) View.VISIBLE else View.GONE
+        val code = item.otpCode.trim()
+        holder.otpCode.text = code
+        val hasCode = code.isNotBlank()
+        holder.otpCode.visibility = if (hasCode) View.VISIBLE else View.GONE
+        holder.copyButton.visibility = if (hasCode) View.VISIBLE else View.GONE
+        holder.copyButton.isEnabled = hasCode
+        holder.codeContainer.visibility = if (hasCode) View.VISIBLE else View.GONE
+        holder.copyButton.setOnClickListener {
+            if (!hasCode) return@setOnClickListener
+            val context = holder.itemView.context
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
+            clipboard?.setPrimaryClip(ClipData.newPlainText("OTP", code))
+            Toast.makeText(context, context.getString(R.string.toast_otp_copied), Toast.LENGTH_SHORT).show()
+        }
+        holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
 
         bindAvatar(holder, item)
     }

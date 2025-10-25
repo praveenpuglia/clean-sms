@@ -93,12 +93,14 @@ class MainActivity : AppCompatActivity() {
     private val phoneUtil = PhoneNumberUtil.getInstance()
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
     private val otpRegex = Regex("\\b\\d{4,8}\\b")
+    private val otpKeywordPattern = Regex("\\botp\\b|one[\\s-]*time\\s+password", RegexOption.IGNORE_CASE)
     private val otpFetchLimit = 200
     
     // Category filtering state
     private var selectedCategory: MessageCategory = MessageCategory.PERSONAL
     private var allThreads: List<ThreadItem> = emptyList()
     private var otpMessages: List<OtpMessageItem> = emptyList()
+    private var initialPageApplied = false
 
     private lateinit var categoryTabs: TabLayout
     private lateinit var threadsPager: ViewPager2
@@ -264,6 +266,7 @@ class MainActivity : AppCompatActivity() {
                 allThreads = enrichedThreads
                 otpMessages = enrichedOtp
                 updatePagerContent()
+                applyInitialPageIfNeeded()
             }
         }.start()
     }
@@ -333,6 +336,7 @@ class MainActivity : AppCompatActivity() {
         categoryTabs.visibility = View.VISIBLE
         threadsPager.visibility = View.VISIBLE
         ViewCompat.requestApplyInsets(threadsPager)
+        initialPageApplied = false
         reloadInboxData()
     }
 
@@ -355,6 +359,21 @@ class MainActivity : AppCompatActivity() {
     private fun labelForPage(page: InboxPage): String = when (page) {
         InboxPage.Otp -> getString(R.string.tab_otp)
         is InboxPage.CategoryPage -> labelForCategory(page.category)
+    }
+
+    private fun applyInitialPageIfNeeded() {
+        if (initialPageApplied) return
+        val otpIndex = pagerPages.indexOfFirst { it is InboxPage.Otp }
+        val desiredIndex = when {
+            otpMessages.isNotEmpty() && otpIndex >= 0 -> otpIndex
+            else -> pagerPages.indexOfFirst { page ->
+                page is InboxPage.CategoryPage && page.category == MessageCategory.PERSONAL
+            }.takeIf { it >= 0 } ?: 0
+        }
+        if (desiredIndex != threadsPager.currentItem && desiredIndex in pagerPages.indices) {
+            threadsPager.setCurrentItem(desiredIndex, false)
+        }
+        initialPageApplied = true
     }
 
     private fun labelForCategory(category: MessageCategory): String = when (category) {
@@ -703,6 +722,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun extractOtpFromBody(body: String?): String? {
         if (body.isNullOrBlank()) return null
+        if (!otpKeywordPattern.containsMatchIn(body)) return null
         return otpRegex.find(body)?.value
     }
 
