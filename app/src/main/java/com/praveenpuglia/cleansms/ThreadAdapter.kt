@@ -55,6 +55,7 @@ class ThreadAdapter(
         val name: TextView = itemView.findViewById(R.id.thread_name)
         val date: TextView = itemView.findViewById(R.id.thread_date)
         val snippet: TextView = itemView.findViewById(R.id.thread_snippet)
+        val divider: View = itemView.findViewById(R.id.thread_divider)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -71,6 +72,7 @@ class ThreadAdapter(
         holder.name.text = item.contactName ?: item.nameOrAddress
         holder.date.text = formatHumanReadableDate(item.date)
         holder.snippet.text = item.snippet
+    holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
 
         // If MainActivity enriched with photoUri/name, use them
         val photo = item.contactPhotoUri

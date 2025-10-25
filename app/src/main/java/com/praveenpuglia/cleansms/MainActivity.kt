@@ -17,6 +17,8 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.core.net.toUri
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import com.google.i18n.phonenumbers.NumberParseException
 import android.provider.ContactsContract
@@ -241,6 +243,18 @@ class MainActivity : AppCompatActivity() {
         recycler.visibility = View.VISIBLE
         recycler.layoutManager = LinearLayoutManager(this)
         recycler.clipToPadding = false
+        val baseBottomPadding = resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
+        ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                view.paddingLeft,
+                view.paddingTop,
+                view.paddingRight,
+                baseBottomPadding + systemBars.bottom
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(recycler)
 
         // Setup category filter pills
         setupCategoryPills()
