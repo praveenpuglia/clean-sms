@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="avatar_fallback_bg_primary">@color/md_theme_dark_primaryContainer</color>
+    <color name="avatar_fallback_fg_primary">@color/md_theme_dark_onPrimaryContainer</color>
+
+    <color name="avatar_fallback_bg_secondary">@color/md_theme_dark_secondaryContainer</color>
+    <color name="avatar_fallback_fg_secondary">@color/md_theme_dark_onSecondaryContainer</color>
+
+    <color name="avatar_fallback_bg_tertiary">@color/md_theme_dark_tertiaryContainer</color>
+    <color name="avatar_fallback_fg_tertiary">@color/md_theme_dark_onTertiaryContainer</color>
+
+    <color name="avatar_fallback_bg_surface_variant">@color/md_theme_dark_surfaceVariant</color>
+    <color name="avatar_fallback_fg_surface_variant">@color/md_theme_dark_onSurfaceVariant</color>
+
+    <color name="avatar_fallback_bg_error_container">@color/md_theme_dark_errorContainer</color>
+    <color name="avatar_fallback_fg_error_container">@color/md_theme_dark_onErrorContainer</color>
+</resources>

@@ -1,14 +1,14 @@
 package com.praveenpuglia.cleansms
 
+import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.recyclerview.widget.RecyclerView
-import java.text.DateFormat
-import java.util.*
 import androidx.core.net.toUri
+import androidx.recyclerview.widget.RecyclerView
+import java.util.Calendar
 
 class ThreadAdapter(
     private var items: List<ThreadItem>,
@@ -67,14 +67,12 @@ class ThreadAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        
-        holder.itemView.setOnClickListener {
-            onItemClick(item)
-        }
+
+        holder.itemView.setOnClickListener { onItemClick(item) }
         holder.name.text = item.contactName ?: item.nameOrAddress
         holder.date.text = formatHumanReadableDate(item.date)
         holder.snippet.text = item.snippet
-    holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
+        holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
 
         val unreadCount = item.unreadCount
         val hasUnread = unreadCount > 0
@@ -85,45 +83,28 @@ class ThreadAdapter(
         } else {
             holder.unreadBadge.visibility = View.GONE
         }
+        holder.name.setTypeface(null, if (hasUnread) Typeface.BOLD else Typeface.NORMAL)
 
-        // If MainActivity enriched with photoUri/name, use them
         val photo = item.contactPhotoUri
-        val contactName = item.contactName
-
+        var avatarApplied = false
         if (!photo.isNullOrEmpty()) {
             try {
                 holder.avatarImage.setImageURI(photo.toUri())
                 holder.avatarImage.visibility = View.VISIBLE
                 holder.avatarText.visibility = View.GONE
-                return
+                avatarApplied = true
             } catch (_: Exception) {
-                // fall through to initials
+                avatarApplied = false
             }
         }
 
-        if (!contactName.isNullOrEmpty()) {
-            val initial = contactName.trim().firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
-            holder.avatarText.text = initial
+        if (!avatarApplied) {
+            val (label, key) = resolveAvatarLabel(item.contactName, item.nameOrAddress)
+            holder.avatarText.text = label
             holder.avatarText.visibility = View.VISIBLE
             holder.avatarImage.visibility = View.GONE
-            return
+            AvatarColorResolver.applyTo(holder.avatarText, key)
         }
-
-        // Fallback: if the nameOrAddress contains letters (alphanumeric sender ID), show first letter
-        val raw = item.nameOrAddress
-        val hasLetters = raw.any { it.isLetter() }
-        if (hasLetters) {
-            val firstLetter = raw.trim().firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
-            holder.avatarText.text = firstLetter
-            holder.avatarText.visibility = View.VISIBLE
-            holder.avatarImage.visibility = View.GONE
-            return
-        }
-
-        // Final fallback
-        holder.avatarText.text = "#"
-        holder.avatarText.visibility = View.VISIBLE
-        holder.avatarImage.visibility = View.GONE
     }
 
     override fun getItemCount(): Int = items.size
@@ -131,5 +112,29 @@ class ThreadAdapter(
     fun updateItems(newItems: List<ThreadItem>) {
         items = newItems
         notifyDataSetChanged()
+    }
+
+    private fun resolveAvatarLabel(contactName: String?, fallbackIdentifier: String): Pair<String, String> {
+        val trimmedName = contactName?.trim().orEmpty()
+        val letterFromName = trimmedName.firstOrNull { it.isLetter() }
+        if (letterFromName != null) {
+            val label = letterFromName.uppercaseChar().toString()
+            return label to trimmedName.ifBlank { fallbackIdentifier }
+        }
+
+        val trimmedFallback = fallbackIdentifier.trim()
+        val fallbackLetter = trimmedFallback.firstOrNull { it.isLetter() }
+        if (fallbackLetter != null) {
+            val label = fallbackLetter.uppercaseChar().toString()
+            return label to fallbackIdentifier
+        }
+
+        val digits = fallbackIdentifier.filter { it.isDigit() }
+        if (digits.isNotEmpty()) {
+            val label = digits.takeLast(2)
+            return label to fallbackIdentifier
+        }
+
+        return "#" to fallbackIdentifier
     }
 }

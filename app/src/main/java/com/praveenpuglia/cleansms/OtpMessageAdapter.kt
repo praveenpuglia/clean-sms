@@ -3,6 +3,7 @@ package com.praveenpuglia.cleansms
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -43,6 +44,7 @@ class OtpMessageAdapter(
 
         holder.itemView.setOnClickListener { onItemClick(item) }
         holder.senderName.text = item.contactName ?: item.address
+    holder.senderName.setTypeface(null, if (item.isUnread) Typeface.BOLD else Typeface.NORMAL)
         holder.messageDate.text = formatHumanReadableDate(item.date)
         val preview = item.body.trim()
         holder.messagePreview.text = preview
@@ -89,27 +91,35 @@ class OtpMessageAdapter(
             }
         }
 
-        if (!contactName.isNullOrEmpty()) {
-            val initial = contactName.trim().firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
-            holder.avatarText.text = initial
-            holder.avatarText.visibility = View.VISIBLE
-            holder.avatarImage.visibility = View.GONE
-            return
-        }
-
-        val raw = item.address
-        val hasLetters = raw.any { it.isLetter() }
-        if (hasLetters) {
-            val firstLetter = raw.trim().firstOrNull { it.isLetter() }?.uppercaseChar()?.toString() ?: "#"
-            holder.avatarText.text = firstLetter
-            holder.avatarText.visibility = View.VISIBLE
-            holder.avatarImage.visibility = View.GONE
-            return
-        }
-
-        holder.avatarText.text = "#"
+        val (label, key) = resolveAvatarLabel(contactName, item.address)
+        holder.avatarText.text = label
         holder.avatarText.visibility = View.VISIBLE
         holder.avatarImage.visibility = View.GONE
+        AvatarColorResolver.applyTo(holder.avatarText, key)
+    }
+
+    private fun resolveAvatarLabel(contactName: String?, fallbackIdentifier: String): Pair<String, String> {
+        val trimmedName = contactName?.trim().orEmpty()
+        val letterFromName = trimmedName.firstOrNull { it.isLetter() }
+        if (letterFromName != null) {
+            val label = letterFromName.uppercaseChar().toString()
+            return label to trimmedName.ifBlank { fallbackIdentifier }
+        }
+
+        val trimmedFallback = fallbackIdentifier.trim()
+        val fallbackLetter = trimmedFallback.firstOrNull { it.isLetter() }
+        if (fallbackLetter != null) {
+            val label = fallbackLetter.uppercaseChar().toString()
+            return label to fallbackIdentifier
+        }
+
+        val digits = fallbackIdentifier.filter { it.isDigit() }
+        if (digits.isNotEmpty()) {
+            val label = digits.takeLast(2)
+            return label to fallbackIdentifier
+        }
+
+        return "#" to fallbackIdentifier
     }
 
     private fun formatHumanReadableDate(timestamp: Long): String {
