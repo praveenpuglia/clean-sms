@@ -12,7 +12,6 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/header_gradient"
         android:elevation="4dp"
         android:fitsSystemWindows="false">
 
@@ -33,7 +32,7 @@
                 android:letterSpacing="0.015"
                 android:text="Messages"
                 android:textColor="?android:attr/textColorPrimary"
-                android:textSize="24sp"
+                android:textSize="28sp"
                 android:textStyle="bold" />
 
             <com.google.android.material.tabs.TabLayout
@@ -42,8 +41,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:paddingBottom="4dp"
+                android:background="@android:color/transparent"
                 app:tabIndicatorAnimationMode="elastic"
+                app:tabIndicatorGravity="bottom"
+                app:tabIndicatorHeight="3dp"
                 app:tabIndicatorFullWidth="false"
                 app:tabMode="scrollable" />
 

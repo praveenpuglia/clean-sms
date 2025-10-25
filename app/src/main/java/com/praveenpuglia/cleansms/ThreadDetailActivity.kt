@@ -59,6 +59,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         loadMessages()
     }
 
+    override fun onResume() {
+        super.onResume()
+    }
+
     private fun setupHeader() {
         findViewById<ImageButton>(R.id.back_button).setOnClickListener {
             finish()
@@ -84,7 +88,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         
         setupHeaderText()
     }
-    
+
     private fun setAvatarInitials(avatarText: TextView, avatarImage: ImageView) {
         // Use contact name if available
         if (!contactName.isNullOrEmpty()) {

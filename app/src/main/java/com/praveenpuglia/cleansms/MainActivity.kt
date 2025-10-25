@@ -147,7 +147,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         activeInstance = this
         // Re-check after potential default change
-        setupDefaultSmsUi()
+    setupDefaultSmsUi()
     }
 
     override fun onPause() {
