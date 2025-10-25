@@ -171,6 +171,7 @@
                 android:layout_marginStart="12dp"
                 android:contentDescription="Send"
                 android:src="@drawable/ic_send"
+                app:elevation="0dp"
                 app:fabSize="mini" />
 
         </LinearLayout>

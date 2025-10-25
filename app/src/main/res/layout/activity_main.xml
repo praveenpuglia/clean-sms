@@ -24,7 +24,7 @@
             android:paddingStart="20dp"
             android:paddingTop="16dp"
             android:paddingEnd="20dp"
-            android:paddingBottom="0dp">
+            android:paddingBottom="8dp">
 
             <TextView
                 android:id="@+id/header_title"
