@@ -9,4 +9,5 @@
     <string name="category_government">Government</string>
     <string name="category_unknown">Unknown</string>
     <string name="tab_otp">OTP</string>
+    <string name="toast_contact_not_found">Contact not available</string>
 </resources>

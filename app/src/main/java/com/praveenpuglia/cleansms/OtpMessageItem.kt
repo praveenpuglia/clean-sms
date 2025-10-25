@@ -9,8 +9,11 @@ data class OtpMessageItem(
     val otpCode: String,
     val contactName: String? = null,
     val contactPhotoUri: String? = null,
+    val contactLookupUri: String? = null,
     val isRead: Boolean = true
 ) {
     val isUnread: Boolean
         get() = !isRead
+    val hasSavedContact: Boolean
+        get() = !contactLookupUri.isNullOrBlank()
 }

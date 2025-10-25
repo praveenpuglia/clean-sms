@@ -12,7 +12,8 @@ import java.util.Calendar
 
 class ThreadAdapter(
     private var items: List<ThreadItem>,
-    private val onItemClick: (ThreadItem) -> Unit
+    private val onItemClick: (ThreadItem) -> Unit,
+    private val onAvatarClick: (ThreadItem) -> Unit
 ) : RecyclerView.Adapter<ThreadAdapter.VH>() {
 
     private fun formatHumanReadableDate(timestamp: Long): String {
@@ -105,6 +106,20 @@ class ThreadAdapter(
             holder.avatarImage.visibility = View.GONE
             AvatarColorResolver.applyTo(holder.avatarText, key)
         }
+
+        val canOpenContact = item.hasSavedContact
+        if (canOpenContact) {
+            val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
+            holder.avatarText.setOnClickListener(avatarClickListener)
+            holder.avatarImage.setOnClickListener(avatarClickListener)
+        } else {
+            holder.avatarText.setOnClickListener(null)
+            holder.avatarImage.setOnClickListener(null)
+        }
+        holder.avatarText.isClickable = canOpenContact
+        holder.avatarText.isFocusable = canOpenContact
+        holder.avatarImage.isClickable = canOpenContact
+        holder.avatarImage.isFocusable = canOpenContact
     }
 
     override fun getItemCount(): Int = items.size

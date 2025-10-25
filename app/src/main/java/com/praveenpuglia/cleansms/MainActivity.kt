@@ -13,6 +13,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -30,6 +31,7 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import java.util.LinkedHashMap
+import java.util.LinkedHashSet
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
@@ -54,7 +56,7 @@ class MainActivity : AppCompatActivity() {
             // Treat >=10 digits as likely mobile to allow enrichment attempts, else rely on PhoneLookup directly.
             return digits.length >= 7
         }
-        fun lookupFromCache(raw: String): Pair<String?, String?>? {
+        fun lookupFromCache(raw: String): ContactInfo? {
             val inst = activeInstance ?: return null
             val keys = inst.candidateKeysForAddress(raw)
             for (k in keys) {
@@ -63,7 +65,7 @@ class MainActivity : AppCompatActivity() {
             }
             return null
         }
-        fun lookupFromIndex(raw: String): Pair<String?, String?>? {
+        fun lookupFromIndex(raw: String): ContactInfo? {
             val inst = activeInstance ?: return null
             val idx = inst.bulkContactsIndex ?: return null
             val keys = inst.candidateKeysForAddress(raw)
@@ -89,9 +91,9 @@ class MainActivity : AppCompatActivity() {
     )
 
     // Cache keyed by E.164 or digits-only for phone numbers; fallback to raw key for alphanumeric senders
-    private val contactLookupCache = mutableMapOf<String, Pair<String?, String?>>()
+    private val contactLookupCache = mutableMapOf<String, ContactInfo>()
     // Bulk in-memory index built once per process run to speed repeated lookups
-    private var bulkContactsIndex: Map<String, Pair<String?, String?>>? = null
+    private var bulkContactsIndex: Map<String, ContactInfo>? = null
     private val phoneUtil = PhoneNumberUtil.getInstance()
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
     private val otpRegex = Regex("\\b\\d{4,8}\\b")
@@ -136,7 +138,9 @@ class MainActivity : AppCompatActivity() {
         threadsPagerAdapter = ThreadCategoryPagerAdapter(
             pagerPages,
             onThreadClick = { threadItem -> openThreadDetail(threadItem) },
-            onOtpClick = { otpItem -> openThreadDetailFromOtp(otpItem) }
+            onThreadAvatarClick = { threadItem -> openContactFromThread(threadItem) },
+            onOtpClick = { otpItem -> openThreadDetailFromOtp(otpItem) },
+            onOtpAvatarClick = { otpItem -> openContactFromOtp(otpItem) }
         )
         threadsPager.adapter = threadsPagerAdapter
         threadsPager.registerOnPageChangeCallback(pageChangeCallback)
@@ -245,9 +249,11 @@ class MainActivity : AppCompatActivity() {
                 threads.map { t ->
                     val hit = resolveContactFromCache(t.nameOrAddress, index)
                     if (hit != null) {
-                        val (name, photo) = hit
-                        if (name != null || photo != null) {
-                            t.copy(contactName = name, contactPhotoUri = photo)
+                        val name = hit.name
+                        val photo = hit.photoUri
+                        val lookup = hit.lookupUri
+                        if (name != null || photo != null || lookup != null) {
+                            t.copy(contactName = name, contactPhotoUri = photo, contactLookupUri = lookup)
                         } else t
                     } else t
                 }
@@ -257,9 +263,11 @@ class MainActivity : AppCompatActivity() {
                 otpRaw.map { item ->
                     val hit = resolveContactFromCache(item.address, index)
                     if (hit != null) {
-                        val (name, photo) = hit
-                        if (name != null || photo != null) {
-                            item.copy(contactName = name, contactPhotoUri = photo)
+                        val name = hit.name
+                        val photo = hit.photoUri
+                        val lookup = hit.lookupUri
+                        if (name != null || photo != null || lookup != null) {
+                            item.copy(contactName = name, contactPhotoUri = photo, contactLookupUri = lookup)
                         } else item
                     } else item
                 }
@@ -276,8 +284,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun resolveContactFromCache(
         rawAddress: String,
-        index: Map<String, Pair<String?, String?>>?
-    ): Pair<String?, String?>? {
+        index: Map<String, ContactInfo>?
+    ): ContactInfo? {
         if (!isMobileNumberCandidate(rawAddress)) return null
         val candidateKeys = candidateKeysForAddress(rawAddress)
         for (key in candidateKeys) {
@@ -293,23 +301,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Build a simple in-memory index mapping normalized keys to (name, photoUri)
-    private fun buildContactsIndex(): Map<String, Pair<String?, String?>> {
-        val map = mutableMapOf<String, Pair<String?, String?>>()
+    private fun buildContactsIndex(): Map<String, ContactInfo> {
+        val map = mutableMapOf<String, ContactInfo>()
         try {
             val projection = arrayOf(
                 ContactsContract.CommonDataKinds.Phone.NUMBER,
                 ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.PHOTO_URI
+                ContactsContract.CommonDataKinds.Phone.PHOTO_URI,
+                ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY,
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID
             )
             val cursor = contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, projection, null, null, null)
             cursor?.use { c ->
                 val idxNumber = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
                 val idxName = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
                 val idxPhoto = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
+                val idxLookup = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY)
+                val idxContactId = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
                 while (c.moveToNext()) {
                     val phone = if (idxNumber >= 0) c.getString(idxNumber) else null
                     val name = if (idxName >= 0) c.getString(idxName) else null
                     val photo = if (idxPhoto >= 0) c.getString(idxPhoto) else null
+                    val lookupKey = if (idxLookup >= 0) c.getString(idxLookup) else null
+                    val contactId = if (idxContactId >= 0) c.getLong(idxContactId) else null
+                    val lookupUri = if (!lookupKey.isNullOrEmpty() && contactId != null) {
+                        ContactsContract.Contacts.getLookupUri(contactId, lookupKey)?.toString()
+                    } else null
                     if (!phone.isNullOrEmpty()) {
                         val key = try {
                             val parsed = phoneUtil.parse(phone, defaultRegion)
@@ -319,12 +336,12 @@ class MainActivity : AppCompatActivity() {
                             val digits = digitsOnly(normalized)
                             if (digits.isNotEmpty()) digits else phone
                         }
-                        map[key] = Pair(name, photo)
+                        map[key] = ContactInfo(name, photo, lookupUri)
                         // also index by raw digits suffixes to help quick suffix matches
                         val digitsOnly = digitsOnly(phone)
-                        if (digitsOnly.length >= 7) map[digitsOnly.takeLast(7)] = Pair(name, photo)
-                        if (digitsOnly.length >= 9) map[digitsOnly.takeLast(9)] = Pair(name, photo)
-                        if (digitsOnly.length >= 10) map[digitsOnly.takeLast(10)] = Pair(name, photo)
+                        if (digitsOnly.length >= 7) map[digitsOnly.takeLast(7)] = ContactInfo(name, photo, lookupUri)
+                        if (digitsOnly.length >= 9) map[digitsOnly.takeLast(9)] = ContactInfo(name, photo, lookupUri)
+                        if (digitsOnly.length >= 10) map[digitsOnly.takeLast(10)] = ContactInfo(name, photo, lookupUri)
                     }
                 }
             }
@@ -447,7 +464,8 @@ class MainActivity : AppCompatActivity() {
         val threadItem = if (existingThread != null) {
             existingThread.copy(
                 contactName = existingThread.contactName ?: item.contactName,
-                contactPhotoUri = existingThread.contactPhotoUri ?: item.contactPhotoUri
+                contactPhotoUri = existingThread.contactPhotoUri ?: item.contactPhotoUri,
+                contactLookupUri = existingThread.contactLookupUri ?: item.contactLookupUri
             )
         } else {
             val category = CategoryStorage.getCategoryOrCompute(this, item.address, item.threadId)
@@ -458,10 +476,94 @@ class MainActivity : AppCompatActivity() {
                 snippet = item.body,
                 contactName = item.contactName,
                 contactPhotoUri = item.contactPhotoUri,
+                contactLookupUri = item.contactLookupUri,
                 category = category
             )
         }
         openThreadDetail(threadItem, item.messageId)
+    }
+
+    private fun openContactFromThread(item: ThreadItem) {
+        if (!hasContactsPermission() || item.contactName.isNullOrBlank()) return
+        openContactForAddress(item.contactLookupUri, item.nameOrAddress, item.contactName, item.contactPhotoUri)
+    }
+
+    private fun openContactFromOtp(item: OtpMessageItem) {
+        if (!hasContactsPermission() || item.contactName.isNullOrBlank()) return
+        openContactForAddress(item.contactLookupUri, item.address, item.contactName, item.contactPhotoUri)
+    }
+
+    private fun openContactForAddress(
+        lookupUriString: String?,
+        rawAddress: String,
+        contactName: String?,
+        contactPhotoUri: String?
+    ) {
+        val existingUri = lookupUriString?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        if (existingUri != null) {
+            launchContactIntent(existingUri)
+            return
+        }
+        Thread {
+            val resolvedUri = findContactLookupUri(rawAddress)
+            if (resolvedUri != null) {
+                val info = ContactInfo(contactName, contactPhotoUri, resolvedUri.toString())
+                val keys = candidateKeysForAddress(rawAddress)
+                if (keys.isEmpty()) {
+                    contactLookupCache[rawAddress] = info
+                } else {
+                    for (key in keys) {
+                        contactLookupCache[key] = info
+                    }
+                }
+                runOnUiThread { launchContactIntent(resolvedUri) }
+            } else {
+                runOnUiThread {
+                    Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun launchContactIntent(contactUri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, contactUri)
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Failed to open contact: ${e.message}")
+            Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun findContactLookupUri(rawAddress: String): Uri? {
+        val resolver = contentResolver
+        val keys = LinkedHashSet<String>()
+        keys += rawAddress
+        keys += candidateKeysForAddress(rawAddress)
+        for (key in keys) {
+            try {
+                val lookupUri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(key))
+                val projection = arrayOf(
+                    ContactsContract.PhoneLookup.LOOKUP_KEY,
+                    ContactsContract.PhoneLookup._ID
+                )
+                resolver.query(lookupUri, projection, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idxLookup = cursor.getColumnIndex(ContactsContract.PhoneLookup.LOOKUP_KEY)
+                        val idxId = cursor.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        val lookupKey = if (idxLookup >= 0) cursor.getString(idxLookup) else null
+                        val contactId = if (idxId >= 0) cursor.getLong(idxId) else null
+                        if (!lookupKey.isNullOrEmpty() && contactId != null) {
+                            val contactUri = ContactsContract.Contacts.getLookupUri(contactId, lookupKey)
+                            if (contactUri != null) return contactUri
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("MainActivity", "findContactLookupUri failed for $key: ${e.message}")
+            }
+        }
+        return null
     }
 
     private fun cacheKeyForAddress(rawAddress: String): String {
@@ -577,7 +679,9 @@ class MainActivity : AppCompatActivity() {
     private inner class ThreadCategoryPagerAdapter(
         private val pages: List<InboxPage>,
         private val onThreadClick: (ThreadItem) -> Unit,
-        private val onOtpClick: (OtpMessageItem) -> Unit
+        private val onThreadAvatarClick: (ThreadItem) -> Unit,
+        private val onOtpClick: (OtpMessageItem) -> Unit,
+        private val onOtpAvatarClick: (OtpMessageItem) -> Unit
     ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
         private val itemsByCategory = pages
@@ -590,7 +694,7 @@ class MainActivity : AppCompatActivity() {
 
         private inner class CategoryPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val recycler: RecyclerView = itemView.findViewById(R.id.category_recycler)
-            private val adapter = ThreadAdapter(emptyList(), onThreadClick)
+            private val adapter = ThreadAdapter(emptyList(), onThreadClick, onThreadAvatarClick)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
             init {
@@ -617,7 +721,7 @@ class MainActivity : AppCompatActivity() {
 
         private inner class OtpPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val recycler: RecyclerView = itemView.findViewById(R.id.otp_recycler)
-            private val adapter = OtpMessageAdapter(emptyList(), onOtpClick)
+            private val adapter = OtpMessageAdapter(emptyList(), onOtpClick, onOtpAvatarClick)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
             init {

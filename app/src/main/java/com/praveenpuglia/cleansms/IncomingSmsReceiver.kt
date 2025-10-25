@@ -38,9 +38,9 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         val fullBody = messages.joinToString(separator = "") { it.displayMessageBody ?: it.messageBody ?: "" }
         val originatingAddress = messages.first().originatingAddress ?: "Unknown"
 
-        val enriched = ContactEnrichment.enrich(context, originatingAddress)
-        val displayName = enriched?.first
-        val photoUri = enriched?.second
+    val enriched = ContactEnrichment.enrich(context, originatingAddress)
+    val displayName = enriched?.name
+    val photoUri = enriched?.photoUri
 
         val threadId = findOrCreateThreadId(context, originatingAddress)
         val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
@@ -182,7 +182,7 @@ object ContactEnrichment {
     private val phoneUtil = PhoneNumberUtil.getInstance()
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
 
-    fun enrich(context: Context, rawAddress: String): Pair<String?, String?>? {
+    fun enrich(context: Context, rawAddress: String): ContactInfo? {
         // Allow enrichment even in cold start: use simplified heuristic
         val candidate = MainActivity.isMobileNumberCandidateStatic(rawAddress)
         // Try cache/index only if activity is active
@@ -194,7 +194,7 @@ object ContactEnrichment {
         return if (candidate) quickPhoneLookup(context, rawAddress) else quickPhoneLookup(context, rawAddress)
     }
 
-    private fun quickPhoneLookup(context: Context, raw: String): Pair<String?, String?>? {
+    private fun quickPhoneLookup(context: Context, raw: String): ContactInfo? {
         val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(raw).ifEmpty { raw.replace(Regex("\\s+"), "") }
         val candidates = LinkedHashSet<String>()
         candidates += raw
@@ -212,15 +212,22 @@ object ContactEnrichment {
         for (c in candidates) {
             try {
                 val lookupUri = android.net.Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, android.net.Uri.encode(c))
-                val proj = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup.PHOTO_URI, ContactsContract.PhoneLookup._ID)
+                val proj = arrayOf(
+                    ContactsContract.PhoneLookup.DISPLAY_NAME,
+                    ContactsContract.PhoneLookup.PHOTO_URI,
+                    ContactsContract.PhoneLookup._ID,
+                    ContactsContract.PhoneLookup.LOOKUP_KEY
+                )
                 context.contentResolver.query(lookupUri, proj, null, null, null)?.use { cur ->
                     if (cur.moveToFirst()) {
                         val idxName = cur.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
                         val idxPhoto = cur.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
                         val idxId = cur.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        val idxLookup = cur.getColumnIndex(ContactsContract.PhoneLookup.LOOKUP_KEY)
                         val name = if (idxName >= 0) cur.getString(idxName) else null
                         var photo = if (idxPhoto >= 0) cur.getString(idxPhoto) else null
                         val contactId = if (idxId >= 0) cur.getLong(idxId) else null
+                        val lookupKey = if (idxLookup >= 0) cur.getString(idxLookup) else null
                         if (photo.isNullOrEmpty() && contactId != null) {
                             try {
                                 val contactUri = android.net.Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, contactId.toString())
@@ -233,7 +240,12 @@ object ContactEnrichment {
                                 }
                             } catch (_: Exception) {}
                         }
-                        return Pair(name, photo)
+                        val lookupString = if (!lookupKey.isNullOrEmpty() && contactId != null) {
+                            ContactsContract.Contacts.getLookupUri(contactId, lookupKey)?.toString()
+                        } else {
+                            null
+                        }
+                        return ContactInfo(name, photo, lookupString)
                     }
                 }
             } catch (_: Exception) {}

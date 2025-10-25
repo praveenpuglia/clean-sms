@@ -54,9 +54,9 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         }
 
         // Enrich for notification
-        val enriched = ContactEnrichment.enrich(context, originatingAddress)
-        val displayName = enriched?.first ?: originatingAddress
-        val photoUri = enriched?.second
+    val enriched = ContactEnrichment.enrich(context, originatingAddress)
+    val displayName = enriched?.name ?: originatingAddress
+    val photoUri = enriched?.photoUri
 
         val threadId = findOrCreateThreadId(context, originatingAddress)
         val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)

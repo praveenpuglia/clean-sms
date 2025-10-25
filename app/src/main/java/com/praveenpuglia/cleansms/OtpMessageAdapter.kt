@@ -17,7 +17,8 @@ import java.util.Calendar
 
 class OtpMessageAdapter(
     private var items: List<OtpMessageItem>,
-    private val onItemClick: (OtpMessageItem) -> Unit
+    private val onItemClick: (OtpMessageItem) -> Unit,
+    private val onAvatarClick: (OtpMessageItem) -> Unit
 ) : RecyclerView.Adapter<OtpMessageAdapter.VH>() {
 
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -61,6 +62,20 @@ class OtpMessageAdapter(
             clipboard?.setPrimaryClip(ClipData.newPlainText("OTP", code))
             Toast.makeText(context, context.getString(R.string.toast_otp_copied), Toast.LENGTH_SHORT).show()
         }
+
+        val canOpenContact = item.hasSavedContact
+        if (canOpenContact) {
+            val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
+            holder.avatarText.setOnClickListener(avatarClickListener)
+            holder.avatarImage.setOnClickListener(avatarClickListener)
+        } else {
+            holder.avatarText.setOnClickListener(null)
+            holder.avatarImage.setOnClickListener(null)
+        }
+        holder.avatarText.isClickable = canOpenContact
+        holder.avatarText.isFocusable = canOpenContact
+        holder.avatarImage.isClickable = canOpenContact
+        holder.avatarImage.isFocusable = canOpenContact
         holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
 
         bindAvatar(holder, item)
