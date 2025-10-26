@@ -53,7 +53,7 @@
                     android:contentDescription="@string/delete_selected_content_description"
                     android:padding="8dp"
                     android:src="@drawable/ic_delete"
-                    android:visibility="gone"
+                    android:visibility="invisible"
                     app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>

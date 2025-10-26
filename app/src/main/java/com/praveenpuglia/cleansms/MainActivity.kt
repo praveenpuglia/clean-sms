@@ -607,7 +607,7 @@ class MainActivity : AppCompatActivity() {
             deleteButton.isEnabled = count > 0
         } else {
             headerTitle.text = getString(R.string.header_messages)
-            deleteButton.visibility = View.GONE
+            deleteButton.visibility = View.INVISIBLE
             deleteButton.isEnabled = false
         }
         if (::threadsPagerAdapter.isInitialized) {
