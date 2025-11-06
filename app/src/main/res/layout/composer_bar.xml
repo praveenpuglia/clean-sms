@@ -6,8 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?android:attr/colorBackground"
-    android:elevation="8dp"
-    android:fitsSystemWindows="true">
+    android:elevation="8dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/composer_bar_container"

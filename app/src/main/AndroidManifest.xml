@@ -45,7 +45,10 @@
 
         <activity android:name=".ThreadDetailActivity" android:exported="false" />
 
-        <activity android:name=".NewMessageActivity" android:exported="false" />
+        <activity 
+            android:name=".NewMessageActivity" 
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".RespondViaMessageService"
