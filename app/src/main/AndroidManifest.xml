@@ -45,6 +45,8 @@
 
         <activity android:name=".ThreadDetailActivity" android:exported="false" />
 
+        <activity android:name=".NewMessageActivity" android:exported="false" />
+
         <service
             android:name=".RespondViaMessageService"
             android:exported="true"

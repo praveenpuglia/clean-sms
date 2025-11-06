@@ -74,6 +74,15 @@ class ThreadDetailActivity : AppCompatActivity() {
         setupRecyclerView()
     setupComposeBar()
         loadMessages()
+        
+        // Focus composer if requested
+        if (intent.getBooleanExtra("focus_composer", false)) {
+            messageInput.post {
+                messageInput.requestFocus()
+                val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.showSoftInput(messageInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
     }
 
     override fun onResume() {

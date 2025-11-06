@@ -116,6 +116,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var threadsPagerAdapter: ThreadCategoryPagerAdapter
     private lateinit var headerTitle: TextView
     private lateinit var deleteButton: ImageButton
+    private lateinit var newMessageFab: com.google.android.material.floatingactionbutton.FloatingActionButton
     private var tabLayoutMediator: TabLayoutMediator? = null
     private val categories = listOf(
         MessageCategory.PERSONAL,
@@ -147,6 +148,13 @@ class MainActivity : AppCompatActivity() {
         threadsPager = findViewById(R.id.threads_pager)
         headerTitle = findViewById(R.id.header_title)
         deleteButton = findViewById(R.id.header_delete_button)
+        newMessageFab = findViewById(R.id.new_message_fab)
+        
+        newMessageFab.setOnClickListener {
+            val intent = Intent(this, NewMessageActivity::class.java)
+            startActivity(intent)
+        }
+        
         // TODO: Prevent initial OTP tab flicker during first load.
         threadsPagerAdapter = ThreadCategoryPagerAdapter(
             pagerPages,
@@ -381,6 +389,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
         categoryTabs.visibility = View.VISIBLE
         threadsPager.visibility = View.VISIBLE
+        newMessageFab.visibility = View.VISIBLE
         ViewCompat.requestApplyInsets(threadsPager)
         reloadInboxData()
     }

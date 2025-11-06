@@ -129,6 +129,17 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Floating Action Button for New Message -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/new_message_fab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:src="@drawable/ic_add"
+            android:contentDescription="New message"
+            android:visibility="gone" />
+
     </FrameLayout>
 
 </LinearLayout>
