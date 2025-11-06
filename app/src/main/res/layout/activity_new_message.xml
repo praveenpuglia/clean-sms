@@ -17,59 +17,76 @@
         app:titleCentered="false"
         android:elevation="4dp" />
 
-    <!-- Recipient input section (Material 3 Outlined TextField) -->
-    <com.google.android.material.card.MaterialCardView
+    <!-- Recipient input section with chips -->
+    <LinearLayout
         android:id="@+id/new_message_recipients_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginEnd="20dp"
-        android:layout_marginTop="20dp"
-        android:padding="12dp"
-        app:cardElevation="0dp"
-        app:strokeWidth="1dp"
-        app:strokeColor="?attr/colorOutline"
-        app:cardBackgroundColor="?attr/colorSurfaceVariant">
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="16dp"
+        android:background="?attr/colorSurface">
 
-        <LinearLayout
+        <!-- Label for the recipient section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="To"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorOnSurface"
+            android:paddingBottom="8dp" />
+
+        <!-- Container for chips and input -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:minHeight="56dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorOutline"
+            app:cardCornerRadius="8dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:contentPadding="8dp">
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/new_message_recipients_chip_group"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp"
-                app:chipSpacingHorizontal="6dp"
-                app:chipSpacingVertical="6dp"
-                app:singleLine="false"
-                app:selectionRequired="false" />
+                android:orientation="vertical">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/new_message_recipient_input_layout"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                app:boxBackgroundMode="outline"
-                app:hintEnabled="true">
+                <!-- ChipGroup with inline flow layout -->
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/new_message_recipients_chip_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:chipSpacingHorizontal="8dp"
+                    app:chipSpacingVertical="4dp"
+                    app:singleLine="false"
+                    app:selectionRequired="false" />
 
-                <com.google.android.material.textfield.TextInputEditText
+                <!-- Plain EditText for recipient input -->
+                <EditText
                     android:id="@+id/new_message_recipient_input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="40dp"
                     android:hint="Type name or phone number"
                     android:inputType="text|textCapWords|textNoSuggestions"
-                    android:maxLines="1" />
-            </com.google.android.material.textfield.TextInputLayout>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+                    android:maxLines="1"
+                    android:background="@android:color/transparent"
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
 
+    <!-- Small spacing -->
     <View
         android:layout_width="match_parent"
-        android:layout_height="8dp"
+        android:layout_height="12dp"
         android:background="@android:color/transparent" />
 
     <!-- Contact suggestions list -->
