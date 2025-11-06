@@ -45,6 +45,7 @@
                     android:id="@+id/composer_message_input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="40dp"
                     android:inputType="textCapSentences|textMultiLine"
                     android:maxLines="4"
                     android:paddingEnd="56dp"
@@ -78,8 +79,7 @@
             app:fabSize="mini"
             app:layout_constraintBottom_toBottomOf="@id/composer_input_container"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/composer_input_container"
-            app:layout_constraintTop_toTopOf="@id/composer_input_container" />
+            app:layout_constraintStart_toEndOf="@id/composer_input_container" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
