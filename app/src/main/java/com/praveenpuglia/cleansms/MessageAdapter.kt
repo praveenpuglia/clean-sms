@@ -1,5 +1,6 @@
 package com.praveenpuglia.cleansms
 
+import android.text.method.LinkMovementMethod
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -46,27 +47,22 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
         val msg = messages[position]
         val timeStr = formatMessageTime(msg.date)
 
+        // Common binding logic extracted
+        fun bindCommon(bodyView: TextView, timeView: TextView, simIndicator: View, simSlotText: TextView) {
+            bodyView.text = msg.body
+            // Apply linkification after setting text (web/email/phone). Using framework Linkify via movement method for accessibility.
+            LinkifyUtil.linkify(bodyView)
+            timeView.text = timeStr
+            if (msg.simSlot != null || msg.subscriptionId != null) {
+                simIndicator.visibility = View.VISIBLE
+                simSlotText.text = (msg.simSlot ?: "?").toString()
+            } else {
+                simIndicator.visibility = View.GONE
+            }
+        }
         when (holder) {
-            is IncomingVH -> {
-                holder.body.text = msg.body
-                holder.time.text = timeStr
-                if (msg.simSlot != null || msg.subscriptionId != null) {
-                    holder.simIndicator.visibility = View.VISIBLE
-                    holder.simSlotText.text = (msg.simSlot ?: "?").toString()
-                } else {
-                    holder.simIndicator.visibility = View.GONE
-                }
-            }
-            is OutgoingVH -> {
-                holder.body.text = msg.body
-                holder.time.text = timeStr
-                if (msg.simSlot != null || msg.subscriptionId != null) {
-                    holder.simIndicator.visibility = View.VISIBLE
-                    holder.simSlotText.text = (msg.simSlot ?: "?").toString()
-                } else {
-                    holder.simIndicator.visibility = View.GONE
-                }
-            }
+            is IncomingVH -> bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
+            is OutgoingVH -> bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
         }
     }
 

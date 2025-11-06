@@ -24,7 +24,8 @@
             android:layout_height="wrap_content"
             android:textSize="15sp"
             android:textColor="?attr/colorOnPrimaryContainer"
-            android:lineSpacingExtra="2dp" />
+            android:lineSpacingExtra="2dp"
+            android:autoLink="none" />
 
         <LinearLayout
             android:layout_width="wrap_content"
