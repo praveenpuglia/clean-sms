@@ -23,6 +23,29 @@ object CategoryClassifier {
     // Full phone number patterns (with or without country code, typically 10+ digits)
     private val phonePattern = Pattern.compile("^\\+?[1-9]\\d{9,14}$")
 
+    // OTP keyword proximity detection (shared with notification logic) per constitution §5 (Non-intrusive, high precision)
+    // We require an OTP keyword within a small window (<= 40 chars) of a candidate numeric code (4-8 digits)
+    private val otpKeywordRegex = Regex("\\b(otp|one[\\s-]*time\\s*password|verification\\s*code|security\\s*code|login\\s*code)\\b", RegexOption.IGNORE_CASE)
+    private val otpCodeRegex = Regex("\\b\\d{4,8}\\b")
+
+    fun extractHighPrecisionOtp(body: String): String? {
+        if (body.length > 1000) return null // avoid heavy processing on very long messages
+        if (!otpKeywordRegex.containsMatchIn(body)) return null
+        // Collect all codes and test proximity to keyword matches
+        val keywords = otpKeywordRegex.findAll(body).map { it.range }.toList()
+        if (keywords.isEmpty()) return null
+        val codes = otpCodeRegex.findAll(body).map { it }.toList()
+        for (codeMatch in codes) {
+            val codeRange = codeMatch.range
+            val near = keywords.any { kw ->
+                val distance = if (codeRange.first >= kw.last) codeRange.first - kw.last else kw.first - codeRange.last
+                distance in 0..40 // within 40 chars forward or backward
+            }
+            if (near) return codeMatch.value
+        }
+        return null
+    }
+
     /**
      * Categorize a sender address based on TRAI format or phone number
      */

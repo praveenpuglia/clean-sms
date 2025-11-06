@@ -56,9 +56,10 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         val photoUri = enriched?.photoUri
         val lookupUri = enriched?.lookupUri
 
-        val threadId = findOrCreateThreadId(context, originatingAddress)
-        val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
-        val otpCode = extractOtp(fullBody)
+    val threadId = findOrCreateThreadId(context, originatingAddress)
+    val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
+    // Unified high precision OTP detection (keyword + proximity) per CategoryClassifier
+    val otpCode = CategoryClassifier.extractHighPrecisionOtp(fullBody)
 
         postNotification(
             context = context,
@@ -203,10 +204,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         return Telephony.Threads.getOrCreateThreadId(context, setOf(address))
     }
 
-    private fun extractOtp(body: String): String? {
-        val otpRegex = Regex("\\b\\d{4,8}\\b")
-        return otpRegex.find(body)?.value
-    }
+    // Legacy simple OTP extraction removed; use CategoryClassifier.extractHighPrecisionOtp at call sites.
 
     private fun loadBitmap(context: Context, uriString: String?): android.graphics.Bitmap? {
         if (uriString.isNullOrBlank()) return null

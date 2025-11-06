@@ -101,7 +101,10 @@ class MainActivity : AppCompatActivity() {
     private var bulkContactsIndex: Map<String, ContactInfo>? = null
     private val phoneUtil = PhoneNumberUtil.getInstance()
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
+    // Unified OTP detection replaced by CategoryClassifier.extractHighPrecisionOtp; legacy patterns kept only for future phased removal
+    @Deprecated("Use CategoryClassifier.extractHighPrecisionOtp")
     private val otpRegex = Regex("\\b\\d{4,8}\\b")
+    @Deprecated("Use CategoryClassifier.extractHighPrecisionOtp")
     private val otpKeywordPattern = Regex("\\botp\\b|one[\\s-]*time\\s+password", RegexOption.IGNORE_CASE)
     private val otpFetchLimit = 200
     
@@ -1157,8 +1160,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun extractOtpFromBody(body: String?): String? {
         if (body.isNullOrBlank()) return null
-        if (!otpKeywordPattern.containsMatchIn(body)) return null
-        return otpRegex.find(body)?.value
+        return CategoryClassifier.extractHighPrecisionOtp(body)
     }
 
     /**
