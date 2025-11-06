@@ -32,7 +32,6 @@ class OtpMessageAdapter(
         val senderName: TextView = itemView.findViewById(R.id.otp_sender_name)
         val messageDate: TextView = itemView.findViewById(R.id.otp_message_date)
         val messagePreview: TextView = itemView.findViewById(R.id.otp_message_preview)
-        val codeContainer: View = itemView.findViewById(R.id.otp_code_container)
         val otpCode: TextView = itemView.findViewById(R.id.otp_code)
         val divider: View = itemView.findViewById(R.id.otp_divider)
         val selectionIcon: ImageView = itemView.findViewById(R.id.otp_avatar_selection_icon)
@@ -66,7 +65,6 @@ class OtpMessageAdapter(
         holder.otpCode.text = code
         val hasCode = code.isNotBlank()
         holder.otpCode.visibility = if (hasCode) View.VISIBLE else View.GONE
-        holder.codeContainer.visibility = if (hasCode) View.VISIBLE else View.GONE
         holder.unreadDot.visibility = if (item.isUnread) View.VISIBLE else View.GONE
         if (item.simSlot != null || item.subscriptionId != null) {
             holder.simIndicator.visibility = View.VISIBLE
@@ -78,7 +76,6 @@ class OtpMessageAdapter(
     holder.otpCode.isEnabled = codeEnabled
     holder.otpCode.isClickable = codeEnabled
     holder.otpCode.isFocusable = codeEnabled
-    holder.codeContainer.isEnabled = !selectionMode
         holder.otpCode.setOnClickListener {
             if (selectionMode) {
                 onItemClick(item)
