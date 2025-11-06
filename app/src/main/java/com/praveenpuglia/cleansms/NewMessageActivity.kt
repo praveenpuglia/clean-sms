@@ -5,15 +5,13 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
-import android.widget.AutoCompleteTextView
 import android.widget.EditText
 import android.widget.ImageButton
-import com.google.android.material.appbar.MaterialToolbar
+import android.widget.TextView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
-import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -22,16 +20,18 @@ import android.provider.Telephony
 import android.content.ContentValues
 import android.telephony.PhoneNumberUtils
 import android.widget.Toast
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class NewMessageActivity : AppCompatActivity() {
 
-    private lateinit var toolbar: MaterialToolbar
+    private lateinit var backButton: ImageButton
     private lateinit var chipGroup: ChipGroup
     private lateinit var recipientInput: EditText
     private lateinit var contactsList: RecyclerView
-    private lateinit var composerContainer: LinearLayout
+    private lateinit var composerContainer: View
     private lateinit var messageInput: EditText
-    private lateinit var sendButton: ImageButton
+    private lateinit var sendButton: FloatingActionButton
+    private lateinit var messageCounter: TextView
     
     private lateinit var contactsAdapter: ContactSuggestionAdapter
     private var allContacts: List<ContactSuggestion> = emptyList()
@@ -41,21 +41,21 @@ class NewMessageActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_new_message)
 
-    toolbar = findViewById(R.id.new_message_toolbar)
+        backButton = findViewById(R.id.new_message_back_button)
         chipGroup = findViewById(R.id.new_message_recipients_chip_group)
         recipientInput = findViewById(R.id.new_message_recipient_input)
         contactsList = findViewById(R.id.new_message_contacts_list)
-        composerContainer = findViewById(R.id.new_message_composer_container)
-        messageInput = findViewById(R.id.new_message_input)
-        sendButton = findViewById(R.id.new_message_send_button)
+        composerContainer = findViewById(R.id.new_message_composer_include)
+        messageInput = findViewById(R.id.composer_message_input)
+        sendButton = findViewById(R.id.composer_send_button)
+        messageCounter = findViewById(R.id.composer_message_counter)
 
         setupViews()
         loadContacts()
     }
 
     private fun setupViews() {
-        toolbar.title = getString(R.string.new_message_title)
-        toolbar.setNavigationOnClickListener { finish() }
+        backButton.setOnClickListener { finish() }
 
         // Autofocus recipient field and show keyboard
         recipientInput.post {
@@ -102,11 +102,12 @@ class NewMessageActivity : AppCompatActivity() {
             false
         }
 
-        // Setup message input enabling logic based on recipients list
+        // Setup message input enabling logic and counter
         messageInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 sendButton.isEnabled = !s.isNullOrBlank() && selectedRecipients.isNotEmpty()
+                messageCounter.text = s?.length?.toString() ?: "0"
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -227,6 +228,13 @@ class NewMessageActivity : AppCompatActivity() {
         // Show composer when at least one recipient present
         if (selectedRecipients.isNotEmpty()) {
             composerContainer.visibility = View.VISIBLE
+            
+            // Auto-focus message input for quick typing after selecting first contact
+            messageInput.post {
+                messageInput.requestFocus()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT)
+            }
         }
     }
 

@@ -32,6 +32,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private lateinit var messageAdapter: MessageAdapter
     private lateinit var messageInput: EditText
     private lateinit var sendButton: ImageButton
+    private lateinit var messageCounter: TextView
     private lateinit var composeBarContainer: View
     private lateinit var avatarContainer: View
     private lateinit var avatarImage: ImageView
@@ -250,9 +251,19 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun setupComposeBar() {
-        composeBarContainer = findViewById(R.id.compose_bar)
-        messageInput = findViewById(R.id.message_input)
-        sendButton = findViewById(R.id.send_button)
+        composeBarContainer = findViewById(R.id.composer_bar_container)
+        messageInput = findViewById(R.id.composer_message_input)
+        sendButton = findViewById(R.id.composer_send_button)
+        messageCounter = findViewById(R.id.composer_message_counter)
+
+        // Update counter as user types
+        messageInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                messageCounter.text = s?.length?.toString() ?: "0"
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
 
         sendButton.setOnClickListener {
             val messageText = messageInput.text.toString().trim()
