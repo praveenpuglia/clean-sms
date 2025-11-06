@@ -7,7 +7,7 @@ object CategoryStorage {
     private const val PREF_NAME = "thread_categories"
     private const val KEY_PREFIX = "thread_"
     private const val KEY_VERSION = "categorization_version"
-    private const val CURRENT_VERSION = 2 // Increment when categorization logic changes
+    private const val CURRENT_VERSION = 4 // v4: TRAI header regex now 1–6 chars + mandatory suffix for classification (fix JX-BOLT-S) (§3, §6, §10)
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)

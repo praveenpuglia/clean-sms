@@ -7,9 +7,15 @@ import java.util.regex.Pattern
 
 object CategoryClassifier {
 
-    // TRAI format: XY-ABCDEF-G (e.g., AB-HDFCBK-S, CD-AMAZON-P)
-    // X = TSP, Y = Service Area, ABCDEF = Header Name (6 chars), G = Suffix (S/P/T/G)
-    private val traiPattern = Pattern.compile("^([A-Z]{2})-([A-Z0-9]{6})-([A-Z])$", Pattern.CASE_INSENSITIVE)
+    // TRAI header handling (refined):
+    // Formal pattern: XY-HEADER-SFX
+    // - XY          : 2 alpha chars (TSP + service area codes)
+    // - HEADER      : 1–6 alphanumeric chars (registered sender header; may be shorter than 6)
+    // - SFX         : Single alpha suffix bucket in (S, P, T, G)
+    // We also allow headers without suffix (XY-HEADER) but only classify when suffix present.
+    // Examples: JX-BOLT-S, VM-HDFCBK-T, DZ-AMAZN-P, BK-IRCTC-G
+    private val traiWithSuffixPattern = Pattern.compile("^([A-Z]{2})-([A-Z0-9]{1,6})-([A-Z])$", Pattern.CASE_INSENSITIVE)
+    private val traiNoSuffixPattern = Pattern.compile("^([A-Z]{2})-([A-Z0-9]{1,6})$", Pattern.CASE_INSENSITIVE)
     
     // Short code pattern: 3-8 digits (service messages from companies, banks, etc.)
     private val shortCodePattern = Pattern.compile("^\\d{3,8}$")
@@ -21,36 +27,46 @@ object CategoryClassifier {
      * Categorize a sender address based on TRAI format or phone number
      */
     fun categorizeAddress(address: String): MessageCategory {
+        // Normalization: trim, collapse whitespace, strip common formatting characters
+        // This prevents misclassification of spaced or dashed numbers (e.g. "77384 56881" or "77-384-56881")
         val cleaned = address.trim()
+        val digitsOnly = cleaned.filter { it.isDigit() }
 
-        // Check if it's a TRAI format sender ID: XY-ABCDEF-G
-        val traiMatcher = traiPattern.matcher(cleaned)
-        if (traiMatcher.matches()) {
-            val suffix = traiMatcher.group(3) // Get the G suffix (S/P/T/G)
-            val category = MessageCategory.fromTraiSuffix(suffix)
-            if (category != null) {
-                return category
+        // 1. TRAI header with suffix
+        traiWithSuffixPattern.matcher(cleaned.uppercase()).apply {
+            if (matches()) {
+                val suffix = group(3)
+                MessageCategory.fromTraiSuffix(suffix)?.let { return it }
+                return MessageCategory.UNKNOWN
             }
         }
 
-        // Check if it's a short code (e.g., 57575, 59099) - categorize as Service
-        if (shortCodePattern.matcher(cleaned).matches()) {
-            return MessageCategory.SERVICE
+        // 2. TRAI header without suffix -> UNKNOWN (will be inferred later)
+        if (traiNoSuffixPattern.matcher(cleaned.uppercase()).matches()) {
+            return MessageCategory.UNKNOWN
         }
 
-        // Check if it's a full phone number (10+ digits)
-        if (phonePattern.matcher(cleaned).matches()) {
+    // 3. Full phone number (after normalization) -> PERSONAL
+        if (digitsOnly.length in 10..15) {
+            // Accept E.164 with leading + as well as local 10-digit numbers.
+            // Extra guard: ensure not a short code inadvertently (length >=10 already ensures this)
             return MessageCategory.PERSONAL
         }
 
-        // For non-TRAI, non-phone senders, return UNKNOWN for now
-        // Will be classified later based on content
+    // 4. Short codes (3–8 digits) -> SERVICE (company/bank system messages)
+        if (shortCodePattern.matcher(digitsOnly).matches()) {
+            return MessageCategory.SERVICE
+        }
+
+    // 5. Other alphanumeric sender IDs: treat as UNKNOWN now, will resolve via content
+        // Rationale: Many such headers are promotional but we rely on robust keyword inference to avoid false positives.
         return MessageCategory.UNKNOWN
     }
 
     /**
      * Analyze message content to infer category for unknown senders
      */
+    @Suppress("UNUSED_PARAMETER") // address retained for future heuristics (e.g., contact presence, locale analysis)
     fun inferCategoryFromContent(context: Context, address: String, threadId: Long): MessageCategory {
         // Get a few messages from this thread
         val messages = getSampleMessages(context, threadId, 5)
