@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/otp_item_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -122,6 +123,29 @@
                     android:textColor="?attr/colorOnSecondaryContainer"
                     android:textStyle="bold"
                     android:background="@drawable/bg_otp_code" />
+
+                <FrameLayout
+                    android:id="@+id/otp_sim_indicator"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_gravity="center_vertical"
+                    android:visibility="gone">
+                    <ImageView
+                        android:id="@+id/otp_sim_icon"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_sim_outline"
+                        app:tint="?attr/colorOutlineVariant" />
+                    <TextView
+                        android:id="@+id/otp_sim_slot"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
 
             </LinearLayout>
 

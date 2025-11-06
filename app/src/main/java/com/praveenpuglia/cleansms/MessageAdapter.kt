@@ -17,11 +17,15 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
     class IncomingVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val body: TextView = itemView.findViewById(R.id.message_body)
         val time: TextView = itemView.findViewById(R.id.message_time)
+        val simIndicator: View = itemView.findViewById(R.id.message_sim_indicator)
+        val simSlotText: TextView = itemView.findViewById(R.id.message_sim_slot)
     }
 
     class OutgoingVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val body: TextView = itemView.findViewById(R.id.message_body)
         val time: TextView = itemView.findViewById(R.id.message_time)
+        val simIndicator: View = itemView.findViewById(R.id.message_sim_indicator)
+        val simSlotText: TextView = itemView.findViewById(R.id.message_sim_slot)
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -46,10 +50,22 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
             is IncomingVH -> {
                 holder.body.text = msg.body
                 holder.time.text = timeStr
+                if (msg.simSlot != null || msg.subscriptionId != null) {
+                    holder.simIndicator.visibility = View.VISIBLE
+                    holder.simSlotText.text = (msg.simSlot ?: "?").toString()
+                } else {
+                    holder.simIndicator.visibility = View.GONE
+                }
             }
             is OutgoingVH -> {
                 holder.body.text = msg.body
                 holder.time.text = timeStr
+                if (msg.simSlot != null || msg.subscriptionId != null) {
+                    holder.simIndicator.visibility = View.VISIBLE
+                    holder.simSlotText.text = (msg.simSlot ?: "?").toString()
+                } else {
+                    holder.simIndicator.visibility = View.GONE
+                }
             }
         }
     }

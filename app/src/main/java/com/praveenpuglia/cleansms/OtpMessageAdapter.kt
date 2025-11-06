@@ -36,6 +36,8 @@ class OtpMessageAdapter(
         val otpCode: TextView = itemView.findViewById(R.id.otp_code)
         val divider: View = itemView.findViewById(R.id.otp_divider)
         val selectionIcon: ImageView = itemView.findViewById(R.id.otp_avatar_selection_icon)
+        val simIndicator: View = itemView.findViewById(R.id.otp_sim_indicator)
+        val simSlotText: TextView = itemView.findViewById(R.id.otp_sim_slot)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -66,6 +68,12 @@ class OtpMessageAdapter(
         holder.otpCode.visibility = if (hasCode) View.VISIBLE else View.GONE
         holder.codeContainer.visibility = if (hasCode) View.VISIBLE else View.GONE
         holder.unreadDot.visibility = if (item.isUnread) View.VISIBLE else View.GONE
+        if (item.simSlot != null || item.subscriptionId != null) {
+            holder.simIndicator.visibility = View.VISIBLE
+            holder.simSlotText.text = (item.simSlot ?: "?").toString()
+        } else {
+            holder.simIndicator.visibility = View.GONE
+        }
     val codeEnabled = hasCode && !selectionMode
     holder.otpCode.isEnabled = codeEnabled
     holder.otpCode.isClickable = codeEnabled

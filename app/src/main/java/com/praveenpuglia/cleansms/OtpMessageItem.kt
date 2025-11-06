@@ -7,6 +7,8 @@ data class OtpMessageItem(
     val body: String,
     val date: Long,
     val otpCode: String,
+    val subscriptionId: Int? = null, // platform subscription id (sub_id column)
+    val simSlot: Int? = null, // resolved SIM slot index (1-based for UI: 1 or 2)
     val contactName: String? = null,
     val contactPhotoUri: String? = null,
     val contactLookupUri: String? = null,

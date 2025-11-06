@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.ContentUris
 import android.provider.Telephony
+import android.telephony.SubscriptionManager
 import android.app.role.RoleManager
 import android.database.Cursor
 import android.net.Uri
@@ -90,7 +91,8 @@ class MainActivity : AppCompatActivity() {
     private val requestedPermissions = arrayOf(
         Manifest.permission.READ_SMS,
         Manifest.permission.SEND_SMS,
-        Manifest.permission.READ_CONTACTS
+        Manifest.permission.READ_CONTACTS,
+        Manifest.permission.READ_PHONE_STATE // needed to reliably map subscriptionId to SIM slot
     )
 
     // Cache keyed by E.164 or digits-only for phone numbers; fallback to raw key for alphanumeric senders
@@ -1067,7 +1069,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadOtpMessages(): List<OtpMessageItem> {
         val uri: Uri = "content://sms".toUri()
-    val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read")
+    val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id")
         val selection = "type = ?"
         val selectionArgs = arrayOf("1") // Inbox / received messages
         val sortOrder = "date DESC"
@@ -1081,6 +1083,7 @@ class MainActivity : AppCompatActivity() {
             val idxBody = cursor.getColumnIndex("body")
             val idxDate = cursor.getColumnIndex("date")
             val idxRead = cursor.getColumnIndex("read")
+            val idxSubId = cursor.getColumnIndex("sub_id")
 
             while (cursor.moveToNext() && results.size < otpFetchLimit) {
                 val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
@@ -1094,6 +1097,9 @@ class MainActivity : AppCompatActivity() {
                     val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
                     val isRead = idxRead >= 0 && cursor.getInt(idxRead) != 0
                     if (messageId != -1L && threadId != -1L) {
+                        val subIdRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
+                        val subscriptionId = if (subIdRaw >= 0) subIdRaw else null
+                        val simSlot = subscriptionId?.let { resolveSimSlot(it) }
                         results.add(
                             OtpMessageItem(
                                 messageId = messageId,
@@ -1102,6 +1108,8 @@ class MainActivity : AppCompatActivity() {
                                 body = body,
                                 date = date,
                                 otpCode = otpCode,
+                                subscriptionId = subscriptionId,
+                                simSlot = simSlot,
                                 isRead = isRead
                             )
                         )
@@ -1111,6 +1119,28 @@ class MainActivity : AppCompatActivity() {
         }
 
         return results
+    }
+
+    private val simSlotCache = mutableMapOf<Int, Int?>()
+    private val subscriptionFallbackOrder = mutableListOf<Int>()
+    private fun resolveSimSlot(subscriptionId: Int): Int? {
+        if (simSlotCache.containsKey(subscriptionId)) return simSlotCache[subscriptionId]
+        val hasPhoneState = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+        var slot: Int? = null
+        if (hasPhoneState) {
+            val mgr = getSystemService(SubscriptionManager::class.java)
+            val info = try { mgr?.activeSubscriptionInfoList?.firstOrNull { it.subscriptionId == subscriptionId } } catch (_: SecurityException) { null }
+            slot = info?.simSlotIndex?.plus(1)
+        }
+        if (slot == null) {
+            // Fallback: deterministic assignment order 1..2 based on first appearance
+            if (!subscriptionFallbackOrder.contains(subscriptionId) && subscriptionFallbackOrder.size < 2) {
+                subscriptionFallbackOrder += subscriptionId
+            }
+            slot = subscriptionFallbackOrder.indexOf(subscriptionId).takeIf { it >= 0 }?.plus(1)
+        }
+        simSlotCache[subscriptionId] = slot
+        return slot
     }
 
     // Helper: digits only

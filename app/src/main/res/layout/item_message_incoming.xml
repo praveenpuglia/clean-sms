@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Incoming message bubble -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -25,14 +26,44 @@
             android:textColor="?attr/colorOnSurfaceVariant"
             android:lineSpacingExtra="2dp" />
 
-        <TextView
-            android:id="@+id/message_time"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:textSize="11sp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_gravity="end" />
+            android:layout_gravity="end"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/message_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <FrameLayout
+                android:id="@+id/message_sim_indicator"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="6dp"
+                android:visibility="gone">
+                <ImageView
+                    android:id="@+id/message_sim_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/ic_sim_outline"
+                    app:tint="?attr/colorOutlineVariant" />
+                <TextView
+                    android:id="@+id/message_sim_slot"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+        </LinearLayout>
 
     </LinearLayout>
 

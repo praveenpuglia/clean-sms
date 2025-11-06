@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.telephony.SubscriptionManager
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
@@ -374,7 +375,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun queryMessagesForThread(threadId: Long): List<Message> {
         val uri = "content://sms".toUri()
-        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type")
+        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "sub_id")
         val selection = "thread_id = ?"
         val selectionArgs = arrayOf(threadId.toString())
         val sortOrder = "date ASC"
@@ -387,6 +388,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             val idxBody = cursor.getColumnIndex("body")
             val idxDate = cursor.getColumnIndex("date")
             val idxType = cursor.getColumnIndex("type")
+            val idxSubId = cursor.getColumnIndex("sub_id")
 
             while (cursor.moveToNext()) {
                 val id = if (idxId >= 0) cursor.getLong(idxId) else -1L
@@ -395,11 +397,34 @@ class ThreadDetailActivity : AppCompatActivity() {
                 val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
                 val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
                 val type = if (idxType >= 0) cursor.getInt(idxType) else 1
-
-                messages.add(Message(id, thread, address, body, date, type))
+                val subRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
+                val subscriptionId = if (subRaw >= 0) subRaw else null
+                val simSlot = subscriptionId?.let { resolveSimSlot(it) }
+                messages.add(Message(id, thread, address, body, date, type, subscriptionId, simSlot))
             }
         }
         return messages
+    }
+
+    private val simSlotCache = mutableMapOf<Int, Int?>()
+    private val subscriptionFallbackOrder = mutableListOf<Int>()
+    private fun resolveSimSlot(subscriptionId: Int): Int? {
+        if (simSlotCache.containsKey(subscriptionId)) return simSlotCache[subscriptionId]
+        val hasPhoneState = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+        var slot: Int? = null
+        if (hasPhoneState) {
+            val mgr = getSystemService(SubscriptionManager::class.java)
+            val info = try { mgr?.activeSubscriptionInfoList?.firstOrNull { it.subscriptionId == subscriptionId } } catch (_: SecurityException) { null }
+            slot = info?.simSlotIndex?.plus(1)
+        }
+        if (slot == null) {
+            if (!subscriptionFallbackOrder.contains(subscriptionId) && subscriptionFallbackOrder.size < 2) {
+                subscriptionFallbackOrder += subscriptionId
+            }
+            slot = subscriptionFallbackOrder.indexOf(subscriptionId).takeIf { it >= 0 }?.plus(1)
+        }
+        simSlotCache[subscriptionId] = slot
+        return slot
     }
 
     private fun markThreadAsRead(threadId: Long) {
