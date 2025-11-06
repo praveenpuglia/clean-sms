@@ -29,7 +29,7 @@
             android:ellipsize="end"
             android:paddingStart="0dp"
             android:paddingEnd="8dp"
-            android:textColor="?android:attr/textColorPrimary" />
+            android:textColor="@color/notification_otp_text_color" />
 
         <ImageButton
             android:id="@+id/notification_copy_button"
@@ -39,7 +39,7 @@
             android:scaleType="center"
             android:contentDescription="@string/notification_copy_otp"
             android:padding="12dp"
-            android:tint="?android:attr/textColorPrimary" />
+            android:tint="@color/notification_otp_icon_tint" />
     </LinearLayout>
 
     <!-- Sender Name -->
@@ -51,6 +51,7 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:paddingTop="4dp"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:textColor="@color/notification_otp_text_color"
+        android:alpha="0.7" />
 
 </LinearLayout>
