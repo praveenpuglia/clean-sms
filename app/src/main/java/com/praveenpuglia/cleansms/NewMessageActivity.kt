@@ -52,16 +52,139 @@ class NewMessageActivity : AppCompatActivity() {
 
         setupViews()
         loadContacts()
+        handleIncomingIntent()
+    }
+
+    private fun handleIncomingIntent() {
+        // Handle SENDTO intent from contacts app or other apps (e.g., sms:+1234567890?body=message)
+        intent?.data?.let { uri ->
+            if (uri.scheme?.startsWith("sms") == true || uri.scheme?.startsWith("mms") == true) {
+                // Extract phone number and optional body from URI
+                // SMS URIs are non-hierarchical, so we parse manually
+                val schemeSpecificPart = uri.schemeSpecificPart
+                val phoneNumber = schemeSpecificPart.substringBefore('?').trim()
+                
+                // Extract optional message body from query string (e.g., ?body=Hello&other=param)
+                val bodyText = if (schemeSpecificPart.contains('?')) {
+                    val queryString = schemeSpecificPart.substringAfter('?')
+                    parseQueryParameter(queryString, "body")
+                } else {
+                    null
+                }
+
+                if (phoneNumber.isNotEmpty()) {
+                    // Look up contact from phone number or create raw number entry
+                    val contact = findContactByPhoneNumber(phoneNumber)
+                    
+                    // Add contact to recipients
+                    if (contact != null && selectedRecipients.none { it.phoneNumber == contact.phoneNumber }) {
+                        selectedRecipients.add(contact)
+                        addRecipientChip(contact)
+                        composerContainer.visibility = View.VISIBLE
+                    }
+
+                    // Pre-fill message body if provided
+                    if (!bodyText.isNullOrBlank()) {
+                        messageInput.setText(bodyText)
+                        messageInput.setSelection(bodyText.length) // Cursor at end
+                    }
+
+                    // Focus on message input instead of recipient input
+                    messageInput.post {
+                        messageInput.requestFocus()
+                        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                        imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun parseQueryParameter(queryString: String, paramName: String): String? {
+        // Parse query string manually for non-hierarchical URIs
+        queryString.split('&').forEach { param ->
+            val parts = param.split('=', limit = 2)
+            if (parts.size == 2 && parts[0] == paramName) {
+                return android.net.Uri.decode(parts[1])
+            }
+        }
+        return null
+    }
+
+    private fun findContactByPhoneNumber(phoneNumber: String): ContactSuggestion? {
+        val normalizedInput = normalizeNumber(phoneNumber)
+        
+        // First, try to find exact match in loaded contacts
+        allContacts.firstOrNull { normalizeNumber(it.phoneNumber) == normalizedInput }?.let {
+            return it
+        }
+
+        // If not found in memory, query contacts database
+        try {
+            val projection = arrayOf(
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ContactsContract.CommonDataKinds.Phone.PHOTO_URI,
+                ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY
+            )
+
+            val cursor = contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                projection,
+                "${ContactsContract.CommonDataKinds.Phone.NUMBER} = ?",
+                arrayOf(phoneNumber),
+                null
+            )
+
+            cursor?.use { c ->
+                if (c.moveToFirst()) {
+                    val idxId = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
+                    val idxName = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                    val idxNumber = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                    val idxPhoto = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
+                    val idxLookup = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY)
+
+                    return ContactSuggestion(
+                        contactId = if (idxId >= 0) c.getLong(idxId) else -1L,
+                        name = if (idxName >= 0) c.getString(idxName) ?: phoneNumber else phoneNumber,
+                        phoneNumber = if (idxNumber >= 0) c.getString(idxNumber) ?: phoneNumber else phoneNumber,
+                        photoUri = if (idxPhoto >= 0) c.getString(idxPhoto) else null,
+                        lookupKey = if (idxLookup >= 0) c.getString(idxLookup) else null,
+                        isRawNumber = false
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // If still not found, create a raw number contact suggestion
+        return ContactSuggestion(
+            contactId = -1L,
+            name = phoneNumber,
+            phoneNumber = phoneNumber,
+            photoUri = null,
+            lookupKey = null,
+            isRawNumber = true
+        )
     }
 
     private fun setupViews() {
         backButton.setOnClickListener { finish() }
 
-        // Autofocus recipient field and show keyboard
-        recipientInput.post {
-            recipientInput.requestFocus()
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.showSoftInput(recipientInput, InputMethodManager.SHOW_IMPLICIT)
+        // Autofocus recipient field and show keyboard (unless intent provides recipient)
+        val hasIncomingRecipient = intent?.data?.let { uri ->
+            (uri.scheme?.startsWith("sms") == true || uri.scheme?.startsWith("mms") == true) &&
+            uri.schemeSpecificPart.substringBefore('?').trim().isNotEmpty()
+        } ?: false
+
+        if (!hasIncomingRecipient) {
+            recipientInput.post {
+                recipientInput.requestFocus()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showSoftInput(recipientInput, InputMethodManager.SHOW_IMPLICIT)
+            }
         }
 
         // Setup contacts list

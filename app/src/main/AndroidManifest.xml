@@ -32,7 +32,14 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".ComposeActivity" android:exported="true">
+        <activity android:name=".ComposeActivity" android:exported="false" />
+
+        <activity android:name=".ThreadDetailActivity" android:exported="false" />
+
+        <activity 
+            android:name=".NewMessageActivity" 
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.SENDTO" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -42,13 +49,6 @@
                 <data android:scheme="mmsto" />
             </intent-filter>
         </activity>
-
-        <activity android:name=".ThreadDetailActivity" android:exported="false" />
-
-        <activity 
-            android:name=".NewMessageActivity" 
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".RespondViaMessageService"
