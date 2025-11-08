@@ -6,6 +6,9 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:padding="4dp"
+    android:paddingTop="14dp"
+    android:clipToPadding="false"
+    android:clipChildren="false"
     android:gravity="start">
 
     <LinearLayout
@@ -16,7 +19,42 @@
         android:layout_marginEnd="60dp"
         android:background="@drawable/message_bubble_incoming"
         android:padding="12dp"
+        android:clipToPadding="false"
+        android:clipChildren="false"
         android:layout_gravity="start">
+
+        <!-- Spam badge at top center, half inside, half outside -->
+        <LinearLayout
+            android:id="@+id/message_spam_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="-18dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_spam_badge"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:src="@drawable/ic_warning"
+                android:layout_marginEnd="3dp"
+                android:contentDescription="Spam warning" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SPAM"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/message_body"

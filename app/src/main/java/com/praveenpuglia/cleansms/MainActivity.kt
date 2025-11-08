@@ -1046,6 +1046,7 @@ class MainActivity : AppCompatActivity() {
         val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
         val map = LinkedHashMap<Long, ThreadItem>()
         val unreadCounts = mutableMapOf<Long, Int>()
+        val threadsWithSpam = mutableSetOf<Long>()
 
         cursor?.use { c ->
             val idxThread = c.getColumnIndex("thread_id")
@@ -1056,10 +1057,16 @@ class MainActivity : AppCompatActivity() {
 
             while (c.moveToNext()) {
                 val threadId = if (idxThread >= 0) c.getLong(idxThread) else -1L
+                val body = if (idxBody >= 0) c.getString(idxBody) ?: "" else ""
+                
+                // Check if this message is spam
+                if (SpamDetector.isSpam(body)) {
+                    threadsWithSpam.add(threadId)
+                }
+                
                 if (!map.containsKey(threadId)) {
                     val address = if (idxAddress >= 0) c.getString(idxAddress) ?: "Unknown" else "Unknown"
                     val date = if (idxDate >= 0) c.getLong(idxDate) else 0L
-                    val body = if (idxBody >= 0) c.getString(idxBody) ?: "" else ""
                     
                     // Categorize the thread
                     val category = CategoryStorage.getCategoryOrCompute(this, address, threadId)
@@ -1075,7 +1082,8 @@ class MainActivity : AppCompatActivity() {
 
         return map.values.map { item ->
             val unread = unreadCounts[item.threadId] ?: 0
-            if (unread > 0) item.copy(unreadCount = unread) else item
+            val hasSpam = threadsWithSpam.contains(item.threadId)
+            item.copy(unreadCount = unread, hasSpam = hasSpam)
         }
     }
 

@@ -20,6 +20,7 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
         val time: TextView = itemView.findViewById(R.id.message_time)
         val simIndicator: View = itemView.findViewById(R.id.message_sim_indicator)
         val simSlotText: TextView = itemView.findViewById(R.id.message_sim_slot)
+        val spamBadge: View = itemView.findViewById(R.id.message_spam_badge)
     }
 
     class OutgoingVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -46,6 +47,9 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val msg = messages[position]
         val timeStr = formatMessageTime(msg.date)
+        
+        // Check for spam (but keep the full message text)
+        val isSpam = SpamDetector.isSpam(msg.body)
 
         // Common binding logic extracted
         fun bindCommon(bodyView: TextView, timeView: TextView, simIndicator: View, simSlotText: TextView) {
@@ -61,7 +65,11 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
             }
         }
         when (holder) {
-            is IncomingVH -> bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
+            is IncomingVH -> {
+                bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
+                // Show spam badge for incoming spam messages
+                holder.spamBadge.visibility = if (isSpam) View.VISIBLE else View.GONE
+            }
             is OutgoingVH -> bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
         }
     }

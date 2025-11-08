@@ -10,13 +10,17 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="12dp">
+    android:padding="12dp"
+    android:paddingBottom="22dp"
+    android:clipToPadding="false"
+    android:clipChildren="false">
 
     <FrameLayout
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginEnd="12dp"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        android:clipChildren="false">
 
         <ImageView
             android:id="@+id/thread_avatar_image"
@@ -48,6 +52,19 @@
             android:layout_marginTop="2dp"
             android:background="@drawable/bg_unread_dot"
             android:visibility="gone" />
+
+        <!-- Spam indicator at bottom center, half inside, half outside avatar -->
+        <ImageView
+            android:id="@+id/thread_spam_indicator"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="-10dp"
+            android:src="@drawable/ic_warning"
+            android:background="@drawable/bg_spam_indicator_circle"
+            android:padding="3dp"
+            android:visibility="gone"
+            android:contentDescription="Contains spam" />
 
         <ImageView
             android:id="@+id/thread_avatar_selection_icon"

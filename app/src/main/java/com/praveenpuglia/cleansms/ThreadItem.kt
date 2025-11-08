@@ -9,7 +9,8 @@ data class ThreadItem(
     val contactPhotoUri: String? = null,
     val contactLookupUri: String? = null,
     val category: MessageCategory = MessageCategory.UNKNOWN,
-    val unreadCount: Int = 0
+    val unreadCount: Int = 0,
+    val hasSpam: Boolean = false
 ) {
     val hasUnread: Boolean
         get() = unreadCount > 0

@@ -65,6 +65,7 @@ class ThreadAdapter(
         val unreadDot: View = itemView.findViewById(R.id.thread_unread_dot)
         val unreadBadge: TextView = itemView.findViewById(R.id.thread_unread_badge)
         val selectionIcon: ImageView = itemView.findViewById(R.id.thread_avatar_selection_icon)
+        val spamIndicator: ImageView = itemView.findViewById(R.id.thread_spam_indicator)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -133,6 +134,9 @@ class ThreadAdapter(
         holder.avatarText.isFocusable = selectionMode || canOpenContact
         holder.avatarImage.isClickable = selectionMode || canOpenContact
         holder.avatarImage.isFocusable = selectionMode || canOpenContact
+        
+        // Show spam indicator if thread has spam
+        holder.spamIndicator.visibility = if (item.hasSpam) View.VISIBLE else View.GONE
 
         val isSelected = selectionMode && selectedThreadIds.contains(item.threadId)
     val avatarAlpha = if (isSelected) 0.35f else 1f
