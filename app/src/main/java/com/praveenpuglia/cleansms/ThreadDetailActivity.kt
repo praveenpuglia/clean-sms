@@ -200,6 +200,9 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         messageAdapter = MessageAdapter(emptyList())
         messagesRecycler.adapter = messageAdapter
+        
+        // Add sticky day header decoration
+        messagesRecycler.addItemDecoration(StickyDayHeaderDecoration(messageAdapter))
     }
 
     private fun hasContactsPermission(): Boolean {
