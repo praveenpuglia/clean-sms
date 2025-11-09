@@ -442,13 +442,39 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyInitialPageIfNeeded() {
         if (initialPageApplied) return
-        val otpIndex = pagerPages.indexOfFirst { it is InboxPage.Otp }
-        val desiredIndex = when {
-            otpMessages.isNotEmpty() && otpIndex >= 0 -> otpIndex
-            else -> pagerPages.indexOfFirst { page ->
-                page is InboxPage.CategoryPage && page.category == MessageCategory.PERSONAL
-            }.takeIf { it >= 0 } ?: 0
+        
+        // Get default tab preference
+        val defaultTab = SettingsActivity.getDefaultTab(this)
+        
+        // Map tab name to category
+        val defaultCategory = when (defaultTab) {
+            "Personal" -> MessageCategory.PERSONAL
+            "Transactions" -> MessageCategory.TRANSACTIONAL
+            "Service" -> MessageCategory.SERVICE
+            "Promotions" -> MessageCategory.PROMOTIONAL
+            "Government" -> MessageCategory.GOVERNMENT
+            else -> null // OTP or unknown
         }
+        
+        val desiredIndex = if (defaultTab == "OTP") {
+            // User selected OTP as default
+            pagerPages.indexOfFirst { it is InboxPage.Otp }.takeIf { it >= 0 } ?: 0
+        } else if (defaultCategory != null) {
+            // User selected a specific category as default
+            pagerPages.indexOfFirst { page ->
+                page is InboxPage.CategoryPage && page.category == defaultCategory
+            }.takeIf { it >= 0 } ?: 0
+        } else {
+            // Fallback to OTP if available, otherwise Personal
+            val otpIndex = pagerPages.indexOfFirst { it is InboxPage.Otp }
+            when {
+                otpMessages.isNotEmpty() && otpIndex >= 0 -> otpIndex
+                else -> pagerPages.indexOfFirst { page ->
+                    page is InboxPage.CategoryPage && page.category == MessageCategory.PERSONAL
+                }.takeIf { it >= 0 } ?: 0
+            }
+        }
+        
         if (desiredIndex != threadsPager.currentItem && desiredIndex in pagerPages.indices) {
             threadsPager.setCurrentItem(desiredIndex, false)
         }

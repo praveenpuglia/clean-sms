@@ -157,10 +157,28 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Settings will be added here"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="14sp"
+                android:text="Default Tab"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="16sp"
                 android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/default_tab_layout"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:hint="Select default tab">
+
+                <AutoCompleteTextView
+                    android:id="@+id/default_tab_dropdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="16sp" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- About Section -->
             <TextView

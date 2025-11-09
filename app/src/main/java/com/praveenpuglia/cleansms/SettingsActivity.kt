@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -15,6 +17,7 @@ class SettingsActivity : AppCompatActivity() {
     companion object {
         private const val PREFS_NAME = "CleanSmsPrefs"
         private const val KEY_THEME = "theme_mode"
+        private const val KEY_DEFAULT_TAB = "default_tab"
         const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
         const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
         const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
@@ -28,6 +31,16 @@ class SettingsActivity : AppCompatActivity() {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putInt(KEY_THEME, mode).apply()
         }
+
+        fun getDefaultTab(context: Context): String {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getString(KEY_DEFAULT_TAB, "OTP") ?: "OTP"
+        }
+
+        fun setDefaultTab(context: Context, tab: String) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString(KEY_DEFAULT_TAB, tab).apply()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +49,7 @@ class SettingsActivity : AppCompatActivity() {
 
         setupHeader()
         setupThemeToggle()
+        setupDefaultTabDropdown()
         setupAboutSection()
     }
 
@@ -72,6 +86,27 @@ class SettingsActivity : AppCompatActivity() {
                 // Apply theme immediately
                 AppCompatDelegate.setDefaultNightMode(newTheme)
             }
+        }
+    }
+
+    private fun setupDefaultTabDropdown() {
+        val dropdown = findViewById<AutoCompleteTextView>(R.id.default_tab_dropdown)
+        
+        // Define available tabs
+        val tabs = arrayOf("OTP", "Personal", "Transactions", "Service", "Promotions", "Government")
+        
+        // Create adapter
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, tabs)
+        dropdown.setAdapter(adapter)
+        
+        // Set current selection
+        val currentTab = getDefaultTab(this)
+        dropdown.setText(currentTab, false)
+        
+        // Listen for selection changes
+        dropdown.setOnItemClickListener { _, _, position, _ ->
+            val selectedTab = tabs[position]
+            setDefaultTab(this, selectedTab)
         }
     }
 

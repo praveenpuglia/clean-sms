@@ -14,8 +14,21 @@ Clean SMS is a privacy‑respectful, focused Android SMS client providing a clea
 ## 3. Material Design 3 Compliance
 All UI surfaces MUST comply with Material Design 3 (M3):
 - Follow official guidelines: https://github.com/material-components/material-components-android/tree/master/docs/components
-- Use Material Components Views where available (`MaterialToolbar`, `MaterialCardView`, `TextInputLayout`, `Chip`, `FloatingActionButton`, etc.).
-- Typography: Use Material3 text appearances (`TextAppearance.Material3.*`) or theme tokens rather than hardcoded sizes.
+- Use Material Components Views where available (`MaterialToolbar`, `MaterialCardView`, `TextInputLayout`, `Chip`, `FloatingActionButton`, `MaterialButton`, `MaterialButtonToggleGroup`, etc.).
+- **Typography**: Use Material3 type scale tokens where possible. Current hardcoded sizes are acceptable for precision needs but must align with M3 scale:
+  - Display Large: 57sp (unused)
+  - Headline Large: 32sp → use 28sp for headers (close match)
+  - Headline Medium: 28sp → headers
+  - Title Large: 22sp (unused) 
+  - Title Medium: 16sp → primary text (contact names, list items)
+  - Title Small: 14sp → section headers, secondary labels
+  - Body Large: 16sp → message body text
+  - Body Medium: 14sp → metadata, descriptions
+  - Body Small: 12sp → timestamps
+  - Label Large: 14sp → button text
+  - Label Medium: 12sp → chip labels
+  - Label Small: 11sp → small metadata (time, badges)
+- **Icons**: Standard icon size is 24dp. Use 16dp only for inline metadata icons (delivery status, etc.). All icons must be theme-aware using `android:tint="?attr/colorOnSurface"` or appropriate theme attribute.
 - Shapes: Adopt M3 Shape tokens; avoid arbitrary corner radii.
 - Elevation & Shadow: Use elevation only where semantically meaningful (e.g., top app bar, modal surfaces). Avoid stacking multiple elevated containers.
 - States & Ripple: Use Material default ripple/state layers; do not implement custom press animations unless consistent with M3 guidance.
@@ -24,7 +37,8 @@ All UI surfaces MUST comply with Material Design 3 (M3):
 - Dynamic Color: App theme must derive color roles from `MaterialColors` / dynamic color APIs when available (Android 12+). Fall back to static M3 palette for earlier versions.
 - Theme Layering: Single source of truth in `Theme` definition (XML + possibly Compose later). No inline color literals for semantic roles—always reference theme attributes (`?attr/colorSurface`, `?attr/colorPrimary`, etc.).
 - Dark Mode: Provide parity in dark theme using dynamic color roles; verify contrast (WCAG AA wherever practical).
-- Iconography & Contrast: Icons must respect `colorOnSurfaceVariant` or `colorOnSurface` depending on emphasis.
+- Iconography & Contrast: **ALL icons, drawables, and visual elements MUST be theme-aware.** Always use `app:tint="?attr/colorOnSurface"` or appropriate theme attributes. Never use hardcoded colors like `@android:color/white` in drawable files—icons must adapt to both light and dark themes automatically.
+- Theme Consistency: Every UI element must respond to theme changes without app restart when possible.
 
 ## 5. UX / Interaction Principles
 - Simplicity: Minimize friction—actions should be discoverable without multi-step onboarding.
@@ -95,6 +109,9 @@ All UI surfaces MUST comply with Material Design 3 (M3):
 - Strings externalized in `strings.xml`; avoid concatenating dynamic user data with static phrases without formatting placeholders.
 
 ## 17. Release & Build Constraints
+- **Development Workflow**: Always use debug builds for testing during development (`./gradlew assembleDebug`). Debug builds are faster and suitable for iterative development.
+- **Auto-relaunch**: After installing debug APK, immediately relaunch the app using `adb shell am start -n com.praveenpuglia.cleansms/.MainActivity` to verify changes.
+- **Release builds**: Only create release builds for final testing or production deployment.
 - Build must produce a lint-clean (or justified suppressed) artifact.
 - Warnings related to deprecated APIs (e.g., `SmsManager.getDefault()`) tracked and replaced with modern equivalents as soon as stable alternatives confirm compatibility.
 - Proguard/R8 configuration ensures no removal of reflection-required SMS/contacts APIs.
@@ -114,6 +131,6 @@ All UI surfaces MUST comply with Material Design 3 (M3):
 - Automated snapshot tests for critical UI flows (recipient chips, OTP list rendering).
 
 ---
-_Last updated: 2025-11-06_
+_Last updated: 2025-11-09_
 
 Amendment Procedure: Propose changes via PR titled `Constitution: Amendment <short description>` referencing affected sections. Approval requires review confirming user impact and consistency with project principles.
