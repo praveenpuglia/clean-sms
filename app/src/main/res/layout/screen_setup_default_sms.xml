@@ -14,9 +14,9 @@
         <!-- Illustration/Icon -->
         <ImageView
             android:id="@+id/setup_icon"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_marginTop="64dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginTop="32dp"
             android:src="@mipmap/ic_launcher"
             android:contentDescription="Clean SMS logo"
             app:layout_constraintTop_toTopOf="parent"
@@ -29,7 +29,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="Set as Default SMS App"
+            android:text="Welcome to Clean SMS"
             android:textAlignment="center"
             android:textSize="28sp"
             android:textColor="?attr/colorOnSurface"
@@ -45,7 +45,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="To send and receive messages, Clean SMS needs to be set as your default messaging app."
+            android:text="Let's set up Clean SMS to manage your messages seamlessly."
             android:textAlignment="center"
             android:textSize="16sp"
             android:textColor="?attr/colorOnSurfaceVariant"
@@ -144,22 +144,185 @@
 
         </LinearLayout>
 
-        <!-- Set Default Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/set_default_button"
+        <!-- Setup Steps Container -->
+        <LinearLayout
+            android:id="@+id/setup_steps_container"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="48dp"
-            android:text="Set as Default"
+            android:orientation="vertical"
+            app:layout_constraintTop_toBottomOf="@id/features_container"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <!-- Step 1: Default SMS App -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutlineVariant">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:background="@drawable/setup_step_number_bg"
+                            android:text="1"
+                            android:textColor="?attr/colorOnPrimary"
+                            android:textSize="14sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:gravity="center" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="12dp"
+                            android:text="Set as Default SMS App"
+                            android:textSize="16sp"
+                            android:textColor="?attr/colorOnSurface"
+                            android:fontFamily="sans-serif-medium" />
+
+                        <ImageView
+                            android:id="@+id/step1_check"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_tick_single"
+                            android:tint="?attr/colorPrimary"
+                            android:contentDescription="Completed"
+                            android:visibility="gone" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginStart="40dp"
+                        android:text="Required to send and receive messages"
+                        android:textSize="14sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/set_default_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="Set as Default"
+                        android:textSize="15sp"
+                        app:cornerRadius="10dp"
+                        style="@style/Widget.Material3.Button" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Step 2: Background Running -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutlineVariant">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:background="@drawable/setup_step_number_bg"
+                            android:text="2"
+                            android:textColor="?attr/colorOnPrimary"
+                            android:textSize="14sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:gravity="center" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="12dp"
+                            android:text="Allow Running in Background"
+                            android:textSize="16sp"
+                            android:textColor="?attr/colorOnSurface"
+                            android:fontFamily="sans-serif-medium" />
+
+                        <ImageView
+                            android:id="@+id/step2_check"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_tick_single"
+                            android:tint="?attr/colorPrimary"
+                            android:contentDescription="Completed"
+                            android:visibility="gone" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginStart="40dp"
+                        android:text="Ensures you receive messages even when the app is closed"
+                        android:textSize="14sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/allow_background_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="Allow"
+                        android:textSize="15sp"
+                        app:cornerRadius="10dp"
+                        style="@style/Widget.Material3.Button.TonalButton" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+        <!-- Continue Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/continue_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Continue"
             android:textSize="16sp"
             android:paddingTop="16dp"
             android:paddingBottom="16dp"
+            android:enabled="false"
             app:cornerRadius="12dp"
-            app:layout_constraintTop_toBottomOf="@id/features_container"
+            app:layout_constraintTop_toBottomOf="@id/setup_steps_container"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/privacy_note"
-            android:layout_marginBottom="24dp" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
         <!-- Privacy Note -->
         <TextView
@@ -172,7 +335,7 @@
             android:textAlignment="center"
             android:textSize="13sp"
             android:textColor="?attr/colorOnSurfaceVariant"
-            app:layout_constraintTop_toBottomOf="@id/set_default_button"
+            app:layout_constraintTop_toBottomOf="@id/continue_button"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"

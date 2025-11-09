@@ -10,6 +10,8 @@ import android.app.role.RoleManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -243,11 +245,15 @@ class MainActivity : AppCompatActivity() {
         val roleManager = getSystemService(RoleManager::class.java)
         val roleHeld = try { roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true && roleManager.isRoleHeld(RoleManager.ROLE_SMS) } catch (_: Exception) { false }
         val isDefault = DefaultSmsHelper.isDefaultSmsApp(this)
-        Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName}")
+        val powerManager = getSystemService(PowerManager::class.java)
+        val isBatteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
+        
+        Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored")
         
         val setupScreen = findViewById<View>(R.id.setup_screen)
         val header = findViewById<View>(R.id.header_container)
         
+        // Only show setup screen if not default SMS app
         if (!isDefault) {
             // Show setup screen, hide everything else
             setupScreen.visibility = View.VISIBLE
@@ -259,8 +265,17 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
             findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
             
-            // Setup button click
-            setupScreen.findViewById<View>(R.id.set_default_button)?.setOnClickListener {
+            // Update UI based on completion status
+            val step1Check = setupScreen.findViewById<View>(R.id.step1_check)
+            val step2Check = setupScreen.findViewById<View>(R.id.step2_check)
+            val setDefaultButton = setupScreen.findViewById<View>(R.id.set_default_button)
+            val allowBackgroundButton = setupScreen.findViewById<View>(R.id.allow_background_button)
+            val continueButton = setupScreen.findViewById<View>(R.id.continue_button)
+            
+            // Step 1: Default SMS App (required)
+            step1Check?.visibility = if (isDefault) View.VISIBLE else View.GONE
+            setDefaultButton?.isEnabled = !isDefault
+            setDefaultButton?.setOnClickListener {
                 try {
                     val roleManager = getSystemService(RoleManager::class.java)
                     if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
@@ -273,6 +288,38 @@ class MainActivity : AppCompatActivity() {
                     }
                 } catch (e: Exception) {
                     Log.w("DefaultSms", "Role request failed: ${e.message}")
+                }
+            }
+            
+            // Step 2: Battery Optimization (optional)
+            step2Check?.visibility = if (isBatteryOptimizationIgnored) View.VISIBLE else View.GONE
+            allowBackgroundButton?.isEnabled = !isBatteryOptimizationIgnored
+            allowBackgroundButton?.setOnClickListener {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.w("BatteryOptimization", "Request failed: ${e.message}")
+                    Toast.makeText(this, "Please allow battery optimization exemption in settings", Toast.LENGTH_LONG).show()
+                }
+            }
+            
+            // Continue button (enabled only when default SMS app is set)
+            continueButton?.isEnabled = isDefault
+            continueButton?.setOnClickListener {
+                // Hide setup screen and show main UI
+                setupScreen.visibility = View.GONE
+                header.visibility = View.VISIBLE
+                findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
+                findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
+                
+                // Proceed with permission check/display
+                if (hasReadPermission()) {
+                    showThreadsUi()
+                } else {
+                    showInstructionsUi()
                 }
             }
         } else {
