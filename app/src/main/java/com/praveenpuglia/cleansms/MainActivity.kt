@@ -244,17 +244,23 @@ class MainActivity : AppCompatActivity() {
         val roleHeld = try { roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true && roleManager.isRoleHeld(RoleManager.ROLE_SMS) } catch (_: Exception) { false }
         val isDefault = DefaultSmsHelper.isDefaultSmsApp(this)
         Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName}")
-        val defaultStatus = findViewById<TextView>(R.id.default_sms_status)
-        val setDefaultBtn = findViewById<View>(R.id.set_default_sms_button)
+        
+        val setupScreen = findViewById<View>(R.id.setup_screen)
+        val header = findViewById<View>(R.id.header_container)
+        
         if (!isDefault) {
-            // Show prompt, hide threads until default is set
-            defaultStatus.visibility = View.VISIBLE
-            setDefaultBtn.visibility = View.VISIBLE
+            // Show setup screen, hide everything else
+            setupScreen.visibility = View.VISIBLE
+            header.visibility = View.GONE
             categoryTabs.visibility = View.GONE
             threadsPager.visibility = View.GONE
+            newMessageFab.visibility = View.GONE
             findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
-            defaultStatus.text = "This app is not the default SMS app. Tap below to set it as default."
-            setDefaultBtn.setOnClickListener {
+            findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
+            findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
+            
+            // Setup button click
+            setupScreen.findViewById<View>(R.id.set_default_button)?.setOnClickListener {
                 try {
                     val roleManager = getSystemService(RoleManager::class.java)
                     if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
@@ -270,8 +276,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } else {
-            defaultStatus.visibility = View.GONE
-            setDefaultBtn.visibility = View.GONE
+            // Hide setup screen, show normal UI
+            setupScreen.visibility = View.GONE
+            header.visibility = View.VISIBLE
+            findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
+            findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
+            
             // Proceed with permission check/display
             if (hasReadPermission()) {
                 showThreadsUi()

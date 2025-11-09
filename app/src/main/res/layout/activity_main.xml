@@ -97,6 +97,14 @@
         android:layout_weight="1"
         android:fitsSystemWindows="false">
 
+        <!-- Setup Screen (shown when not default SMS app) -->
+        <include
+            android:id="@+id/setup_screen"
+            layout="@layout/screen_setup_default_sms"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
