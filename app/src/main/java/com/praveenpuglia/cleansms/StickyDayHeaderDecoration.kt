@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -11,6 +12,10 @@ import androidx.recyclerview.widget.RecyclerView
 class StickyDayHeaderDecoration(
     private val adapter: MessageAdapter
 ) : RecyclerView.ItemDecoration() {
+
+    private var currentStickyPosition = RecyclerView.NO_POSITION
+    private var stickyTranslationY = 0f
+    private val interpolator = DecelerateInterpolator()
 
     override fun onDrawOver(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) {
         super.onDrawOver(canvas, parent, state)
@@ -49,12 +54,33 @@ class StickyDayHeaderDecoration(
         val contactPoint = currentHeader.bottom
         val childInContact = getChildInContact(parent, contactPoint, headerPos)
 
-        if (childInContact != null && adapter.isHeader(parent.getChildAdapterPosition(childInContact))) {
-            moveHeader(canvas, currentHeader, childInContact)
-            return
+        // Animate position changes
+        val targetY = if (childInContact != null && adapter.isHeader(parent.getChildAdapterPosition(childInContact))) {
+            (childInContact.top - currentHeader.height).toFloat()
+        } else {
+            0f
         }
 
-        drawHeader(canvas, currentHeader)
+        // Smooth animation when header position changes
+        if (currentStickyPosition != headerPos) {
+            currentStickyPosition = headerPos
+            stickyTranslationY = targetY
+        } else {
+            // Interpolate towards target
+            val diff = targetY - stickyTranslationY
+            if (Math.abs(diff) > 0.5f) {
+                stickyTranslationY += diff * 0.3f // Smooth animation factor
+            } else {
+                stickyTranslationY = targetY
+            }
+        }
+
+        drawHeader(canvas, currentHeader, stickyTranslationY, parent.paddingLeft.toFloat())
+        
+        // Request another frame if animating
+        if (Math.abs(stickyTranslationY - targetY) > 0.5f) {
+            parent.invalidate()
+        }
     }
 
     private fun getHeaderViewForItem(itemPosition: Int, parent: RecyclerView): View {
@@ -73,17 +99,10 @@ class StickyDayHeaderDecoration(
         return headerView
     }
 
-    private fun drawHeader(canvas: Canvas, header: View) {
+    private fun drawHeader(canvas: Canvas, header: View, translationY: Float, translationX: Float = 0f) {
         canvas.save()
-        canvas.translate(0f, 0f)
+        canvas.translate(translationX, translationY)
         header.draw(canvas)
-        canvas.restore()
-    }
-
-    private fun moveHeader(canvas: Canvas, currentHeader: View, nextHeader: View) {
-        canvas.save()
-        canvas.translate(0f, (nextHeader.top - currentHeader.height).toFloat())
-        currentHeader.draw(canvas)
         canvas.restore()
     }
 
