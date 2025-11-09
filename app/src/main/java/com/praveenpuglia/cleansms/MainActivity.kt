@@ -18,6 +18,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -144,6 +145,9 @@ class MainActivity : AppCompatActivity() {
     private val selectedMessageIds = LinkedHashSet<Long>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Apply saved theme before setting content view
+        AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
+        
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 

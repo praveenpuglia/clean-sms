@@ -13,6 +13,7 @@ import com.google.android.material.chip.ChipGroup
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.provider.ContactsContract
@@ -38,6 +39,9 @@ class NewMessageActivity : AppCompatActivity() {
     private val selectedRecipients = mutableListOf<ContactSuggestion>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Apply saved theme before setting content view
+        AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
+        
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_new_message)
 
