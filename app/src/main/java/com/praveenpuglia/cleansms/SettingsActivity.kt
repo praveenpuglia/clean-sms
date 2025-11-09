@@ -1,8 +1,11 @@
 package com.praveenpuglia.cleansms
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.ImageButton
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -33,6 +36,7 @@ class SettingsActivity : AppCompatActivity() {
 
         setupHeader()
         setupThemeToggle()
+        setupAboutSection()
     }
 
     private fun setupHeader() {
@@ -68,6 +72,35 @@ class SettingsActivity : AppCompatActivity() {
                 // Apply theme immediately
                 AppCompatDelegate.setDefaultNightMode(newTheme)
             }
+        }
+    }
+
+    private fun setupAboutSection() {
+        // Set app version
+        try {
+            val versionName = packageManager.getPackageInfo(packageName, 0).versionName
+            findViewById<TextView>(R.id.app_version).text = versionName
+        } catch (e: Exception) {
+            findViewById<TextView>(R.id.app_version).text = "Unknown"
+        }
+
+        // Terms & Conditions click listener
+        findViewById<TextView>(R.id.terms_conditions).setOnClickListener {
+            openUrl("https://praveenpuglia.com")
+        }
+
+        // Privacy Policy click listener
+        findViewById<TextView>(R.id.privacy_policy).setOnClickListener {
+            openUrl("https://praveenpuglia.com")
+        }
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Handle case where no browser is available
         }
     }
 }
