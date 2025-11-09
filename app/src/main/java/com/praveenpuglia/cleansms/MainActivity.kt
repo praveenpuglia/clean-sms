@@ -158,6 +158,11 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
         
+        findViewById<ImageButton>(R.id.settings_button).setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
+        
         // TODO: Prevent initial OTP tab flicker during first load.
         threadsPagerAdapter = ThreadCategoryPagerAdapter(
             pagerPages,

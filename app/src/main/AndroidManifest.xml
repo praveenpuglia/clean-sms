@@ -36,6 +36,8 @@
 
         <activity android:name=".ThreadDetailActivity" android:exported="false" />
 
+        <activity android:name=".SettingsActivity" android:exported="false" />
+
         <activity 
             android:name=".NewMessageActivity" 
             android:exported="true"
