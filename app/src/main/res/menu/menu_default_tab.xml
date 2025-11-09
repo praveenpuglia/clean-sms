@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/tab_otps"
+        android:title="OTPs" />
+    <item
+        android:id="@+id/tab_personal"
+        android:title="Personal" />
+    <item
+        android:id="@+id/tab_transactions"
+        android:title="Transactions" />
+    <item
+        android:id="@+id/tab_services"
+        android:title="Services" />
+    <item
+        android:id="@+id/tab_promotions"
+        android:title="Promotions" />
+    <item
+        android:id="@+id/tab_governmental"
+        android:title="Governmental" />
+</menu>

@@ -6,11 +6,11 @@
     <string name="toast_otp_copied">OTP copied to clipboard</string>
     <string name="category_personal">Personal</string>
     <string name="category_transactions">Transactions</string>
-    <string name="category_service">Service</string>
+    <string name="category_service">Services</string>
     <string name="category_promotions">Promotions</string>
-    <string name="category_government">Government</string>
+    <string name="category_government">Governmental</string>
     <string name="category_unknown">Unknown</string>
-    <string name="tab_otp">OTP</string>
+    <string name="tab_otp">OTPs</string>
     <string name="toast_contact_not_found">Contact not available</string>
     <string name="toast_contact_permission_required">Allow contact access to open saved contacts</string>
     <string name="delete_selected_content_description">Delete selected conversations or messages</string>

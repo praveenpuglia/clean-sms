@@ -154,31 +154,36 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginBottom="12dp" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Default Tab"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/default_tab_layout"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:hint="Select default tab">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="16dp">
 
-                <AutoCompleteTextView
-                    android:id="@+id/default_tab_dropdown"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="none"
+                    android:layout_weight="1"
+                    android:text="Default Tab"
                     android:textColor="?android:attr/textColorPrimary"
                     android:textSize="16sp" />
 
-            </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/default_tab_button"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="OTPs"
+                    android:textColor="?attr/colorPrimary"
+                    app:icon="@drawable/ic_arrow_drop_down"
+                    app:iconGravity="end"
+                    app:iconPadding="4dp"
+                    android:minHeight="40dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="8dp" />
+
+            </LinearLayout>
 
             <!-- About Section -->
             <TextView

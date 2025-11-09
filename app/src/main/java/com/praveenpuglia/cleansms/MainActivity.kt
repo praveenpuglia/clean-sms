@@ -109,8 +109,8 @@ class MainActivity : AppCompatActivity() {
     private val otpKeywordPattern = Regex("\\botp\\b|one[\\s-]*time\\s+password", RegexOption.IGNORE_CASE)
     private val otpFetchLimit = 200
     
-    // Category filtering state
-    private var selectedCategory: MessageCategory = MessageCategory.PERSONAL
+    // Category filtering state - will be initialized in onCreate
+    private lateinit var selectedCategory: MessageCategory
     private var allThreads: List<ThreadItem> = emptyList()
     private var otpMessages: List<OtpMessageItem> = emptyList()
     private var initialPageApplied = false
@@ -151,6 +151,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Initialize selectedCategory based on user preference
+        selectedCategory = getInitialCategory()
+
         categoryTabs = findViewById(R.id.category_tabs)
         threadsPager = findViewById(R.id.threads_pager)
         headerTitle = findViewById(R.id.header_title)
@@ -167,7 +170,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
         
-        // TODO: Prevent initial OTP tab flicker during first load.
+        // Set initial page based on user preference before data loads to prevent flicker
+        val defaultTab = SettingsActivity.getDefaultTab(this)
+        val initialPageIndex = getInitialPageIndexForTab(defaultTab)
+        
         threadsPagerAdapter = ThreadCategoryPagerAdapter(
             pagerPages,
             onThreadClick = { threadItem -> handleThreadClick(threadItem) },
@@ -178,6 +184,12 @@ class MainActivity : AppCompatActivity() {
             onOtpAvatarLongPress = { otpItem -> startOtpSelection(otpItem) }
         )
         threadsPager.adapter = threadsPagerAdapter
+        
+        // Set initial page immediately to avoid flicker
+        if (initialPageIndex in pagerPages.indices) {
+            threadsPager.setCurrentItem(initialPageIndex, false)
+        }
+        
         threadsPager.registerOnPageChangeCallback(pageChangeCallback)
         tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager) { tab, position ->
             tab.text = labelForPage(pagerPages[position])
@@ -440,44 +452,53 @@ class MainActivity : AppCompatActivity() {
         is InboxPage.CategoryPage -> labelForCategory(page.category)
     }
 
-    private fun applyInitialPageIfNeeded() {
-        if (initialPageApplied) return
-        
-        // Get default tab preference
+    private fun getInitialCategory(): MessageCategory {
         val defaultTab = SettingsActivity.getDefaultTab(this)
-        
-        // Map tab name to category
-        val defaultCategory = when (defaultTab) {
-            "Personal" -> MessageCategory.PERSONAL
-            "Transactions" -> MessageCategory.TRANSACTIONAL
-            "Service" -> MessageCategory.SERVICE
-            "Promotions" -> MessageCategory.PROMOTIONAL
-            "Government" -> MessageCategory.GOVERNMENT
-            else -> null // OTP or unknown
+        return when (defaultTab) {
+            SettingsActivity.DefaultTab.PERSONAL -> MessageCategory.PERSONAL
+            SettingsActivity.DefaultTab.TRANSACTIONAL -> MessageCategory.TRANSACTIONAL
+            SettingsActivity.DefaultTab.SERVICE -> MessageCategory.SERVICE
+            SettingsActivity.DefaultTab.PROMOTIONAL -> MessageCategory.PROMOTIONAL
+            SettingsActivity.DefaultTab.GOVERNMENT -> MessageCategory.GOVERNMENT
+            SettingsActivity.DefaultTab.OTP -> MessageCategory.PERSONAL // fallback for OTP
         }
-        
-        val desiredIndex = if (defaultTab == "OTP") {
-            // User selected OTP as default
-            pagerPages.indexOfFirst { it is InboxPage.Otp }.takeIf { it >= 0 } ?: 0
-        } else if (defaultCategory != null) {
-            // User selected a specific category as default
-            pagerPages.indexOfFirst { page ->
-                page is InboxPage.CategoryPage && page.category == defaultCategory
-            }.takeIf { it >= 0 } ?: 0
-        } else {
-            // Fallback to OTP if available, otherwise Personal
-            val otpIndex = pagerPages.indexOfFirst { it is InboxPage.Otp }
-            when {
-                otpMessages.isNotEmpty() && otpIndex >= 0 -> otpIndex
-                else -> pagerPages.indexOfFirst { page ->
+    }
+
+    private fun getInitialPageIndexForTab(defaultTab: SettingsActivity.DefaultTab): Int {
+        return when (defaultTab) {
+            SettingsActivity.DefaultTab.OTP -> {
+                pagerPages.indexOfFirst { it is InboxPage.Otp }.takeIf { it >= 0 } ?: 0
+            }
+            SettingsActivity.DefaultTab.PERSONAL -> {
+                pagerPages.indexOfFirst { page ->
                     page is InboxPage.CategoryPage && page.category == MessageCategory.PERSONAL
                 }.takeIf { it >= 0 } ?: 0
             }
+            SettingsActivity.DefaultTab.TRANSACTIONAL -> {
+                pagerPages.indexOfFirst { page ->
+                    page is InboxPage.CategoryPage && page.category == MessageCategory.TRANSACTIONAL
+                }.takeIf { it >= 0 } ?: 0
+            }
+            SettingsActivity.DefaultTab.SERVICE -> {
+                pagerPages.indexOfFirst { page ->
+                    page is InboxPage.CategoryPage && page.category == MessageCategory.SERVICE
+                }.takeIf { it >= 0 } ?: 0
+            }
+            SettingsActivity.DefaultTab.PROMOTIONAL -> {
+                pagerPages.indexOfFirst { page ->
+                    page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL
+                }.takeIf { it >= 0 } ?: 0
+            }
+            SettingsActivity.DefaultTab.GOVERNMENT -> {
+                pagerPages.indexOfFirst { page ->
+                    page is InboxPage.CategoryPage && page.category == MessageCategory.GOVERNMENT
+                }.takeIf { it >= 0 } ?: 0
+            }
         }
-        
-        if (desiredIndex != threadsPager.currentItem && desiredIndex in pagerPages.indices) {
-            threadsPager.setCurrentItem(desiredIndex, false)
-        }
+    }
+
+    private fun applyInitialPageIfNeeded() {
+        if (initialPageApplied) return
         initialPageApplied = true
     }
 

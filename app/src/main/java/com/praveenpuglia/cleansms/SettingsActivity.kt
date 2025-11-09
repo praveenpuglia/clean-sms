@@ -4,15 +4,25 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
+import android.view.MenuItem
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.widget.PopupMenu
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 
 class SettingsActivity : AppCompatActivity() {
+
+    enum class DefaultTab {
+        OTP,
+        PERSONAL,
+        TRANSACTIONAL,
+        SERVICE,
+        PROMOTIONAL,
+        GOVERNMENT
+    }
 
     companion object {
         private const val PREFS_NAME = "CleanSmsPrefs"
@@ -32,14 +42,41 @@ class SettingsActivity : AppCompatActivity() {
             prefs.edit().putInt(KEY_THEME, mode).apply()
         }
 
-        fun getDefaultTab(context: Context): String {
+        fun getDefaultTab(context: Context): DefaultTab {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            return prefs.getString(KEY_DEFAULT_TAB, "OTP") ?: "OTP"
+            
+            // Handle migration from old string-based format to new enum ordinal format
+            if (prefs.contains(KEY_DEFAULT_TAB)) {
+                try {
+                    // Try to read as int (new format)
+                    val ordinal = prefs.getInt(KEY_DEFAULT_TAB, -1)
+                    if (ordinal >= 0) {
+                        return DefaultTab.values().getOrNull(ordinal) ?: DefaultTab.OTP
+                    }
+                } catch (e: ClassCastException) {
+                    // Old format - migrate from string to enum
+                    val oldValue = prefs.getString(KEY_DEFAULT_TAB, null)
+                    val migratedTab = when (oldValue) {
+                        "OTP", "OTPs" -> DefaultTab.OTP
+                        "Personal" -> DefaultTab.PERSONAL
+                        "Transactions" -> DefaultTab.TRANSACTIONAL
+                        "Service", "Services" -> DefaultTab.SERVICE
+                        "Promotions" -> DefaultTab.PROMOTIONAL
+                        "Government", "Governmental" -> DefaultTab.GOVERNMENT
+                        else -> DefaultTab.OTP
+                    }
+                    // Save in new format
+                    setDefaultTab(context, migratedTab)
+                    return migratedTab
+                }
+            }
+            
+            return DefaultTab.OTP
         }
 
-        fun setDefaultTab(context: Context, tab: String) {
+        fun setDefaultTab(context: Context, tab: DefaultTab) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().putString(KEY_DEFAULT_TAB, tab).apply()
+            prefs.edit().putInt(KEY_DEFAULT_TAB, tab.ordinal).apply()
         }
     }
 
@@ -90,24 +127,54 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupDefaultTabDropdown() {
-        val dropdown = findViewById<AutoCompleteTextView>(R.id.default_tab_dropdown)
-        
-        // Define available tabs
-        val tabs = arrayOf("OTP", "Personal", "Transactions", "Service", "Promotions", "Government")
-        
-        // Create adapter
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, tabs)
-        dropdown.setAdapter(adapter)
+        val button = findViewById<MaterialButton>(R.id.default_tab_button)
         
         // Set current selection
         val currentTab = getDefaultTab(this)
-        dropdown.setText(currentTab, false)
+        button.text = getLabelForDefaultTab(currentTab)
         
-        // Listen for selection changes
-        dropdown.setOnItemClickListener { _, _, position, _ ->
-            val selectedTab = tabs[position]
-            setDefaultTab(this, selectedTab)
+        // Setup popup menu
+        button.setOnClickListener { view ->
+            val popup = PopupMenu(this, view)
+            popup.menuInflater.inflate(R.menu.menu_default_tab, popup.menu)
+            
+            // Set current item checked
+            val currentItemId = when (currentTab) {
+                DefaultTab.OTP -> R.id.tab_otps
+                DefaultTab.PERSONAL -> R.id.tab_personal
+                DefaultTab.TRANSACTIONAL -> R.id.tab_transactions
+                DefaultTab.SERVICE -> R.id.tab_services
+                DefaultTab.PROMOTIONAL -> R.id.tab_promotions
+                DefaultTab.GOVERNMENT -> R.id.tab_governmental
+            }
+            popup.menu.findItem(currentItemId)?.isChecked = true
+            
+            popup.setOnMenuItemClickListener { item: MenuItem ->
+                val selectedTab = when (item.itemId) {
+                    R.id.tab_otps -> DefaultTab.OTP
+                    R.id.tab_personal -> DefaultTab.PERSONAL
+                    R.id.tab_transactions -> DefaultTab.TRANSACTIONAL
+                    R.id.tab_services -> DefaultTab.SERVICE
+                    R.id.tab_promotions -> DefaultTab.PROMOTIONAL
+                    R.id.tab_governmental -> DefaultTab.GOVERNMENT
+                    else -> DefaultTab.OTP
+                }
+                button.text = getLabelForDefaultTab(selectedTab)
+                setDefaultTab(this, selectedTab)
+                true
+            }
+            
+            popup.show()
         }
+    }
+    
+    private fun getLabelForDefaultTab(tab: DefaultTab): String = when (tab) {
+        DefaultTab.OTP -> getString(R.string.tab_otp)
+        DefaultTab.PERSONAL -> getString(R.string.category_personal)
+        DefaultTab.TRANSACTIONAL -> getString(R.string.category_transactions)
+        DefaultTab.SERVICE -> getString(R.string.category_service)
+        DefaultTab.PROMOTIONAL -> getString(R.string.category_promotions)
+        DefaultTab.GOVERNMENT -> getString(R.string.category_government)
     }
 
     private fun setupAboutSection() {
