@@ -7,8 +7,11 @@ import android.animation.ValueAnimator
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Telephony
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
@@ -44,6 +47,13 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var contactLookupUri: String? = null
     private var messageCategory: MessageCategory = MessageCategory.UNKNOWN
     private var targetMessageId: Long? = null
+    
+    private val smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            super.onChange(selfChange)
+            loadMessages()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +98,18 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Register content observer to watch for SMS changes (delivery status updates)
+        contentResolver.registerContentObserver(
+            Telephony.Sms.CONTENT_URI,
+            true,
+            smsObserver
+        )
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Unregister content observer
+        contentResolver.unregisterContentObserver(smsObserver)
     }
 
     private fun setupHeader() {
@@ -395,7 +417,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun queryMessagesForThread(threadId: Long): List<Message> {
         val uri = "content://sms".toUri()
-        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "sub_id")
+        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "sub_id", "status")
         val selection = "thread_id = ?"
         val selectionArgs = arrayOf(threadId.toString())
         val sortOrder = "date ASC"
@@ -409,6 +431,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             val idxDate = cursor.getColumnIndex("date")
             val idxType = cursor.getColumnIndex("type")
             val idxSubId = cursor.getColumnIndex("sub_id")
+            val idxStatus = cursor.getColumnIndex("status")
 
             while (cursor.moveToNext()) {
                 val id = if (idxId >= 0) cursor.getLong(idxId) else -1L
@@ -420,7 +443,8 @@ class ThreadDetailActivity : AppCompatActivity() {
                 val subRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
                 val subscriptionId = if (subRaw >= 0) subRaw else null
                 val simSlot = subscriptionId?.let { resolveSimSlot(it) }
-                messages.add(Message(id, thread, address, body, date, type, subscriptionId, simSlot))
+                val status = if (idxStatus >= 0) cursor.getInt(idxStatus) else -1
+                messages.add(Message(id, thread, address, body, date, type, subscriptionId, simSlot, status))
             }
         }
         return messages

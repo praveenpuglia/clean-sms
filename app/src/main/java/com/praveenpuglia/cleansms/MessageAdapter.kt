@@ -4,6 +4,7 @@ import android.text.method.LinkMovementMethod
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import java.util.*
@@ -26,6 +27,7 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
     class OutgoingVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val body: TextView = itemView.findViewById(R.id.message_body)
         val time: TextView = itemView.findViewById(R.id.message_time)
+        val deliveryStatus: ImageView = itemView.findViewById(R.id.message_delivery_status)
         val simIndicator: View = itemView.findViewById(R.id.message_sim_indicator)
         val simSlotText: TextView = itemView.findViewById(R.id.message_sim_slot)
     }
@@ -57,12 +59,8 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
             // Apply linkification after setting text (web/email/phone). Using framework Linkify via movement method for accessibility.
             LinkifyUtil.linkify(bodyView)
             timeView.text = timeStr
-            if (msg.simSlot != null || msg.subscriptionId != null) {
-                simIndicator.visibility = View.VISIBLE
-                simSlotText.text = (msg.simSlot ?: "?").toString()
-            } else {
-                simIndicator.visibility = View.GONE
-            }
+            // Hide SIM indicator in thread detail view
+            simIndicator.visibility = View.GONE
         }
         when (holder) {
             is IncomingVH -> {
@@ -70,7 +68,25 @@ class MessageAdapter(private var messages: List<Message>) : RecyclerView.Adapter
                 // Show spam badge for incoming spam messages
                 holder.spamBadge.visibility = if (isSpam) View.VISIBLE else View.GONE
             }
-            is OutgoingVH -> bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
+            is OutgoingVH -> {
+                bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
+                // Show delivery status for sent messages (type 2)
+                // SMS status values: -1 = no status/default, 0 = complete (sent successfully), 32 = pending, 64 = failed
+                // Note: Android SMS database doesn't track "delivered" separately - that requires delivery reports
+                // For sent messages (type 2), show single tick unless failed
+                when (msg.status) {
+                    64 -> {
+                        // Message failed - hide tick
+                        holder.deliveryStatus.visibility = View.GONE
+                    }
+                    else -> {
+                        // For all other cases (sent, pending, or no status), show single tick
+                        // If a message is in the sent folder, it means it was sent successfully
+                        holder.deliveryStatus.setImageResource(R.drawable.ic_tick_single)
+                        holder.deliveryStatus.visibility = View.VISIBLE
+                    }
+                }
+            }
         }
     }
 
