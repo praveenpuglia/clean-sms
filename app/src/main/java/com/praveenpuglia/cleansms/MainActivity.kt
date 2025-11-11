@@ -111,6 +111,9 @@ class MainActivity : AppCompatActivity() {
     private val otpKeywordPattern = Regex("\\botp\\b|one[\\s-]*time\\s+password", RegexOption.IGNORE_CASE)
     private val otpFetchLimit = 200
     
+    // Onboarding state - track if user has completed setup flow
+    private var hasCompletedOnboarding = false
+    
     // Category filtering state - will be initialized in onCreate
     private lateinit var selectedCategory: MessageCategory
     private var allThreads: List<ThreadItem> = emptyList()
@@ -248,13 +251,13 @@ class MainActivity : AppCompatActivity() {
         val powerManager = getSystemService(PowerManager::class.java)
         val isBatteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
         
-        Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored")
+        Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored hasCompletedOnboarding=$hasCompletedOnboarding")
         
         val setupScreen = findViewById<View>(R.id.setup_screen)
         val header = findViewById<View>(R.id.header_container)
         
-        // Only show setup screen if not default SMS app
-        if (!isDefault) {
+        // Show setup screen if not default SMS app OR if user hasn't clicked Continue yet
+        if (!isDefault || !hasCompletedOnboarding) {
             // Show setup screen, hide everything else
             setupScreen.visibility = View.VISIBLE
             header.visibility = View.GONE
@@ -306,9 +309,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             
-            // Continue button (enabled only when default SMS app is set)
+            // Continue button: enabled once default SMS app is set, doesn't wait for background permission
             continueButton?.isEnabled = isDefault
             continueButton?.setOnClickListener {
+                // Mark onboarding as complete
+                hasCompletedOnboarding = true
+                
                 // Hide setup screen and show main UI
                 setupScreen.visibility = View.GONE
                 header.visibility = View.VISIBLE
