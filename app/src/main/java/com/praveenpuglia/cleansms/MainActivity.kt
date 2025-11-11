@@ -111,8 +111,9 @@ class MainActivity : AppCompatActivity() {
     private val otpKeywordPattern = Regex("\\botp\\b|one[\\s-]*time\\s+password", RegexOption.IGNORE_CASE)
     private val otpFetchLimit = 200
     
-    // Onboarding state - track if user has completed setup flow
-    private var hasCompletedOnboarding = false
+    // SharedPreferences for persistent onboarding state
+    private val PREFS_NAME = "CleanSmsPrefs"
+    private val PREF_ONBOARDING_COMPLETED = "onboarding_completed"
     
     // Category filtering state - will be initialized in onCreate
     private lateinit var selectedCategory: MessageCategory
@@ -251,6 +252,10 @@ class MainActivity : AppCompatActivity() {
         val powerManager = getSystemService(PowerManager::class.java)
         val isBatteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
         
+        // Check if onboarding has been completed (persisted)
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val hasCompletedOnboarding = prefs.getBoolean(PREF_ONBOARDING_COMPLETED, false)
+        
         Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored hasCompletedOnboarding=$hasCompletedOnboarding")
         
         val setupScreen = findViewById<View>(R.id.setup_screen)
@@ -312,8 +317,9 @@ class MainActivity : AppCompatActivity() {
             // Continue button: enabled once default SMS app is set, doesn't wait for background permission
             continueButton?.isEnabled = isDefault
             continueButton?.setOnClickListener {
-                // Mark onboarding as complete
-                hasCompletedOnboarding = true
+                // Mark onboarding as complete and persist it
+                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                prefs.edit().putBoolean(PREF_ONBOARDING_COMPLETED, true).apply()
                 
                 // Hide setup screen and show main UI
                 setupScreen.visibility = View.GONE
