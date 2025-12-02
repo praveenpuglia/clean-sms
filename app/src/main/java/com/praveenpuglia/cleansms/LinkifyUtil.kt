@@ -1,6 +1,5 @@
 package com.praveenpuglia.cleansms
 
-import android.graphics.Color
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.method.LinkMovementMethod
@@ -49,7 +48,7 @@ object LinkifyUtil {
         }
         tv.text = spannable
         tv.movementMethod = LinkMovementMethod.getInstance()
-        tv.highlightColor = Color.TRANSPARENT
+        // Note: Don't set highlightColor to TRANSPARENT as it breaks text selection highlighting
     }
 
     private fun stripCardLastFourPhoneSpans(spannable: Spannable, fullText: String) {

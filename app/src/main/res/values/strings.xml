@@ -22,4 +22,7 @@
     <string name="dialog_delete_negative">Cancel</string>
     <string name="toast_messages_deleted">Deleted</string>
     <string name="toast_messages_delete_failed">Nothing was deleted</string>
+    <string name="action_select_text">Select text</string>
+    <string name="action_copy">Copy</string>
+    <string name="toast_message_copied">Message copied</string>
 </resources>

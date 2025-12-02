@@ -10,7 +10,9 @@ import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MessageAdapter(private var items: List<MessageListItem>) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+class MessageAdapter(
+    private var items: List<MessageListItem>
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
         const val VIEW_TYPE_INCOMING = 1
@@ -79,7 +81,9 @@ class MessageAdapter(private var items: List<MessageListItem>) : RecyclerView.Ad
                 // Common binding logic extracted
                 fun bindCommon(bodyView: TextView, timeView: TextView, simIndicator: View, simSlotText: TextView) {
                     bodyView.text = msg.body
-                    // Apply linkification after setting text (web/email/phone). Using framework Linkify via movement method for accessibility.
+                    // Enable long-press text selection
+                    bodyView.setTextIsSelectable(true)
+                    // Apply linkification after setting text (web/email/phone)
                     LinkifyUtil.linkify(bodyView)
                     timeView.text = timeStr
                     // Hide SIM indicator in thread detail view
