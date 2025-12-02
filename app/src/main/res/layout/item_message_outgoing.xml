@@ -27,6 +27,12 @@
             android:lineSpacingExtra="2dp"
             android:autoLink="none" />
 
+        <!-- Railway preview (shown for IRCTC messages) -->
+        <include
+            layout="@layout/layout_railway_preview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

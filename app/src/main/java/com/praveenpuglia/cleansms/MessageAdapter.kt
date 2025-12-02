@@ -26,6 +26,19 @@ class MessageAdapter(
         val simIndicator: View = itemView.findViewById(R.id.message_sim_indicator)
         val simSlotText: TextView = itemView.findViewById(R.id.message_sim_slot)
         val spamBadge: View = itemView.findViewById(R.id.message_spam_badge)
+        // Railway preview views
+        val railwayPreview: View = itemView.findViewById(R.id.railway_preview_container)
+        val railwayPnr: TextView = itemView.findViewById(R.id.railway_pnr)
+        val railwayTrainNumber: TextView = itemView.findViewById(R.id.railway_train_number)
+        val railwayDate: TextView = itemView.findViewById(R.id.railway_date)
+        val railwayClass: TextView = itemView.findViewById(R.id.railway_class)
+        val railwayClassContainer: View = itemView.findViewById(R.id.railway_class_container)
+        val railwayFrom: TextView = itemView.findViewById(R.id.railway_from)
+        val railwayTo: TextView = itemView.findViewById(R.id.railway_to)
+        val railwayRouteContainer: View = itemView.findViewById(R.id.railway_route_container)
+        val railwaySeats: TextView = itemView.findViewById(R.id.railway_seats)
+        val railwayBoarding: TextView = itemView.findViewById(R.id.railway_boarding)
+        val railwayChartStatus: TextView = itemView.findViewById(R.id.railway_chart_status)
     }
 
     class OutgoingVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -34,6 +47,19 @@ class MessageAdapter(
         val deliveryStatus: ImageView = itemView.findViewById(R.id.message_delivery_status)
         val simIndicator: View = itemView.findViewById(R.id.message_sim_indicator)
         val simSlotText: TextView = itemView.findViewById(R.id.message_sim_slot)
+        // Railway preview views
+        val railwayPreview: View = itemView.findViewById(R.id.railway_preview_container)
+        val railwayPnr: TextView = itemView.findViewById(R.id.railway_pnr)
+        val railwayTrainNumber: TextView = itemView.findViewById(R.id.railway_train_number)
+        val railwayDate: TextView = itemView.findViewById(R.id.railway_date)
+        val railwayClass: TextView = itemView.findViewById(R.id.railway_class)
+        val railwayClassContainer: View = itemView.findViewById(R.id.railway_class_container)
+        val railwayFrom: TextView = itemView.findViewById(R.id.railway_from)
+        val railwayTo: TextView = itemView.findViewById(R.id.railway_to)
+        val railwayRouteContainer: View = itemView.findViewById(R.id.railway_route_container)
+        val railwaySeats: TextView = itemView.findViewById(R.id.railway_seats)
+        val railwayBoarding: TextView = itemView.findViewById(R.id.railway_boarding)
+        val railwayChartStatus: TextView = itemView.findViewById(R.id.railway_chart_status)
     }
 
     class DayIndicatorVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -89,11 +115,30 @@ class MessageAdapter(
                     // Hide SIM indicator in thread detail view
                     simIndicator.visibility = View.GONE
                 }
+                // Check for railway message
+                val railwayInfo = RailwayMessageParser.parse(msg.body)
+                
                 when (holder) {
                     is IncomingVH -> {
                         bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
                         // Show spam badge for incoming spam messages
                         holder.spamBadge.visibility = if (isSpam) View.VISIBLE else View.GONE
+                        // Bind railway preview
+                        bindRailwayPreview(
+                            railwayInfo,
+                            holder.railwayPreview,
+                            holder.railwayPnr,
+                            holder.railwayTrainNumber,
+                            holder.railwayDate,
+                            holder.railwayClass,
+                            holder.railwayClassContainer,
+                            holder.railwayFrom,
+                            holder.railwayTo,
+                            holder.railwayRouteContainer,
+                            holder.railwaySeats,
+                            holder.railwayBoarding,
+                            holder.railwayChartStatus
+                        )
                     }
                     is OutgoingVH -> {
                         bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
@@ -113,9 +158,111 @@ class MessageAdapter(
                                 holder.deliveryStatus.visibility = View.VISIBLE
                             }
                         }
+                        // Bind railway preview
+                        bindRailwayPreview(
+                            railwayInfo,
+                            holder.railwayPreview,
+                            holder.railwayPnr,
+                            holder.railwayTrainNumber,
+                            holder.railwayDate,
+                            holder.railwayClass,
+                            holder.railwayClassContainer,
+                            holder.railwayFrom,
+                            holder.railwayTo,
+                            holder.railwayRouteContainer,
+                            holder.railwaySeats,
+                            holder.railwayBoarding,
+                            holder.railwayChartStatus
+                        )
                     }
                 }
             }
+        }
+    }
+    
+    private fun bindRailwayPreview(
+        info: RailwayInfo?,
+        container: View,
+        pnrView: TextView,
+        trainNumberView: TextView,
+        dateView: TextView,
+        classView: TextView,
+        classContainer: View,
+        fromView: TextView,
+        toView: TextView,
+        routeContainer: View,
+        seatsView: TextView,
+        boardingView: TextView,
+        chartStatusView: TextView
+    ) {
+        if (info == null) {
+            container.visibility = View.GONE
+            return
+        }
+        
+        container.visibility = View.VISIBLE
+        
+        // PNR
+        pnrView.text = "PNR: ${info.pnr}"
+        
+        // Train number
+        if (info.trainNumber != null) {
+            trainNumberView.text = info.trainNumber
+            trainNumberView.visibility = View.VISIBLE
+        } else {
+            trainNumberView.text = "—"
+        }
+        
+        // Date
+        if (info.date != null) {
+            dateView.text = info.date
+            dateView.visibility = View.VISIBLE
+        } else {
+            dateView.text = "—"
+        }
+        
+        // Class
+        if (info.travelClass != null) {
+            classView.text = info.travelClass
+            classContainer.visibility = View.VISIBLE
+        } else {
+            classContainer.visibility = View.GONE
+        }
+        
+        // Route
+        if (info.fromStation != null && info.toStation != null) {
+            fromView.text = info.fromStation
+            toView.text = info.toStation
+            routeContainer.visibility = View.VISIBLE
+        } else {
+            routeContainer.visibility = View.GONE
+        }
+        
+        // Seats/Passengers
+        if (info.passengers.isNotEmpty()) {
+            val seatsText = info.passengers.joinToString(" • ") { p ->
+                "P${p.passengerNumber}: ${p.coach}/${p.seat}"
+            }
+            seatsView.text = seatsText
+            seatsView.visibility = View.VISIBLE
+        } else {
+            seatsView.visibility = View.GONE
+        }
+        
+        // Boarding station (if different from origin)
+        if (info.boardingStation != null && info.boardingStation != info.fromStation) {
+            boardingView.text = "⚠ Board from ${info.boardingStation}"
+            boardingView.visibility = View.VISIBLE
+        } else {
+            boardingView.visibility = View.GONE
+        }
+        
+        // Chart status
+        if (info.chartStatus != null) {
+            chartStatusView.text = if (info.chartStatus.contains("Prepared", ignoreCase = true)) "CONFIRMED" else "WAITING"
+            chartStatusView.visibility = View.VISIBLE
+        } else {
+            chartStatusView.visibility = View.GONE
         }
     }
 
