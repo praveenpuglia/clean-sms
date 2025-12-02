@@ -88,8 +88,8 @@
 
             <FrameLayout
                 android:id="@+id/message_sim_indicator"
-                android:layout_width="18dp"
-                android:layout_height="11dp"
+                android:layout_width="10dp"
+                android:layout_height="12dp"
                 android:layout_marginStart="4dp"
                 android:layout_gravity="center_vertical"
                 android:visibility="gone">
@@ -97,13 +97,14 @@
                     android:id="@+id/message_sim_icon"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:src="@drawable/ic_sim_horizontal"
+                    android:src="@drawable/ic_sim_card"
                     app:tint="?attr/colorOnSurfaceVariant" />
                 <TextView
                     android:id="@+id/message_sim_slot"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
+                    android:paddingTop="1dp"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="7sp"
                     android:textStyle="bold" />

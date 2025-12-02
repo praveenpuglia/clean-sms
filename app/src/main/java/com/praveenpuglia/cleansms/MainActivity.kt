@@ -159,6 +159,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var searchClearButton: ImageButton
     private lateinit var searchResultsRecycler: RecyclerView
     private var searchResultAdapter: SearchResultAdapter? = null
+    private val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var searchRunnable: Runnable? = null
+    private val searchDebounceMs = 300L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Apply saved theme before setting content view
@@ -235,6 +238,10 @@ class MainActivity : AppCompatActivity() {
         setupDefaultSmsUi()
         if (hasReadPermission()) {
             refreshThreadsAsync()
+        }
+        // Restore search UI if we were in search mode (returning from thread detail)
+        if (isSearchMode) {
+            restoreSearchModeUi()
         }
     }
 
@@ -495,9 +502,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun showThreadsUi() {
         findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
-        categoryTabs.visibility = View.VISIBLE
-        threadsPager.visibility = View.VISIBLE
-        newMessageFab.visibility = View.VISIBLE
+        // Don't show threads UI if we're in search mode
+        if (!isSearchMode) {
+            categoryTabs.visibility = View.VISIBLE
+            threadsPager.visibility = View.VISIBLE
+            newMessageFab.visibility = View.VISIBLE
+        }
         ViewCompat.requestApplyInsets(threadsPager)
         reloadInboxData()
     }
@@ -1580,13 +1590,19 @@ class MainActivity : AppCompatActivity() {
             searchInput.text.clear()
         }
         
-        // Text change listener for search
+        // Text change listener for search with debouncing
         searchInput.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val query = s?.toString() ?: ""
                 searchClearButton.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
-                performSearch(query)
+                
+                // Cancel any pending search
+                searchRunnable?.let { searchHandler.removeCallbacks(it) }
+                
+                // Debounce the search
+                searchRunnable = Runnable { performSearch(query) }
+                searchHandler.postDelayed(searchRunnable!!, searchDebounceMs)
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
@@ -1629,6 +1645,9 @@ class MainActivity : AppCompatActivity() {
     private fun exitSearchMode() {
         isSearchMode = false
         
+        // Cancel any pending search
+        searchRunnable?.let { searchHandler.removeCallbacks(it) }
+        
         // Hide keyboard
         val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
         imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
@@ -1645,6 +1664,16 @@ class MainActivity : AppCompatActivity() {
         searchResultsRecycler.visibility = View.GONE
         threadsPager.visibility = View.VISIBLE
         newMessageFab.visibility = View.VISIBLE
+    }
+    
+    private fun restoreSearchModeUi() {
+        // Restore search mode UI without triggering keyboard or reloading
+        searchBarContainer.visibility = View.VISIBLE
+        headerContainer.visibility = View.GONE
+        categoryTabs.visibility = View.GONE
+        threadsPager.visibility = View.GONE
+        searchResultsRecycler.visibility = View.VISIBLE
+        newMessageFab.visibility = View.GONE
     }
     
     private fun loadAllMessagesForSearch() {

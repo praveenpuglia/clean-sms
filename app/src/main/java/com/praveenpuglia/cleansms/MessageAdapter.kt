@@ -112,8 +112,13 @@ class MessageAdapter(
                     // Apply linkification after setting text (web/email/phone)
                     LinkifyUtil.linkify(bodyView)
                     timeView.text = timeStr
-                    // Hide SIM indicator in thread detail view
-                    simIndicator.visibility = View.GONE
+                    // Show SIM indicator if we have SIM slot info
+                    if (msg.simSlot != null) {
+                        simIndicator.visibility = View.VISIBLE
+                        simSlotText.text = msg.simSlot.toString()
+                    } else {
+                        simIndicator.visibility = View.GONE
+                    }
                 }
                 // Check for railway message
                 val railwayInfo = RailwayMessageParser.parse(msg.body)

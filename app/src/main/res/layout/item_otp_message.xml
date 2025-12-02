@@ -102,24 +102,24 @@
 
                     <FrameLayout
                         android:id="@+id/otp_sim_indicator"
-                        android:layout_width="26dp"
-                        android:layout_height="16dp"
+                        android:layout_width="10dp"
+                        android:layout_height="13dp"
                         android:layout_marginStart="4dp"
                         android:visibility="gone">
                         <ImageView
                             android:id="@+id/otp_sim_icon"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
-                            android:padding="1dp"
-                            android:src="@drawable/ic_sim_horizontal"
+                            android:src="@drawable/ic_sim_card"
                             app:tint="?attr/colorOnSurfaceVariant" />
                         <TextView
                             android:id="@+id/otp_sim_slot"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:gravity="center"
+                            android:paddingTop="1dp"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="9sp"
+                            android:textSize="8sp"
                             android:textStyle="bold" />
                     </FrameLayout>
 
