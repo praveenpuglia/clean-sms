@@ -29,7 +29,6 @@ class NewMessageActivity : AppCompatActivity() {
     private lateinit var chipGroup: ChipGroup
     private lateinit var recipientInput: EditText
     private lateinit var contactsList: RecyclerView
-    private lateinit var composerContainer: View
     private lateinit var messageInput: EditText
     private lateinit var sendButton: FloatingActionButton
     private lateinit var messageCounter: TextView
@@ -49,10 +48,9 @@ class NewMessageActivity : AppCompatActivity() {
         chipGroup = findViewById(R.id.new_message_recipients_chip_group)
         recipientInput = findViewById(R.id.new_message_recipient_input)
         contactsList = findViewById(R.id.new_message_contacts_list)
-        composerContainer = findViewById(R.id.new_message_composer_include)
-        messageInput = findViewById(R.id.composer_message_input)
-        sendButton = findViewById(R.id.composer_send_button)
-        messageCounter = findViewById(R.id.composer_message_counter)
+        messageInput = findViewById(R.id.new_message_body_input)
+        sendButton = findViewById(R.id.new_message_send_button)
+        messageCounter = findViewById(R.id.new_message_counter)
 
         setupViews()
         loadContacts()
@@ -84,7 +82,7 @@ class NewMessageActivity : AppCompatActivity() {
                     if (contact != null && selectedRecipients.none { it.phoneNumber == contact.phoneNumber }) {
                         selectedRecipients.add(contact)
                         addRecipientChip(contact)
-                        composerContainer.visibility = View.VISIBLE
+                        updateSendButtonState()
                     }
 
                     // Pre-fill message body if provided
@@ -177,17 +175,18 @@ class NewMessageActivity : AppCompatActivity() {
     private fun setupViews() {
         backButton.setOnClickListener { finish() }
 
-        // Autofocus recipient field and show keyboard (unless intent provides recipient)
+        // Check if we have incoming recipient from intent
         val hasIncomingRecipient = intent?.data?.let { uri ->
             (uri.scheme?.startsWith("sms") == true || uri.scheme?.startsWith("mms") == true) &&
             uri.schemeSpecificPart.substringBefore('?').trim().isNotEmpty()
         } ?: false
 
+        // Focus message input by default (user writes message first, then adds recipient)
         if (!hasIncomingRecipient) {
-            recipientInput.post {
-                recipientInput.requestFocus()
+            messageInput.post {
+                messageInput.requestFocus()
                 val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.showSoftInput(recipientInput, InputMethodManager.SHOW_IMPLICIT)
+                imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT)
             }
         }
 
@@ -219,22 +218,19 @@ class NewMessageActivity : AppCompatActivity() {
                             break
                         }
                     }
-                    if (selectedRecipients.isEmpty()) {
-                        composerContainer.visibility = View.GONE
-                        sendButton.isEnabled = false
-                    }
+                    updateSendButtonState()
                     return@setOnKeyListener true
                 }
             }
             false
         }
 
-        // Setup message input enabling logic and counter
+        // Setup message input text watcher for counter and send button state
         messageInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                sendButton.isEnabled = !s.isNullOrBlank() && selectedRecipients.isNotEmpty()
-                messageCounter.text = s?.length?.toString() ?: "0"
+                updateSendButtonState()
+                messageCounter.text = (s?.length ?: 0).toString()
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -243,6 +239,10 @@ class NewMessageActivity : AppCompatActivity() {
         sendButton.setOnClickListener {
             sendMessage()
         }
+    }
+
+    private fun updateSendButtonState() {
+        sendButton.isEnabled = !messageInput.text.isNullOrBlank() && selectedRecipients.isNotEmpty()
     }
 
     private fun loadContacts() {
@@ -351,21 +351,8 @@ class NewMessageActivity : AppCompatActivity() {
         addRecipientChip(contact)
         recipientInput.setText("")
         contactsList.visibility = View.GONE
-
-        // Show composer when at least one recipient present
-        if (selectedRecipients.isNotEmpty()) {
-            composerContainer.visibility = View.VISIBLE
-            
-            // Auto-focus message input for quick typing after selecting first contact
-            messageInput.post {
-                messageInput.requestFocus()
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT)
-            }
-        }
+        updateSendButtonState()
     }
-
-    // Existing thread lookup removed for simplified flow.
 
     private fun sendMessage() {
         if (selectedRecipients.isEmpty()) return
@@ -434,17 +421,10 @@ class NewMessageActivity : AppCompatActivity() {
             setOnCloseIconClickListener {
                 selectedRecipients.removeAll { it.phoneNumber == contact.phoneNumber }
                 chipGroup.removeView(this)
-                if (selectedRecipients.isEmpty()) {
-                    composerContainer.visibility = View.GONE
-                    sendButton.isEnabled = false
-                } else {
-                    sendButton.isEnabled = !messageInput.text.isNullOrBlank()
-                }
+                updateSendButtonState()
             }
         }
         chipGroup.addView(chip)
-        sendButton.isEnabled = !messageInput.text.isNullOrBlank()
+        updateSendButtonState()
     }
-
-    // Removed old avatar injection logic; chips handle display now.
 }

@@ -6,7 +6,7 @@
     android:orientation="vertical"
     android:fitsSystemWindows="true">
 
-    <!-- Page Header (matching MainActivity style) -->
+    <!-- Page Header -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -63,98 +63,151 @@
             android:background="?attr/colorOutlineVariant" />
     </FrameLayout>
 
-    <!-- Recipient input section with chips -->
-    <LinearLayout
-        android:id="@+id/new_message_recipients_container"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingTop="16dp"
-        android:background="?attr/colorSurface">
-
-        <!-- Label for the recipient section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="To"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="?attr/colorOnSurface"
-            android:paddingBottom="8dp" />
-
-        <!-- Container for chips and input -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="56dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline"
-            app:cardCornerRadius="8dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:contentPadding="8dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <!-- ChipGroup with inline flow layout -->
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/new_message_recipients_chip_group"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:chipSpacingHorizontal="8dp"
-                    app:chipSpacingVertical="4dp"
-                    app:singleLine="false"
-                    app:selectionRequired="false" />
-
-                <!-- Plain EditText for recipient input -->
-                <EditText
-                    android:id="@+id/new_message_recipient_input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="40dp"
-                    android:hint="Type name or phone number"
-                    android:inputType="text|textCapWords|textNoSuggestions"
-                    android:maxLines="1"
-                    android:background="@android:color/transparent"
-                    android:textAppearance="?attr/textAppearanceBodyLarge"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="4dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-    </LinearLayout>
-
-    <!-- Small spacing -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="12dp"
-        android:background="@android:color/transparent" />
-
-    <!-- Content area that fills remaining space -->
+    <!-- Message input area (fills available space) -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- Contact suggestions list -->
+        <!-- Message input that fills the space -->
+        <EditText
+            android:id="@+id/new_message_body_input"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"
+            android:gravity="top|start"
+            android:hint="Type your message..."
+            android:inputType="textMultiLine|textCapSentences"
+            android:padding="16dp"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textColorHint="?attr/colorOnSurfaceVariant" />
+
+        <!-- Contact suggestions overlay -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/new_message_contacts_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="?attr/colorSurface"
             android:visibility="gone" />
+
     </FrameLayout>
 
-    <!-- Reusable composer bar (sticks to bottom) -->
-    <include
-        android:id="@+id/new_message_composer_include"
-        layout="@layout/composer_bar"
+    <!-- Character counter -->
+    <TextView
+        android:id="@+id/new_message_counter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:paddingEnd="16dp"
+        android:paddingBottom="4dp"
+        android:text="0"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="12sp" />
+
+    <!-- Bottom bar: To field + Send button -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:visibility="gone" />
+        android:orientation="vertical"
+        android:background="?attr/colorSurfaceVariant"
+        android:elevation="4dp">
+
+        <!-- Divider at top -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?attr/colorOutline" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:minHeight="56dp">
+
+            <!-- To label -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="To:"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="14sp"
+                android:paddingEnd="8dp" />
+
+            <!-- Recipient chips and input container -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Horizontal scroll for chips -->
+                <HorizontalScrollView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:scrollbars="none"
+                    android:fillViewport="true">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <!-- ChipGroup for recipients -->
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/new_message_recipients_chip_group"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:chipSpacingHorizontal="4dp"
+                            app:singleLine="true"
+                            app:selectionRequired="false" />
+
+                        <!-- Inline recipient input -->
+                        <EditText
+                            android:id="@+id/new_message_recipient_input"
+                            android:layout_width="120dp"
+                            android:layout_height="40dp"
+                            android:hint="Add recipient"
+                            android:inputType="text|textNoSuggestions"
+                            android:maxLines="1"
+                            android:background="@android:color/transparent"
+                            android:textSize="14sp"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textColorHint="?attr/colorOnSurfaceVariant"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:imeOptions="actionDone" />
+
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+            </LinearLayout>
+
+            <!-- Send button -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/new_message_send_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Send"
+                android:src="@drawable/ic_send"
+                app:fabSize="mini"
+                app:fabCustomSize="40dp"
+                app:maxImageSize="20dp"
+                app:elevation="0dp"
+                app:backgroundTint="?attr/colorPrimary"
+                app:tint="?attr/colorOnPrimary"
+                android:enabled="false" />
+
+        </LinearLayout>
+    </LinearLayout>
 
 </LinearLayout>
