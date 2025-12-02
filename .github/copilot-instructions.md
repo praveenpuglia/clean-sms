@@ -1,1 +1,0 @@
-- Make sure you always refer to PROJECT_CONSTITUTION.md for project guidelines.
