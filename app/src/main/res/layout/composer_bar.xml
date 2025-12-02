@@ -1,86 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Reusable message composer bar component -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/composer_bar_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?android:attr/colorBackground"
-    android:elevation="8dp">
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="?attr/colorSurfaceVariant"
+    android:paddingStart="12dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/composer_bar_container"
-        android:layout_width="match_parent"
+    <!-- Message input -->
+    <EditText
+        android:id="@+id/composer_message_input"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:paddingStart="16dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="12dp">
+        android:layout_weight="1"
+        android:minHeight="44dp"
+        android:hint="Message"
+        android:inputType="textCapSentences|textMultiLine"
+        android:maxLines="4"
+        android:background="@android:color/transparent"
+        android:textSize="16sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textColorHint="?attr/colorOnSurfaceVariant"
+        android:paddingStart="4dp"
+        android:paddingEnd="8dp" />
 
-        <!-- Input container with counter inside -->
-        <FrameLayout
-            android:id="@+id/composer_input_container"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/composer_send_button"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+    <!-- Character counter -->
+    <TextView
+        android:id="@+id/composer_message_counter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="4dp"
+        android:text="0"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="11sp" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/composer_message_input_layout"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Message"
-                app:boxCornerRadiusBottomEnd="24dp"
-                app:boxCornerRadiusBottomStart="24dp"
-                app:boxCornerRadiusTopEnd="24dp"
-                app:boxCornerRadiusTopStart="24dp"
-                app:boxStrokeWidth="1dp"
-                app:counterEnabled="false">
+    <!-- SIM toggle (only visible for dual-SIM) -->
+    <FrameLayout
+        android:id="@+id/composer_sim_toggle"
+        android:layout_width="28dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/composer_message_input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="40dp"
-                    android:inputType="textCapSentences|textMultiLine"
-                    android:maxLines="4"
-                    android:paddingEnd="56dp"
-                    android:textSize="16sp"
-                    tools:ignore="RtlSymmetry,VisualLintTextFieldSize" />
+        <ImageView
+            android:id="@+id/composer_sim_icon"
+            android:layout_width="16dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_sim_card"
+            app:tint="?attr/colorOnSurfaceVariant" />
 
-            </com.google.android.material.textfield.TextInputLayout>
+        <TextView
+            android:id="@+id/composer_sim_number"
+            android:layout_width="16dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:paddingTop="4dp"
+            android:text="1"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="9sp"
+            android:textStyle="bold" />
 
-            <!-- Counter inside input area (bottom right) -->
-            <TextView
-                android:id="@+id/composer_message_counter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom|end"
-                android:layout_marginEnd="12dp"
-                android:layout_marginBottom="14dp"
-                android:text="0"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="11sp"
-                android:alpha="0.7" />
-        </FrameLayout>
+    </FrameLayout>
 
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/composer_send_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:contentDescription="Send"
-            android:src="@drawable/ic_send"
-            android:layout_marginStart="12dp"
-            app:elevation="0dp"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="@id/composer_input_container"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/composer_input_container" />
+    <!-- Send button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/composer_send_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:contentDescription="Send"
+        android:src="@drawable/ic_send"
+        app:elevation="0dp"
+        app:fabSize="mini"
+        app:fabCustomSize="40dp"
+        app:maxImageSize="20dp"
+        app:backgroundTint="?attr/colorPrimary"
+        app:tint="?attr/colorOnPrimary" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-</FrameLayout>
+</LinearLayout>

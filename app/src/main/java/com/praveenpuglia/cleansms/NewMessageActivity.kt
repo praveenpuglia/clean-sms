@@ -1,6 +1,8 @@
 package com.praveenpuglia.cleansms
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -12,14 +14,18 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
+import android.telephony.SubscriptionInfo
+import android.telephony.SubscriptionManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.provider.ContactsContract
 import android.provider.Telephony
 import android.content.ContentValues
 import android.telephony.PhoneNumberUtils
+import android.telephony.SmsManager
 import android.widget.Toast
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
@@ -32,10 +38,17 @@ class NewMessageActivity : AppCompatActivity() {
     private lateinit var messageInput: EditText
     private lateinit var sendButton: FloatingActionButton
     private lateinit var messageCounter: TextView
+    private lateinit var smsPartsIndicator: TextView
+    private lateinit var simToggle: View
+    private lateinit var simNumber: TextView
     
     private lateinit var contactsAdapter: ContactSuggestionAdapter
     private var allContacts: List<ContactSuggestion> = emptyList()
     private val selectedRecipients = mutableListOf<ContactSuggestion>()
+    
+    // SIM selection
+    private var availableSims: List<SubscriptionInfo> = emptyList()
+    private var selectedSimIndex: Int = 0 // Index into availableSims list
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Apply saved theme before setting content view
@@ -51,9 +64,13 @@ class NewMessageActivity : AppCompatActivity() {
         messageInput = findViewById(R.id.new_message_body_input)
         sendButton = findViewById(R.id.new_message_send_button)
         messageCounter = findViewById(R.id.new_message_counter)
+        smsPartsIndicator = findViewById(R.id.new_message_sms_parts)
+        simToggle = findViewById(R.id.new_message_sim_toggle)
+        simNumber = findViewById(R.id.new_message_sim_number)
 
         setupViews()
         loadContacts()
+        setupSimSelector()
         handleIncomingIntent()
     }
 
@@ -62,11 +79,10 @@ class NewMessageActivity : AppCompatActivity() {
         intent?.data?.let { uri ->
             if (uri.scheme?.startsWith("sms") == true || uri.scheme?.startsWith("mms") == true) {
                 // Extract phone number and optional body from URI
-                // SMS URIs are non-hierarchical, so we parse manually
                 val schemeSpecificPart = uri.schemeSpecificPart
                 val phoneNumber = schemeSpecificPart.substringBefore('?').trim()
                 
-                // Extract optional message body from query string (e.g., ?body=Hello&other=param)
+                // Extract optional message body from query string
                 val bodyText = if (schemeSpecificPart.contains('?')) {
                     val queryString = schemeSpecificPart.substringAfter('?')
                     parseQueryParameter(queryString, "body")
@@ -75,23 +91,19 @@ class NewMessageActivity : AppCompatActivity() {
                 }
 
                 if (phoneNumber.isNotEmpty()) {
-                    // Look up contact from phone number or create raw number entry
                     val contact = findContactByPhoneNumber(phoneNumber)
                     
-                    // Add contact to recipients
                     if (contact != null && selectedRecipients.none { it.phoneNumber == contact.phoneNumber }) {
                         selectedRecipients.add(contact)
                         addRecipientChip(contact)
                         updateSendButtonState()
                     }
 
-                    // Pre-fill message body if provided
                     if (!bodyText.isNullOrBlank()) {
                         messageInput.setText(bodyText)
-                        messageInput.setSelection(bodyText.length) // Cursor at end
+                        messageInput.setSelection(bodyText.length)
                     }
 
-                    // Focus on message input instead of recipient input
                     messageInput.post {
                         messageInput.requestFocus()
                         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
@@ -103,7 +115,6 @@ class NewMessageActivity : AppCompatActivity() {
     }
 
     private fun parseQueryParameter(queryString: String, paramName: String): String? {
-        // Parse query string manually for non-hierarchical URIs
         queryString.split('&').forEach { param ->
             val parts = param.split('=', limit = 2)
             if (parts.size == 2 && parts[0] == paramName) {
@@ -116,12 +127,10 @@ class NewMessageActivity : AppCompatActivity() {
     private fun findContactByPhoneNumber(phoneNumber: String): ContactSuggestion? {
         val normalizedInput = normalizeNumber(phoneNumber)
         
-        // First, try to find exact match in loaded contacts
         allContacts.firstOrNull { normalizeNumber(it.phoneNumber) == normalizedInput }?.let {
             return it
         }
 
-        // If not found in memory, query contacts database
         try {
             val projection = arrayOf(
                 ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
@@ -161,7 +170,6 @@ class NewMessageActivity : AppCompatActivity() {
             e.printStackTrace()
         }
 
-        // If still not found, create a raw number contact suggestion
         return ContactSuggestion(
             contactId = -1L,
             name = phoneNumber,
@@ -175,13 +183,11 @@ class NewMessageActivity : AppCompatActivity() {
     private fun setupViews() {
         backButton.setOnClickListener { finish() }
 
-        // Check if we have incoming recipient from intent
         val hasIncomingRecipient = intent?.data?.let { uri ->
             (uri.scheme?.startsWith("sms") == true || uri.scheme?.startsWith("mms") == true) &&
             uri.schemeSpecificPart.substringBefore('?').trim().isNotEmpty()
         } ?: false
 
-        // Focus message input by default (user writes message first, then adds recipient)
         if (!hasIncomingRecipient) {
             messageInput.post {
                 messageInput.requestFocus()
@@ -197,7 +203,7 @@ class NewMessageActivity : AppCompatActivity() {
         contactsList.layoutManager = LinearLayoutManager(this)
         contactsList.adapter = contactsAdapter
 
-        // Setup recipient input with text watcher
+        // Setup recipient input
         recipientInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -206,7 +212,7 @@ class NewMessageActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
 
-        // Backspace to remove last chip when input empty
+        // Backspace to remove last chip
         recipientInput.setOnKeyListener { _, keyCode, event ->
             if (keyCode == android.view.KeyEvent.KEYCODE_DEL && event.action == android.view.KeyEvent.ACTION_DOWN) {
                 if (recipientInput.text.isNullOrEmpty() && selectedRecipients.isNotEmpty()) {
@@ -225,15 +231,18 @@ class NewMessageActivity : AppCompatActivity() {
             false
         }
 
-        // Setup message input text watcher for counter and send button state
+        // Setup message input with SMS counting
         messageInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 updateSendButtonState()
-                messageCounter.text = (s?.length ?: 0).toString()
+                updateSmsCounter(s?.toString() ?: "")
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+
+        // Initial counter update
+        updateSmsCounter("")
 
         // Setup send button
         sendButton.setOnClickListener {
@@ -241,14 +250,135 @@ class NewMessageActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupSimSelector() {
+        // Check if we have phone state permission for SIM info
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            simToggle.visibility = View.GONE
+            return
+        }
+
+        try {
+            val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            val activeSubscriptions = subscriptionManager?.activeSubscriptionInfoList ?: emptyList()
+            
+            if (activeSubscriptions.size > 1) {
+                availableSims = activeSubscriptions
+                
+                // Default to system default SMS SIM
+                val defaultSmsSubId = SubscriptionManager.getDefaultSmsSubscriptionId()
+                selectedSimIndex = availableSims.indexOfFirst { it.subscriptionId == defaultSmsSubId }
+                if (selectedSimIndex < 0) selectedSimIndex = 0
+                
+                simToggle.visibility = View.VISIBLE
+                updateSimToggleDisplay()
+                
+                // Simple toggle - just flip between SIMs with animation
+                simToggle.setOnClickListener {
+                    animateSimToggle {
+                        selectedSimIndex = (selectedSimIndex + 1) % availableSims.size
+                        updateSimToggleDisplay()
+                    }
+                }
+            } else {
+                simToggle.visibility = View.GONE
+            }
+        } catch (e: SecurityException) {
+            simToggle.visibility = View.GONE
+        } catch (e: Exception) {
+            simToggle.visibility = View.GONE
+        }
+    }
+
+    private fun updateSimToggleDisplay() {
+        if (availableSims.isNotEmpty() && selectedSimIndex < availableSims.size) {
+            val sim = availableSims[selectedSimIndex]
+            simNumber.text = (sim.simSlotIndex + 1).toString()
+        }
+    }
+
+    private fun animateSimToggle(onMidpoint: () -> Unit) {
+        val duration = 150L
+        // Slide up and fade out
+        simNumber.animate()
+            .translationY(-simNumber.height.toFloat())
+            .alpha(0f)
+            .setDuration(duration)
+            .withEndAction {
+                onMidpoint()
+                // Reset position to below and slide up
+                simNumber.translationY = simNumber.height.toFloat()
+                simNumber.animate()
+                    .translationY(0f)
+                    .alpha(1f)
+                    .setDuration(duration)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun updateSmsCounter(text: String) {
+        val length = text.length
+        
+        // Check if message contains any non-GSM characters (requires Unicode/UCS-2 encoding)
+        val isUnicode = text.any { !isGsmCharacter(it) }
+        
+        // SMS limits:
+        // GSM 7-bit: 160 chars for single, 153 per part for concatenated
+        // Unicode (UCS-2): 70 chars for single, 67 per part for concatenated
+        val singleLimit = if (isUnicode) 70 else 160
+        val multiPartLimit = if (isUnicode) 67 else 153
+        
+        val parts = when {
+            length == 0 -> 0
+            length <= singleLimit -> 1
+            else -> ((length - 1) / multiPartLimit) + 1
+        }
+        
+        val remaining = when {
+            length == 0 -> singleLimit
+            length <= singleLimit -> singleLimit - length
+            else -> {
+                val usedInCurrentPart = ((length - 1) % multiPartLimit) + 1
+                multiPartLimit - usedInCurrentPart
+            }
+        }
+        
+        // Update counter display
+        if (parts <= 1) {
+            messageCounter.text = "$length / $singleLimit"
+            smsPartsIndicator.visibility = View.GONE
+        } else {
+            messageCounter.text = "$remaining"
+            smsPartsIndicator.text = "$parts SMS"
+            smsPartsIndicator.visibility = View.VISIBLE
+        }
+        
+        // Change color if approaching/exceeding limit
+        val counterColor = when {
+            parts > 1 -> ContextCompat.getColor(this, R.color.md_theme_light_tertiary)
+            length > singleLimit * 0.9 -> ContextCompat.getColor(this, R.color.md_theme_light_error)
+            else -> ContextCompat.getColor(this, android.R.color.darker_gray)
+        }
+        messageCounter.setTextColor(counterColor)
+        smsPartsIndicator.setTextColor(counterColor)
+    }
+
+    private fun isGsmCharacter(c: Char): Boolean {
+        // GSM 7-bit default alphabet characters
+        // Basic Latin + some special chars + extended via escape
+        val gsmBasic = "@£\$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ ÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
+                       "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà"
+        val gsmExtended = "^{}\\[~]|€"
+        return c in gsmBasic || c in gsmExtended
+    }
+
     private fun updateSendButtonState() {
         sendButton.isEnabled = !messageInput.text.isNullOrBlank() && selectedRecipients.isNotEmpty()
     }
 
     private fun loadContacts() {
-        // Load all contacts with phone numbers, deduplicating identical numbers per contact
         val contacts = mutableListOf<ContactSuggestion>()
-        val seen = HashSet<String>() // normalized key to avoid duplicates
+        val seen = HashSet<String>()
 
         try {
             val projection = arrayOf(
@@ -284,7 +414,6 @@ class NewMessageActivity : AppCompatActivity() {
 
                     if (name != null && numberRaw != null) {
                         val normalized = normalizeNumber(numberRaw)
-                        // key uses contact + normalized number so same number across multi-account duplicates is collapsed
                         val key = "$contactId:$normalized"
                         if (seen.add(key)) {
                             contacts.add(
@@ -319,7 +448,6 @@ class NewMessageActivity : AppCompatActivity() {
         }
 
         val mutable = filtered.toMutableList()
-        // Add synthetic suggestion if query looks like a phone number and not an exact match already
         if (isPotentialPhoneNumber(query) && filtered.none { it.phoneNumber == query }) {
             mutable.add(
                 ContactSuggestion(
@@ -342,7 +470,6 @@ class NewMessageActivity : AppCompatActivity() {
     }
 
     private fun onContactSelected(contact: ContactSuggestion) {
-        // Avoid duplicates
         if (selectedRecipients.any { it.phoneNumber == contact.phoneNumber }) {
             recipientInput.setText("")
             return
@@ -360,10 +487,25 @@ class NewMessageActivity : AppCompatActivity() {
         if (messageText.isBlank()) return
 
         try {
-            val smsManager = android.telephony.SmsManager.getDefault()
+            // Get the appropriate SmsManager for selected SIM
+            val smsManager = if (availableSims.isNotEmpty() && selectedSimIndex < availableSims.size) {
+                val subscriptionId = availableSims[selectedSimIndex].subscriptionId
+                SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
+            } else {
+                @Suppress("DEPRECATION")
+                SmsManager.getDefault()
+            }
+            
             selectedRecipients.forEach { recipient ->
-                smsManager.sendTextMessage(recipient.phoneNumber, null, messageText, null, null)
-                // Attempt provider insert for immediate visibility if default SMS app
+                // Handle long messages by splitting
+                val parts = smsManager.divideMessage(messageText)
+                if (parts.size > 1) {
+                    smsManager.sendMultipartTextMessage(recipient.phoneNumber, null, parts, null, null)
+                } else {
+                    smsManager.sendTextMessage(recipient.phoneNumber, null, messageText, null, null)
+                }
+                
+                // Insert into sent folder
                 try {
                     val threadId = Telephony.Threads.getOrCreateThreadId(this, setOf(recipient.phoneNumber))
                     val values = ContentValues().apply {
@@ -373,13 +515,27 @@ class NewMessageActivity : AppCompatActivity() {
                         put("read", 1)
                         put("type", 2)
                         put("thread_id", threadId)
+                        // Include subscription ID if using specific SIM
+                        if (availableSims.isNotEmpty() && selectedSimIndex < availableSims.size) {
+                            put("sub_id", availableSims[selectedSimIndex].subscriptionId)
+                        }
                     }
                     contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
                 } catch (_: SecurityException) { }
             }
-            Toast.makeText(this, if (selectedRecipients.size == 1) "Message sent" else "Messages sent", Toast.LENGTH_SHORT).show()
+            
+            val simInfo = if (availableSims.size > 1) {
+                " via SIM ${availableSims[selectedSimIndex].simSlotIndex + 1}"
+            } else ""
+            
+            Toast.makeText(
+                this, 
+                if (selectedRecipients.size == 1) "Message sent$simInfo" else "Messages sent$simInfo", 
+                Toast.LENGTH_SHORT
+            ).show()
+            
             MainActivity.refreshThreadsIfActive()
-            finish() // Return to previous tab (activity stack pop)
+            finish()
         } catch (e: Exception) {
             Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
             e.printStackTrace()
@@ -391,10 +547,8 @@ class NewMessageActivity : AppCompatActivity() {
     private fun isPotentialPhoneNumber(input: String): Boolean {
         if (input.isBlank()) return false
         val digits = input.filter { it.isDigit() }
-        // Basic heuristic: at least 5 digits, not all same char
         if (digits.length < 5) return false
         if (digits.toSet().size == 1) return false
-        // Allow +, spaces, dashes, parentheses
         return input.matches(Regex("^[+()0-9 -]{5,}"))
     }
 
@@ -402,7 +556,6 @@ class NewMessageActivity : AppCompatActivity() {
         val chip = Chip(this, null, com.google.android.material.R.style.Widget_Material3_Chip_Input).apply {
             text = if (contact.isRawNumber) contact.phoneNumber else contact.name
             isCloseIconVisible = true
-            // Show contact photo if available
             if (!contact.photoUri.isNullOrBlank()) {
                 try {
                     val uri = android.net.Uri.parse(contact.photoUri)

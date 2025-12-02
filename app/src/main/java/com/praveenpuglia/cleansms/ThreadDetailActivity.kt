@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import android.view.View
 import android.widget.EditText
@@ -41,7 +42,13 @@ class ThreadDetailActivity : AppCompatActivity() {
     private lateinit var avatarContainer: View
     private lateinit var avatarImage: ImageView
     private lateinit var avatarText: TextView
+    private lateinit var simToggle: View
+    private lateinit var simNumber: TextView
     private var threadId: Long = -1
+    
+    // SIM selection
+    private var availableSims: List<SubscriptionInfo> = emptyList()
+    private var selectedSimIndex: Int = 0
     private var contactName: String? = null
     private var contactAddress: String? = null
     private var contactPhotoUri: String? = null
@@ -284,6 +291,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         messageInput = findViewById(R.id.composer_message_input)
         sendButton = findViewById(R.id.composer_send_button)
         messageCounter = findViewById(R.id.composer_message_counter)
+        simToggle = findViewById(R.id.composer_sim_toggle)
+        simNumber = findViewById(R.id.composer_sim_number)
 
         // Update counter as user types
         messageInput.addTextChangedListener(object : android.text.TextWatcher {
@@ -301,7 +310,74 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
 
+        setupSimToggle()
         updateComposeBarVisibility()
+    }
+    
+    private fun setupSimToggle() {
+        // Check if we have phone state permission for SIM info
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            simToggle.visibility = View.GONE
+            return
+        }
+
+        try {
+            val subscriptionManager = getSystemService(SubscriptionManager::class.java)
+            val activeSubscriptions = subscriptionManager?.activeSubscriptionInfoList ?: emptyList()
+            
+            if (activeSubscriptions.size > 1) {
+                availableSims = activeSubscriptions
+                
+                // Default to system default SMS SIM
+                val defaultSmsSubId = SubscriptionManager.getDefaultSmsSubscriptionId()
+                selectedSimIndex = availableSims.indexOfFirst { it.subscriptionId == defaultSmsSubId }
+                if (selectedSimIndex < 0) selectedSimIndex = 0
+                
+                simToggle.visibility = View.VISIBLE
+                updateSimToggleDisplay()
+                
+                // Simple toggle - just flip between SIMs with animation
+                simToggle.setOnClickListener {
+                    animateSimToggle {
+                        selectedSimIndex = (selectedSimIndex + 1) % availableSims.size
+                        updateSimToggleDisplay()
+                    }
+                }
+            } else {
+                simToggle.visibility = View.GONE
+            }
+        } catch (e: SecurityException) {
+            simToggle.visibility = View.GONE
+        } catch (e: Exception) {
+            simToggle.visibility = View.GONE
+        }
+    }
+
+    private fun updateSimToggleDisplay() {
+        if (availableSims.isNotEmpty() && selectedSimIndex < availableSims.size) {
+            val sim = availableSims[selectedSimIndex]
+            simNumber.text = (sim.simSlotIndex + 1).toString()
+        }
+    }
+
+    private fun animateSimToggle(onMidpoint: () -> Unit) {
+        val duration = 150L
+        // Slide up and fade out
+        simNumber.animate()
+            .translationY(-simNumber.height.toFloat())
+            .alpha(0f)
+            .setDuration(duration)
+            .withEndAction {
+                onMidpoint()
+                // Reset position to below and slide up
+                simNumber.translationY = simNumber.height.toFloat()
+                simNumber.animate()
+                    .translationY(0f)
+                    .alpha(1f)
+                    .setDuration(duration)
+                    .start()
+            }
+            .start()
     }
 
     private fun updateComposeBarVisibility() {
@@ -327,9 +403,23 @@ class ThreadDetailActivity : AppCompatActivity() {
 
         Thread {
             try {
-                // Send via SmsManager
-                val smsManager = SmsManager.getDefault()
-                smsManager.sendTextMessage(address, null, messageText, null, null)
+                // Get the appropriate SmsManager for selected SIM
+                val smsManager = if (availableSims.isNotEmpty() && selectedSimIndex < availableSims.size) {
+                    val subscriptionId = availableSims[selectedSimIndex].subscriptionId
+                    @Suppress("DEPRECATION")
+                    SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getDefault()
+                }
+                
+                // Handle long messages by splitting
+                val parts = smsManager.divideMessage(messageText)
+                if (parts.size > 1) {
+                    smsManager.sendMultipartTextMessage(address, null, parts, null, null)
+                } else {
+                    smsManager.sendTextMessage(address, null, messageText, null, null)
+                }
 
                 // Insert into provider as sent message
                 val values = ContentValues().apply {
@@ -339,12 +429,20 @@ class ThreadDetailActivity : AppCompatActivity() {
                     put(Telephony.Sms.READ, 1)
                     put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
                     put(Telephony.Sms.THREAD_ID, threadId)
+                    // Include subscription ID if using specific SIM
+                    if (availableSims.isNotEmpty() && selectedSimIndex < availableSims.size) {
+                        put("sub_id", availableSims[selectedSimIndex].subscriptionId)
+                    }
                 }
                 contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
 
+                val simInfo = if (availableSims.size > 1) {
+                    " via SIM ${availableSims[selectedSimIndex].simSlotIndex + 1}"
+                } else ""
+
                 runOnUiThread {
                     messageInput.text.clear()
-                    Toast.makeText(this, "Message sent", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Message sent$simInfo", Toast.LENGTH_SHORT).show()
                     // Reload messages to show the sent message
                     loadMessages()
                 }

@@ -93,19 +93,39 @@
 
     </FrameLayout>
 
-    <!-- Character counter -->
-    <TextView
-        android:id="@+id/new_message_counter"
-        android:layout_width="wrap_content"
+    <!-- SMS counter info bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="end"
+        android:orientation="horizontal"
+        android:gravity="end|center_vertical"
+        android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="4dp"
-        android:text="0"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp" />
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
 
-    <!-- Bottom bar: To field + Send button -->
+        <!-- SMS parts indicator (shows when > 1 part) -->
+        <TextView
+            android:id="@+id/new_message_sms_parts"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <!-- Character counter -->
+        <TextView
+            android:id="@+id/new_message_counter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="0 / 160"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+    <!-- Bottom bar: SIM selector + To field + Send button -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -124,7 +144,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="12dp"
+            android:paddingStart="8dp"
             android:paddingEnd="8dp"
             android:paddingTop="8dp"
             android:paddingBottom="8dp"
@@ -137,66 +157,90 @@
                 android:text="To:"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp"
+                android:paddingStart="4dp"
                 android:paddingEnd="8dp" />
 
             <!-- Recipient chips and input container -->
-            <LinearLayout
+            <HorizontalScrollView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:scrollbars="none"
+                android:fillViewport="true">
 
-                <!-- Horizontal scroll for chips -->
-                <HorizontalScrollView
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:scrollbars="none"
-                    android:fillViewport="true">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                    <LinearLayout
+                    <!-- ChipGroup for recipients -->
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/new_message_recipients_chip_group"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        app:chipSpacingHorizontal="4dp"
+                        app:singleLine="true"
+                        app:selectionRequired="false" />
 
-                        <!-- ChipGroup for recipients -->
-                        <com.google.android.material.chip.ChipGroup
-                            android:id="@+id/new_message_recipients_chip_group"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            app:chipSpacingHorizontal="4dp"
-                            app:singleLine="true"
-                            app:selectionRequired="false" />
+                    <!-- Inline recipient input -->
+                    <EditText
+                        android:id="@+id/new_message_recipient_input"
+                        android:layout_width="100dp"
+                        android:layout_height="40dp"
+                        android:hint="Add recipient"
+                        android:inputType="text|textNoSuggestions"
+                        android:maxLines="1"
+                        android:background="@android:color/transparent"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textColorHint="?attr/colorOnSurfaceVariant"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:imeOptions="actionDone" />
 
-                        <!-- Inline recipient input -->
-                        <EditText
-                            android:id="@+id/new_message_recipient_input"
-                            android:layout_width="120dp"
-                            android:layout_height="40dp"
-                            android:hint="Add recipient"
-                            android:inputType="text|textNoSuggestions"
-                            android:maxLines="1"
-                            android:background="@android:color/transparent"
-                            android:textSize="14sp"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:textColorHint="?attr/colorOnSurfaceVariant"
-                            android:paddingStart="4dp"
-                            android:paddingEnd="4dp"
-                            android:imeOptions="actionDone" />
+                </LinearLayout>
+            </HorizontalScrollView>
 
-                    </LinearLayout>
-                </HorizontalScrollView>
+            <!-- SIM toggle (only visible for dual-SIM) -->
+            <FrameLayout
+                android:id="@+id/new_message_sim_toggle"
+                android:layout_width="32dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone">
 
-            </LinearLayout>
+                <ImageView
+                    android:id="@+id/new_message_sim_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_sim_card"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:id="@+id/new_message_sim_number"
+                    android:layout_width="18dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:gravity="center"
+                    android:paddingTop="5dp"
+                    android:text="1"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+            </FrameLayout>
 
             <!-- Send button -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/new_message_send_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:contentDescription="Send"
                 android:src="@drawable/ic_send"
                 app:fabSize="mini"
