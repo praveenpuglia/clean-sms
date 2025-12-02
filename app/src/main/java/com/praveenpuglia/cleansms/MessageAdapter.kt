@@ -241,7 +241,16 @@ class MessageAdapter(
         // Seats/Passengers
         if (info.passengers.isNotEmpty()) {
             val seatsText = info.passengers.joinToString(" • ") { p ->
-                "P${p.passengerNumber}: ${p.coach}/${p.seat}"
+                val statusPrefix = when (p.status) {
+                    PassengerStatus.RAC -> "RAC "
+                    PassengerStatus.WAITLIST -> "WL "
+                    PassengerStatus.CONFIRMED -> ""
+                }
+                when {
+                    p.coach != null && p.seat != null -> "P${p.passengerNumber}: $statusPrefix${p.coach}/${p.seat}"
+                    p.seat != null -> "P${p.passengerNumber}: $statusPrefix#${p.seat}"
+                    else -> "P${p.passengerNumber}: ${statusPrefix}Waiting"
+                }
             }
             seatsView.text = seatsText
             seatsView.visibility = View.VISIBLE
