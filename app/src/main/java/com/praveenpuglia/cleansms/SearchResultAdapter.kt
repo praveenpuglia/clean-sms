@@ -113,32 +113,39 @@ class SearchResultAdapter(
         val now = Calendar.getInstance()
         val msgTime = Calendar.getInstance().apply { timeInMillis = timestamp }
         
-        val daysDiff = ((now.timeInMillis - msgTime.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
-        
         val hour = if (msgTime.get(Calendar.HOUR) == 0) 12 else msgTime.get(Calendar.HOUR)
         val minute = msgTime.get(Calendar.MINUTE)
         val amPm = if (msgTime.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
         val timeStr = String.format("%d:%02d %s", hour, minute, amPm)
         
         return when {
-            daysDiff == 0 && now.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR) -> {
+            isSameDay(timestamp, now.timeInMillis) -> {
                 timeStr
             }
-            daysDiff == 1 || (now.get(Calendar.DAY_OF_YEAR) - msgTime.get(Calendar.DAY_OF_YEAR) == 1) -> {
-                "Yesterday"
-            }
-            daysDiff < 7 -> {
-                val dayNames = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-                dayNames[msgTime.get(Calendar.DAY_OF_WEEK) - 1]
+            isSameDay(timestamp, now.apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis) -> {
+                "Yesterday, $timeStr"
             }
             else -> {
-                val monthNames = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-                val day = msgTime.get(Calendar.DAY_OF_MONTH)
-                val month = monthNames[msgTime.get(Calendar.MONTH)]
-                "$day $month"
+                val daysAgo = ((Calendar.getInstance().timeInMillis - msgTime.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
+                if (daysAgo < 7) {
+                    val dayNames = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                    "${dayNames[msgTime.get(Calendar.DAY_OF_WEEK) - 1]}, $timeStr"
+                } else {
+                    val monthNames = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+                    val day = msgTime.get(Calendar.DAY_OF_MONTH)
+                    val month = monthNames[msgTime.get(Calendar.MONTH)]
+                    "$day $month, $timeStr"
+                }
             }
         }
+    }
+    
+    private fun isSameDay(timestamp1: Long, timestamp2: Long): Boolean {
+        val cal1 = Calendar.getInstance().apply { timeInMillis = timestamp1 }
+        val cal2 = Calendar.getInstance().apply { timeInMillis = timestamp2 }
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+               cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
     }
 }
 
