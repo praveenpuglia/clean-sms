@@ -173,26 +173,33 @@ class OtpMessageAdapter(
 
         val daysDiff = ((now.timeInMillis - msgTime.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
 
+        // Format time component
+        val hour = if (msgTime.get(Calendar.HOUR) == 0) 12 else msgTime.get(Calendar.HOUR)
+        val minute = msgTime.get(Calendar.MINUTE)
+        val amPm = if (msgTime.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
+        val timeStr = String.format("%d:%02d %s", hour, minute, amPm)
+
         return when {
             daysDiff == 0 && now.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR) -> {
-                val hour = if (msgTime.get(Calendar.HOUR) == 0) 12 else msgTime.get(Calendar.HOUR)
-                val minute = msgTime.get(Calendar.MINUTE)
-                val amPm = if (msgTime.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
-                String.format("%02d:%02d %s", hour, minute, amPm)
+                // Today - show only time
+                timeStr
             }
             daysDiff == 1 || (now.get(Calendar.DAY_OF_YEAR) - msgTime.get(Calendar.DAY_OF_YEAR) == 1) -> {
-                "Yesterday"
+                // Yesterday - show "Yesterday, 9:30 PM"
+                "Yesterday, $timeStr"
             }
             daysDiff < 7 -> {
+                // Within last week - show "Sun, 9:30 PM"
                 val dayNames = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-                dayNames[msgTime.get(Calendar.DAY_OF_WEEK) - 1]
+                "${dayNames[msgTime.get(Calendar.DAY_OF_WEEK) - 1]}, $timeStr"
             }
             else -> {
+                // Older - show "24 Nov, 10:10 AM"
                 val monthNames = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun",
                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
                 val day = msgTime.get(Calendar.DAY_OF_MONTH)
                 val month = monthNames[msgTime.get(Calendar.MONTH)]
-                "$day $month"
+                "$day $month, $timeStr"
             }
         }
     }
