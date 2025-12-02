@@ -364,19 +364,26 @@ class ThreadDetailActivity : AppCompatActivity() {
                 messageAdapter.updateMessages(messages)
                 val targetId = targetMessageId
                 if (targetId != null) {
-                    val index = messages.indexOfFirst { it.id == targetId }
-                    if (index >= 0) {
-                        messagesRecycler.scrollToPosition(index)
-                        highlightMessage(index)
-                    } else if (messages.isNotEmpty()) {
-                        val lastIndex = messages.size - 1
-                        messagesRecycler.scrollToPosition(lastIndex)
-                        highlightMessage(lastIndex)
+                    // Use adapter position which accounts for day indicators
+                    val adapterPosition = messageAdapter.getPositionForMessageId(targetId)
+                    if (adapterPosition >= 0) {
+                        messagesRecycler.scrollToPosition(adapterPosition)
+                        highlightMessage(adapterPosition)
+                    } else {
+                        // Fall back to last message if target not found
+                        val lastPosition = messageAdapter.getLastMessagePosition()
+                        if (lastPosition >= 0) {
+                            messagesRecycler.scrollToPosition(lastPosition)
+                            highlightMessage(lastPosition)
+                        }
                     }
                     targetMessageId = null
-                } else if (messages.isNotEmpty()) {
-                    val lastIndex = messages.size - 1
-                    messagesRecycler.scrollToPosition(lastIndex)
+                } else {
+                    // Scroll to most recent message (last message, not last item which could be day indicator)
+                    val lastPosition = messageAdapter.getLastMessagePosition()
+                    if (lastPosition >= 0) {
+                        messagesRecycler.scrollToPosition(lastPosition)
+                    }
                 }
             }
         }.start()
