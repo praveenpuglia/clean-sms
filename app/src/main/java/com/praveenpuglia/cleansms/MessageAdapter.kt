@@ -245,5 +245,23 @@ class MessageAdapter(private var items: List<MessageListItem>) : RecyclerView.Ad
     fun isHeader(position: Int): Boolean {
         return position in items.indices && items[position] is MessageListItem.DayIndicator
     }
+
+    /**
+     * Find the adapter position for a message with the given ID.
+     * Returns -1 if not found.
+     */
+    fun getPositionForMessageId(messageId: Long): Int {
+        return items.indexOfFirst { item ->
+            item is MessageListItem.MessageItem && item.message.id == messageId
+        }
+    }
+
+    /**
+     * Get the position of the last message (not day indicator).
+     * Returns -1 if no messages exist.
+     */
+    fun getLastMessagePosition(): Int {
+        return items.indexOfLast { it is MessageListItem.MessageItem }
+    }
 }
 
