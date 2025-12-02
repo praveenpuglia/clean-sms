@@ -192,6 +192,20 @@ class MainActivity : AppCompatActivity() {
         // Initialize search views
         setupSearch()
         
+        // Handle back press with modern callback
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                when {
+                    isSearchMode -> exitSearchMode()
+                    selectionMode -> exitSelectionMode()
+                    else -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        })
+        
         // Set initial page based on user preference before data loads to prevent flicker
         val defaultTab = SettingsActivity.getDefaultTab(this)
         val initialPageIndex = getInitialPageIndexForTab(defaultTab)
@@ -248,16 +262,6 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         if (activeInstance === this) activeInstance = null
-    }
-
-    override fun onBackPressed() {
-        if (isSearchMode) {
-            exitSearchMode()
-        } else if (selectionMode) {
-            exitSelectionMode()
-        } else {
-            super.onBackPressed()
-        }
     }
 
     override fun onDestroy() {
