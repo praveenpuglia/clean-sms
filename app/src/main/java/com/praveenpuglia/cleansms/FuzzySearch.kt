@@ -113,19 +113,62 @@ object FuzzySearch {
     
     /**
      * Search and rank messages by relevance.
+     * Prioritizes contact name matches - if a contact's name matches the query,
+     * all messages from that contact will appear first.
      */
     fun search(messages: List<SearchResultItem>, query: String): List<SearchResultItem> {
         if (query.isBlank()) return messages.sortedByDescending { it.date }
         
+        val queryLower = query.lowercase()
+        
         return messages
             .map { msg -> 
-                // Also search in sender name
                 val bodyScore = score(msg.body, query)
-                val senderScore = score(msg.senderDisplay ?: msg.sender, query) * 0.5
-                msg.copy(relevanceScore = bodyScore + senderScore)
+                val contactName = msg.senderDisplay ?: msg.sender
+                val contactNameLower = contactName.lowercase()
+                
+                // Calculate contact name score with higher weight
+                var contactScore = 0.0
+                
+                // Exact contact name match gets very high priority
+                if (contactNameLower == queryLower) {
+                    contactScore = 500.0
+                }
+                // Contact name starts with query (e.g., "John" matches "John Smith")
+                else if (contactNameLower.startsWith(queryLower)) {
+                    contactScore = 400.0
+                }
+                // Query is contained in contact name
+                else if (contactNameLower.contains(queryLower)) {
+                    contactScore = 300.0
+                }
+                // Word boundary match in contact name
+                else {
+                    val words = contactNameLower.split(Regex("\\s+"))
+                    for (word in words) {
+                        if (word.startsWith(queryLower)) {
+                            contactScore = 250.0
+                            break
+                        } else if (word.contains(queryLower)) {
+                            contactScore = 150.0
+                        }
+                    }
+                }
+                
+                // If no contact match, try partial/fuzzy contact name search
+                if (contactScore == 0.0 && queryLower.length >= 2) {
+                    val partialContactScore = score(contactName, query)
+                    if (partialContactScore > 0) {
+                        contactScore = partialContactScore * 1.5 // Boost contact matches slightly
+                    }
+                }
+                
+                val totalScore = bodyScore + contactScore
+                msg.copy(relevanceScore = totalScore)
             }
             .filter { it.relevanceScore > 0 }
-            .sortedByDescending { it.relevanceScore }
+            .sortedWith(compareByDescending<SearchResultItem> { it.relevanceScore }
+                .thenByDescending { it.date }) // Secondary sort by date for same relevance
     }
 }
 
