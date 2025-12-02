@@ -149,6 +149,16 @@ class MainActivity : AppCompatActivity() {
     private var selectionMode: Boolean = false
     private val selectedThreadIds = LinkedHashSet<Long>()
     private val selectedMessageIds = LinkedHashSet<Long>()
+    
+    // Search state
+    private var isSearchMode: Boolean = false
+    private var allMessagesForSearch: List<SearchResultItem> = emptyList()
+    private lateinit var searchBarContainer: View
+    private lateinit var headerContainer: View
+    private lateinit var searchInput: android.widget.EditText
+    private lateinit var searchClearButton: ImageButton
+    private lateinit var searchResultsRecycler: RecyclerView
+    private var searchResultAdapter: SearchResultAdapter? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Apply saved theme before setting content view
@@ -175,6 +185,9 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
         }
+        
+        // Initialize search views
+        setupSearch()
         
         // Set initial page based on user preference before data loads to prevent flicker
         val defaultTab = SettingsActivity.getDefaultTab(this)
@@ -231,7 +244,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (selectionMode) {
+        if (isSearchMode) {
+            exitSearchMode()
+        } else if (selectionMode) {
             exitSelectionMode()
         } else {
             super.onBackPressed()
@@ -1537,6 +1552,201 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d("ContactLookup", "No contact found for '$rawAddress'")
         return Pair(null, null)
+    }
+    
+    // ========== Search Functionality ==========
+    
+    private fun setupSearch() {
+        searchBarContainer = findViewById(R.id.search_bar_container)
+        headerContainer = findViewById(R.id.header_container)
+        searchInput = findViewById(R.id.search_input)
+        searchClearButton = findViewById(R.id.search_clear_button)
+        searchResultsRecycler = findViewById(R.id.search_results_recycler)
+        
+        searchResultsRecycler.layoutManager = LinearLayoutManager(this)
+        
+        // Search button click
+        findViewById<ImageButton>(R.id.search_button).setOnClickListener {
+            enterSearchMode()
+        }
+        
+        // Back button in search bar
+        findViewById<ImageButton>(R.id.search_back_button).setOnClickListener {
+            exitSearchMode()
+        }
+        
+        // Clear button
+        searchClearButton.setOnClickListener {
+            searchInput.text.clear()
+        }
+        
+        // Text change listener for search
+        searchInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString() ?: ""
+                searchClearButton.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
+                performSearch(query)
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        
+        // Handle search action on keyboard
+        searchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                // Hide keyboard
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
+                true
+            } else {
+                false
+            }
+        }
+    }
+    
+    private fun enterSearchMode() {
+        isSearchMode = true
+        
+        // Show search bar, hide normal header and tabs
+        searchBarContainer.visibility = View.VISIBLE
+        headerContainer.visibility = View.GONE
+        categoryTabs.visibility = View.GONE
+        
+        // Show search results, hide pager
+        threadsPager.visibility = View.GONE
+        searchResultsRecycler.visibility = View.VISIBLE
+        newMessageFab.visibility = View.GONE
+        
+        // Focus input and show keyboard
+        searchInput.requestFocus()
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(searchInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        
+        // Load all messages for search
+        loadAllMessagesForSearch()
+    }
+    
+    private fun exitSearchMode() {
+        isSearchMode = false
+        
+        // Hide keyboard
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
+        
+        // Clear search
+        searchInput.text.clear()
+        
+        // Hide search bar, show normal header and tabs
+        searchBarContainer.visibility = View.GONE
+        headerContainer.visibility = View.VISIBLE
+        categoryTabs.visibility = View.VISIBLE
+        
+        // Hide search results, show pager
+        searchResultsRecycler.visibility = View.GONE
+        threadsPager.visibility = View.VISIBLE
+        newMessageFab.visibility = View.VISIBLE
+    }
+    
+    private fun loadAllMessagesForSearch() {
+        Thread {
+            val messages = queryAllMessagesForSearch()
+            runOnUiThread {
+                allMessagesForSearch = messages
+                // Show all messages initially in chronological order
+                updateSearchResults(messages.sortedByDescending { it.date }, "")
+            }
+        }.start()
+    }
+    
+    private fun queryAllMessagesForSearch(): List<SearchResultItem> {
+        val uri = "content://sms".toUri()
+        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type")
+        val sortOrder = "date DESC"
+        
+        val results = mutableListOf<SearchResultItem>()
+        
+        try {
+            contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
+                val idxId = cursor.getColumnIndex("_id")
+                val idxThreadId = cursor.getColumnIndex("thread_id")
+                val idxAddress = cursor.getColumnIndex("address")
+                val idxBody = cursor.getColumnIndex("body")
+                val idxDate = cursor.getColumnIndex("date")
+                
+                while (cursor.moveToNext()) {
+                    val messageId = if (idxId >= 0) cursor.getLong(idxId) else continue
+                    val threadId = if (idxThreadId >= 0) cursor.getLong(idxThreadId) else -1L
+                    val address = if (idxAddress >= 0) cursor.getString(idxAddress) ?: "" else ""
+                    val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
+                    val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
+                    
+                    if (body.isBlank()) continue
+                    
+                    // Try to get contact info from cache or thread
+                    val existingThread = allThreads.firstOrNull { it.threadId == threadId }
+                    val contactName = existingThread?.contactName
+                    val contactPhotoUri = existingThread?.contactPhotoUri
+                    val contactLookupUri = existingThread?.contactLookupUri
+                    val category = existingThread?.category ?: MessageCategory.UNKNOWN
+                    
+                    results.add(SearchResultItem(
+                        messageId = messageId,
+                        threadId = threadId,
+                        sender = address,
+                        senderDisplay = contactName,
+                        body = body,
+                        date = date,
+                        contactPhotoUri = contactPhotoUri,
+                        contactLookupUri = contactLookupUri,
+                        category = category
+                    ))
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Failed to query messages for search: ${e.message}")
+        }
+        
+        return results
+    }
+    
+    private fun performSearch(query: String) {
+        if (query.isBlank()) {
+            // Show all messages in chronological order when no query
+            updateSearchResults(allMessagesForSearch.sortedByDescending { it.date }, "")
+        } else {
+            // Perform fuzzy search
+            val results = FuzzySearch.search(allMessagesForSearch, query)
+            updateSearchResults(results, query)
+        }
+    }
+    
+    private fun updateSearchResults(results: List<SearchResultItem>, query: String) {
+        searchResultAdapter = SearchResultAdapter(results, query) { item ->
+            handleSearchResultClick(item)
+        }
+        searchResultsRecycler.adapter = searchResultAdapter
+    }
+    
+    private fun handleSearchResultClick(item: SearchResultItem) {
+        // Find or create thread item to navigate
+        val existingThread = allThreads.firstOrNull { it.threadId == item.threadId }
+        val threadItem = existingThread ?: ThreadItem(
+            threadId = item.threadId,
+            nameOrAddress = item.sender,
+            date = item.date,
+            snippet = item.body,
+            contactName = item.senderDisplay,
+            contactPhotoUri = item.contactPhotoUri,
+            contactLookupUri = item.contactLookupUri,
+            category = item.category
+        )
+        
+        // Hide keyboard before navigating (but stay in search mode)
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
+        
+        // Open thread with target message - don't exit search mode so user can return to it
+        openThreadDetail(threadItem, item.messageId)
     }
 }
 

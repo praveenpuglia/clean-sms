@@ -16,6 +16,57 @@
         android:elevation="3dp"
         android:fitsSystemWindows="false">
 
+        <!-- Search Bar (hidden by default) -->
+        <LinearLayout
+            android:id="@+id/search_bar_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:visibility="gone">
+
+            <ImageButton
+                android:id="@+id/search_back_button"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Close search"
+                android:padding="8dp"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="?attr/colorOnSurface" />
+
+            <EditText
+                android:id="@+id/search_input"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:background="@android:color/transparent"
+                android:hint="Search messages..."
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorHint"
+                android:textSize="18sp" />
+
+            <ImageButton
+                android:id="@+id/search_clear_button"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Clear search"
+                android:padding="8dp"
+                android:src="@drawable/ic_close"
+                android:visibility="gone"
+                app:tint="?attr/colorOnSurface" />
+
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/header_container"
             android:layout_width="match_parent"
@@ -54,6 +105,16 @@
                     android:padding="8dp"
                     android:src="@drawable/ic_delete"
                     android:visibility="invisible"
+                    app:tint="?attr/colorOnSurface" />
+
+                <ImageButton
+                    android:id="@+id/search_button"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Search messages"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_search"
                     app:tint="?attr/colorOnSurface" />
 
                 <ImageButton
@@ -145,6 +206,16 @@
                 android:layout_weight="1"
                 android:clipToPadding="false"
                 android:visibility="gone" />
+
+            <!-- Search Results -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/search_results_recycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:visibility="gone" />
+
         </LinearLayout>
 
         <!-- Floating Action Button for New Message -->
