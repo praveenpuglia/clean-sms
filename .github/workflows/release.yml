@@ -82,15 +82,21 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
       
-      - name: Rename APK
+      - name: Build Release AAB
+        run: ./gradlew bundleRelease --stacktrace
+      
+      - name: Rename APK and AAB
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           mv app/build/outputs/apk/release/app-release.apk "CleanSMS-v${VERSION}.apk"
+          mv app/build/outputs/bundle/release/app-release.aab "CleanSMS-v${VERSION}.aab"
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: CleanSMS-v${{ steps.version.outputs.version }}.apk
+          files: |
+            CleanSMS-v${{ steps.version.outputs.version }}.apk
+            CleanSMS-v${{ steps.version.outputs.version }}.aab
           generate_release_notes: true
           body: |
             ## Clean SMS v${{ steps.version.outputs.version }}
@@ -105,9 +111,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Upload APK as artifact
+      - name: Upload APK and AAB as artifacts
         uses: actions/upload-artifact@v4
         with:
           name: CleanSMS-v${{ steps.version.outputs.version }}
-          path: CleanSMS-v${{ steps.version.outputs.version }}.apk
+          path: |
+            CleanSMS-v${{ steps.version.outputs.version }}.apk
+            CleanSMS-v${{ steps.version.outputs.version }}.aab
           retention-days: 90
