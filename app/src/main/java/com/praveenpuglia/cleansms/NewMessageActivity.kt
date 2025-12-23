@@ -216,7 +216,7 @@ class NewMessageActivity : AppCompatActivity() {
         recipientInput.setOnKeyListener { _, keyCode, event ->
             if (keyCode == android.view.KeyEvent.KEYCODE_DEL && event.action == android.view.KeyEvent.ACTION_DOWN) {
                 if (recipientInput.text.isNullOrEmpty() && selectedRecipients.isNotEmpty()) {
-                    val last = selectedRecipients.removeLast()
+                    val last = selectedRecipients.removeAt(selectedRecipients.lastIndex)
                     for (i in chipGroup.childCount - 1 downTo 0) {
                         val v = chipGroup.getChildAt(i)
                         if (v is Chip && v.text.toString() == (if (last.isRawNumber) last.phoneNumber else last.name)) {
