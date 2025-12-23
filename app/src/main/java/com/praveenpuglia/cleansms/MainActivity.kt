@@ -230,6 +230,18 @@ class MainActivity : AppCompatActivity() {
         tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager) { tab, position ->
             tab.text = labelForPage(pagerPages[position])
         }.also { it.attach() }
+        
+        // Scroll to top when re-tapping the current tab
+        categoryTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {}
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {
+                tab?.position?.let { position ->
+                    threadsPagerAdapter.scrollToTop(position)
+                }
+            }
+        })
+        
         categoryTabs.visibility = View.GONE
 
         deleteButton.setOnClickListener { confirmDeleteSelection() }
@@ -1084,6 +1096,7 @@ class MainActivity : AppCompatActivity() {
         private var selectionMode: Boolean = false
         private var selectedThreadIds: Set<Long> = emptySet()
         private var selectedOtpIds: Set<Long> = emptySet()
+        private val boundViewHolders = android.util.SparseArray<RecyclerView.ViewHolder>()
 
         private inner class CategoryPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val recycler: RecyclerView = itemView.findViewById(R.id.category_recycler)
@@ -1159,10 +1172,29 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            boundViewHolders.put(position, holder)
             when (val page = pages[position]) {
                 is InboxPage.Otp -> (holder as OtpPageViewHolder).bind(otpItems)
                 is InboxPage.CategoryPage -> (holder as CategoryPageViewHolder).bind(page.category)
             }
+        }
+
+        override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+            super.onViewRecycled(holder)
+            val key = boundViewHolders.indexOfValue(holder)
+            if (key >= 0) {
+                boundViewHolders.removeAt(key)
+            }
+        }
+
+        fun scrollToTop(position: Int) {
+            val holder = boundViewHolders.get(position) ?: return
+            val recycler = when (holder) {
+                is OtpPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.otp_recycler)
+                is CategoryPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.category_recycler)
+                else -> null
+            }
+            recycler?.smoothScrollToPosition(0)
         }
 
         override fun getItemCount(): Int = pages.size
