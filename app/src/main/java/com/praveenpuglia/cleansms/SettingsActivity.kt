@@ -188,12 +188,12 @@ class SettingsActivity : AppCompatActivity() {
 
         // Terms & Conditions click listener
         findViewById<TextView>(R.id.terms_conditions).setOnClickListener {
-            openUrl("https://praveenpuglia.com")
+            openUrl("https://clean-sms.praveenpuglia.com/tnc")
         }
 
         // Privacy Policy click listener
         findViewById<TextView>(R.id.privacy_policy).setOnClickListener {
-            openUrl("https://praveenpuglia.com")
+            openUrl("https://clean-sms.praveenpuglia.com/privacy-policy")
         }
     }
 
