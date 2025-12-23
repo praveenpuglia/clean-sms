@@ -24,25 +24,73 @@ object CategoryClassifier {
     private val phonePattern = Pattern.compile("^\\+?[1-9]\\d{9,14}$")
 
     // OTP keyword proximity detection (shared with notification logic) per constitution §5 (Non-intrusive, high precision)
-    // We require an OTP keyword within a small window (<= 40 chars) of a candidate numeric code (4-8 digits)
+    // We require an OTP keyword within a reasonable window of a candidate numeric code (4-8 digits)
     private val otpKeywordRegex = Regex("\\b(otp|one[\\s-]*time\\s*password|verification\\s*code|security\\s*code|login\\s*code)\\b", RegexOption.IGNORE_CASE)
     private val otpCodeRegex = Regex("\\b\\d{4,8}\\b")
+    
+    // Pattern to detect monetary amounts - numbers preceded by currency indicators
+    // Matches: Rs. 1234, Rs 1234, INR 1234, ₹1234, Rs.1234.56, etc.
+    private val monetaryPrefixRegex = Regex("(rs\\.?|inr|₹)\\s*\\d", RegexOption.IGNORE_CASE)
+    
+    // Pattern for "is XXXX" which commonly follows OTP mentions
+    private val otpIsPatternRegex = Regex("\\bis\\s+(\\d{4,8})\\b", RegexOption.IGNORE_CASE)
 
     fun extractHighPrecisionOtp(body: String): String? {
         if (body.length > 1000) return null // avoid heavy processing on very long messages
         if (!otpKeywordRegex.containsMatchIn(body)) return null
-        // Collect all codes and test proximity to keyword matches
+        
+        // Strategy 1: Look for "is XXXX" pattern after OTP keyword - very common format
+        // e.g., "OTP is 7469" or "your OTP for transaction is 7469"
+        val otpKeywordMatch = otpKeywordRegex.find(body)
+        if (otpKeywordMatch != null) {
+            val afterKeyword = body.substring(otpKeywordMatch.range.last + 1)
+            val isPatternMatch = otpIsPatternRegex.find(afterKeyword)
+            if (isPatternMatch != null) {
+                val code = isPatternMatch.groupValues[1]
+                // Verify it's not a monetary amount
+                val codeStartInOriginal = otpKeywordMatch.range.last + 1 + isPatternMatch.range.first + isPatternMatch.value.indexOf(code)
+                val lookbackStart = maxOf(0, codeStartInOriginal - 10)
+                val prefix = body.substring(lookbackStart, codeStartInOriginal)
+                if (!monetaryPrefixRegex.containsMatchIn(prefix + code[0])) {
+                    return code
+                }
+            }
+        }
+        
+        // Strategy 2: Proximity-based detection with increased window (80 chars)
         val keywords = otpKeywordRegex.findAll(body).map { it.range }.toList()
         if (keywords.isEmpty()) return null
         val codes = otpCodeRegex.findAll(body).map { it }.toList()
-        for (codeMatch in codes) {
-            val codeRange = codeMatch.range
-            val near = keywords.any { kw ->
-                val distance = if (codeRange.first >= kw.last) codeRange.first - kw.last else kw.first - codeRange.last
-                distance in 0..40 // within 40 chars forward or backward
-            }
-            if (near) return codeMatch.value
+        
+        // Filter out codes that are part of monetary amounts
+        val validCodes = codes.filter { codeMatch ->
+            val codeStart = codeMatch.range.first
+            // Check if this code is preceded by a currency indicator (within 10 chars before)
+            val lookbackStart = maxOf(0, codeStart - 10)
+            val prefix = body.substring(lookbackStart, codeStart)
+            !monetaryPrefixRegex.containsMatchIn(prefix + body[codeStart])
         }
+        
+        // First, try to find a code that appears AFTER an OTP keyword (most common pattern)
+        for (codeMatch in validCodes) {
+            val codeRange = codeMatch.range
+            val nearAfterKeyword = keywords.any { kw ->
+                // Code starts after keyword ends, within 80 chars
+                codeRange.first >= kw.last && (codeRange.first - kw.last) <= 80
+            }
+            if (nearAfterKeyword) return codeMatch.value
+        }
+        
+        // Fallback: check codes that appear before the keyword (less common)
+        for (codeMatch in validCodes) {
+            val codeRange = codeMatch.range
+            val nearBeforeKeyword = keywords.any { kw ->
+                // Code ends before keyword starts, within 40 chars
+                kw.first >= codeRange.last && (kw.first - codeRange.last) <= 40
+            }
+            if (nearBeforeKeyword) return codeMatch.value
+        }
+        
         return null
     }
 
