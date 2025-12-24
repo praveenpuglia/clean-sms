@@ -118,16 +118,44 @@
                     app:tint="?attr/colorOnSurface" />
 
                 <ImageButton
-                    android:id="@+id/settings_button"
+                    android:id="@+id/overflow_menu_button"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Settings"
+                    android:contentDescription="More options"
                     android:padding="8dp"
-                    android:src="@drawable/ic_settings"
+                    android:src="@drawable/ic_more_vert"
                     app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
+
+            <!-- Unread Filter Bar -->
+            <FrameLayout
+                android:id="@+id/unread_filter_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:visibility="gone">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/unread_filter_chip"
+                    style="@style/Widget.Material3.Chip.Input"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:text="Unread"
+                    android:textSize="12sp"
+                    app:chipMinHeight="28dp"
+                    app:chipMinTouchTargetSize="0dp"
+                    app:chipStrokeWidth="0dp"
+                    app:closeIconEnabled="true"
+                    app:closeIconVisible="true"
+                    app:closeIconSize="14dp"
+                    app:chipIconVisible="false"
+                    app:checkedIconVisible="false" />
+
+            </FrameLayout>
 
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/category_tabs"

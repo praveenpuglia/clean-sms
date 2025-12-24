@@ -163,6 +163,11 @@ class MainActivity : AppCompatActivity() {
     private var searchRunnable: Runnable? = null
     private val searchDebounceMs = 300L
 
+    // Unread filter state
+    private var unreadOnlyFilter: Boolean = false
+    private lateinit var unreadFilterBar: View
+    private lateinit var unreadFilterChip: com.google.android.material.chip.Chip
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Apply saved theme before setting content view
         AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
@@ -179,15 +184,19 @@ class MainActivity : AppCompatActivity() {
         deleteButton = findViewById(R.id.header_delete_button)
         newMessageFab = findViewById(R.id.new_message_fab)
         
+        // Initialize unread filter views
+        unreadFilterBar = findViewById(R.id.unread_filter_bar)
+        unreadFilterChip = findViewById(R.id.unread_filter_chip)
+        unreadFilterChip.setOnCloseIconClickListener { setUnreadFilter(false) }
+        unreadFilterChip.setOnClickListener { setUnreadFilter(false) }
+        
         newMessageFab.setOnClickListener {
             val intent = Intent(this, NewMessageActivity::class.java)
             startActivity(intent)
         }
         
-        findViewById<ImageButton>(R.id.settings_button).setOnClickListener {
-            val intent = Intent(this, SettingsActivity::class.java)
-            startActivity(intent)
-        }
+        // Setup overflow menu
+        setupOverflowMenu()
         
         // Initialize search views
         setupSearch()
@@ -530,10 +539,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun updatePagerContent(restorePageIndex: Int?) {
         pruneSelection()
-        val grouped = categories.associateWith { category ->
-            allThreads.filter { it.category == category }
+        
+        // Apply unread filter if enabled
+        val filteredThreads = if (unreadOnlyFilter) {
+            allThreads.filter { it.hasUnread }
+        } else {
+            allThreads
         }
-        threadsPagerAdapter.updateAll(otpMessages, grouped)
+        val filteredOtp = if (unreadOnlyFilter) {
+            otpMessages.filter { it.isUnread }
+        } else {
+            otpMessages
+        }
+        
+        val grouped = categories.associateWith { category ->
+            filteredThreads.filter { it.category == category }
+        }
+        threadsPagerAdapter.updateAll(filteredOtp, grouped)
         updateSelectionUi()
         updateTabBadges()
         val restoreIndex = restorePageIndex
@@ -1598,6 +1620,66 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d("ContactLookup", "No contact found for '$rawAddress'")
         return Pair(null, null)
+    }
+    
+    // ========== Overflow Menu ==========
+    
+    private fun setupOverflowMenu() {
+        val overflowButton = findViewById<ImageButton>(R.id.overflow_menu_button)
+        overflowButton.setOnClickListener { view ->
+            showOverflowMenu(view)
+        }
+    }
+    
+    private fun showOverflowMenu(anchor: View) {
+        val popup = android.widget.PopupMenu(this, anchor)
+        popup.menuInflater.inflate(R.menu.menu_main_overflow, popup.menu)
+        
+        // Set checkbox state
+        popup.menu.findItem(R.id.menu_unread_only)?.isChecked = unreadOnlyFilter
+        
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.menu_unread_only -> {
+                    setUnreadFilter(!unreadOnlyFilter)
+                    true
+                }
+                R.id.menu_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+    
+    private fun setUnreadFilter(enabled: Boolean) {
+        unreadOnlyFilter = enabled
+        
+        if (enabled) {
+            // Slide down animation
+            unreadFilterBar.visibility = View.VISIBLE
+            unreadFilterBar.alpha = 0f
+            unreadFilterBar.translationY = -unreadFilterBar.height.toFloat().coerceAtLeast(50f)
+            unreadFilterBar.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(200)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+        } else {
+            // Slide up animation
+            unreadFilterBar.animate()
+                .alpha(0f)
+                .translationY(-unreadFilterBar.height.toFloat().coerceAtLeast(50f))
+                .setDuration(150)
+                .setInterpolator(android.view.animation.AccelerateInterpolator())
+                .withEndAction { unreadFilterBar.visibility = View.GONE }
+                .start()
+        }
+        
+        updatePagerContent(threadsPager.currentItem)
     }
     
     // ========== Search Functionality ==========
