@@ -14,6 +14,7 @@
     <string name="toast_contact_not_found">Contact not available</string>
     <string name="toast_contact_permission_required">Allow contact access to open saved contacts</string>
     <string name="delete_selected_content_description">Delete selected conversations or messages</string>
+    <string name="select_all_content_description">Select all items</string>
     <string name="selection_count">%1$d selected</string>
     <string name="dialog_delete_title">Delete items?</string>
     <string name="dialog_delete_message_single">Delete the selected item?</string>

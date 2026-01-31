@@ -97,6 +97,17 @@
                     android:textStyle="bold" />
 
                 <ImageButton
+                    android:id="@+id/header_select_all_button"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/select_all_content_description"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_select_all"
+                    android:visibility="invisible"
+                    app:tint="?attr/colorOnSurface" />
+
+                <ImageButton
                     android:id="@+id/header_delete_button"
                     android:layout_width="40dp"
                     android:layout_height="40dp"

@@ -126,6 +126,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var threadsPagerAdapter: ThreadCategoryPagerAdapter
     private lateinit var headerTitle: TextView
     private lateinit var deleteButton: ImageButton
+    private lateinit var selectAllButton: ImageButton
     private lateinit var newMessageFab: com.google.android.material.floatingactionbutton.FloatingActionButton
     private var tabLayoutMediator: TabLayoutMediator? = null
     private val categories = listOf(
@@ -182,6 +183,7 @@ class MainActivity : AppCompatActivity() {
         threadsPager = findViewById(R.id.threads_pager)
         headerTitle = findViewById(R.id.header_title)
         deleteButton = findViewById(R.id.header_delete_button)
+        selectAllButton = findViewById(R.id.header_select_all_button)
         newMessageFab = findViewById(R.id.new_message_fab)
         
         // Initialize unread filter views
@@ -208,8 +210,11 @@ class MainActivity : AppCompatActivity() {
                     isSearchMode -> exitSearchMode()
                     selectionMode -> exitSelectionMode()
                     else -> {
+                        // Temporarily disable to allow system back handling
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()
+                        // Re-enable for future back presses (in case activity isn't finished)
+                        isEnabled = true
                     }
                 }
             }
@@ -254,6 +259,7 @@ class MainActivity : AppCompatActivity() {
         categoryTabs.visibility = View.GONE
 
         deleteButton.setOnClickListener { confirmDeleteSelection() }
+        selectAllButton.setOnClickListener { toggleSelectAll() }
         updateSelectionUi()
 
         setupDefaultSmsUi()
@@ -801,16 +807,18 @@ class MainActivity : AppCompatActivity() {
     private fun selectionCount(): Int = selectedThreadIds.size + selectedMessageIds.size
 
     private fun updateSelectionUi() {
-        if (!::headerTitle.isInitialized || !::deleteButton.isInitialized) return
+        if (!::headerTitle.isInitialized || !::deleteButton.isInitialized || !::selectAllButton.isInitialized) return
         val count = selectionCount()
         if (selectionMode) {
             headerTitle.text = getString(R.string.selection_count, count)
             deleteButton.visibility = View.VISIBLE
             deleteButton.isEnabled = count > 0
+            selectAllButton.visibility = View.VISIBLE
         } else {
             headerTitle.text = getString(R.string.header_messages)
             deleteButton.visibility = View.INVISIBLE
             deleteButton.isEnabled = false
+            selectAllButton.visibility = View.INVISIBLE
         }
         if (::threadsPagerAdapter.isInitialized) {
             threadsPagerAdapter.updateSelectionState(selectionMode, selectedThreadIds, selectedMessageIds)
@@ -822,6 +830,62 @@ class MainActivity : AppCompatActivity() {
         selectionMode = false
         selectedThreadIds.clear()
         selectedMessageIds.clear()
+        updateSelectionUi()
+    }
+
+    private fun toggleSelectAll() {
+        if (!selectionMode) return
+
+        val currentPageIndex = threadsPager.currentItem
+        val currentPage = pagerPages.getOrNull(currentPageIndex) ?: return
+
+        // Get filtered items based on unread filter
+        val filteredThreads = if (unreadOnlyFilter) {
+            allThreads.filter { it.hasUnread }
+        } else {
+            allThreads
+        }
+        val filteredOtp = if (unreadOnlyFilter) {
+            otpMessages.filter { it.isUnread }
+        } else {
+            otpMessages
+        }
+
+        when (currentPage) {
+            is InboxPage.Otp -> {
+                val allOtpIds = filteredOtp.map { it.messageId }.toSet()
+                val allSelected = allOtpIds.isNotEmpty() && allOtpIds.all { it in selectedMessageIds }
+
+                if (allSelected) {
+                    // Deselect all OTP messages
+                    selectedMessageIds.removeAll(allOtpIds)
+                    if (selectionCount() == 0) {
+                        exitSelectionMode()
+                        return
+                    }
+                } else {
+                    // Select all OTP messages
+                    selectedMessageIds.addAll(allOtpIds)
+                }
+            }
+            is InboxPage.CategoryPage -> {
+                val categoryThreads = filteredThreads.filter { it.category == currentPage.category }
+                val allThreadIdsInCategory = categoryThreads.map { it.threadId }.toSet()
+                val allSelected = allThreadIdsInCategory.isNotEmpty() && allThreadIdsInCategory.all { it in selectedThreadIds }
+
+                if (allSelected) {
+                    // Deselect all threads in this category
+                    selectedThreadIds.removeAll(allThreadIdsInCategory)
+                    if (selectionCount() == 0) {
+                        exitSelectionMode()
+                        return
+                    }
+                } else {
+                    // Select all threads in this category
+                    selectedThreadIds.addAll(allThreadIdsInCategory)
+                }
+            }
+        }
         updateSelectionUi()
     }
 
