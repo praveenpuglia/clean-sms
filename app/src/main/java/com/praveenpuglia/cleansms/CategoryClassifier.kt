@@ -23,75 +23,202 @@ object CategoryClassifier {
     // Full phone number patterns (with or without country code, typically 10+ digits)
     private val phonePattern = Pattern.compile("^\\+?[1-9]\\d{9,14}$")
 
-    // OTP keyword proximity detection (shared with notification logic) per constitution §5 (Non-intrusive, high precision)
-    // We require an OTP keyword within a reasonable window of a candidate numeric code (4-8 digits)
-    private val otpKeywordRegex = Regex("\\b(otp|one[\\s-]*time\\s*password|verification\\s*code|security\\s*code|login\\s*code)\\b", RegexOption.IGNORE_CASE)
-    private val otpCodeRegex = Regex("\\b\\d{4,8}\\b")
-    
-    // Pattern to detect monetary amounts - numbers preceded by currency indicators
-    // Matches: Rs. 1234, Rs 1234, INR 1234, ₹1234, Rs.1234.56, etc.
-    private val monetaryPrefixRegex = Regex("(rs\\.?|inr|₹)\\s*\\d", RegexOption.IGNORE_CASE)
-    
-    // Pattern for "is XXXX" which commonly follows OTP mentions
-    private val otpIsPatternRegex = Regex("\\bis\\s+(\\d{4,8})\\b", RegexOption.IGNORE_CASE)
+    // ==================== OTP Detection Patterns ====================
 
+    // Strategy 1: Explicit OTP keywords (highest confidence)
+    // Comprehensive list including authorization, auth, access, confirmation, etc.
+    private val otpKeywordRegex = Regex(
+        """(?i)\b(otp|one[\s-]*time[\s-]*password|verification[\s-]*code|security[\s-]*code|login[\s-]*code|authorization[\s-]*code|auth[\s-]*code|access[\s-]*code|confirmation[\s-]*code|authentication[\s-]*code|passcode|pin[\s-]*code|secret[\s-]*code|temporary[\s-]*code|dynamic[\s-]*code)\b"""
+    )
+
+    // Code pattern: 4-8 digits (standard OTP length range)
+    private val otpCodeRegex = Regex("""\b\d{4,8}\b""")
+
+    // Strategy 2: Code-first pattern - handles "98094 is the authorization code" structure
+    // Matches: [DIGITS] [optional words] is [the/your] [TYPE] code
+    private val codeFirstPattern = Regex(
+        """(?i)\b(\d{4,8})\s+(?:\w+\s+)?is\s+(?:the\s+)?(?:your\s+)?(?:\w+\s+)?code\b"""
+    )
+
+    // Strategy 3: Generic "code" with context - "the code is", "your code:", etc.
+    // Requires contextual words before "code" to avoid false positives
+    private val genericCodeContextPattern = Regex(
+        """(?i)\b(?:the|your|is\s+the|is\s+your)\s+(?:\w+\s+)?code\s*(?:is|:)?\s*(\d{4,8})\b"""
+    )
+
+    // Alternative: "code for [service] is [DIGITS]"
+    private val codeForPattern = Regex(
+        """(?i)\bcode\s+(?:for\s+)?(?:your\s+)?(?:\w+\s+){0,3}(?:is|:)\s*(\d{4,8})\b"""
+    )
+
+    // Strategy 4: Time-validity indicators (strong OTP signal)
+    private val timeValidityPattern = Regex(
+        """(?i)\b(?:valid|expires?|use\s+(?:it\s+)?within|expir(?:es|ing)\s+in)\s+(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?|sec(?:ond)?s?|hours?|hrs?)\b"""
+    )
+
+    // Strategy 5: "Do not share" warnings (common in OTP messages)
+    private val doNotSharePattern = Regex(
+        """(?i)\b(?:do\s+not\s+share|don'?t\s+share|never\s+share|keep\s+(?:it\s+)?(?:safe|secret|confidential)|not\s+share\s+(?:it\s+)?with\s+anyone)\b"""
+    )
+
+    // Pattern to detect monetary amounts - numbers preceded by currency indicators
+    // Used to filter out false positives
+    private val monetaryPrefixRegex = Regex("""(?i)(rs\.?|inr|₹)\s*\d""")
+
+    // Excluded code types (to avoid false positives)
+    private val excludedCodeTypes = setOf(
+        "promo", "coupon", "zip", "postal", "area", "country", "discount",
+        "voucher", "gift", "referral", "ref", "order", "tracking", "booking",
+        "reservation", "flight", "pnr", "ticket"
+    )
+
+    // Pattern for "is XXXX" which commonly follows OTP mentions
+    private val otpIsPatternRegex = Regex("""(?i)\bis\s*:?\s*(\d{4,8})\b""")
+
+    /**
+     * Extract OTP code using multi-strategy cascade approach.
+     * Strategies are ordered by confidence level (highest first).
+     */
     fun extractHighPrecisionOtp(body: String): String? {
         if (body.length > 1000) return null // avoid heavy processing on very long messages
-        if (!otpKeywordRegex.containsMatchIn(body)) return null
-        
-        // Strategy 1: Look for "is XXXX" pattern after OTP keyword - very common format
-        // e.g., "OTP is 7469" or "your OTP for transaction is 7469"
-        val otpKeywordMatch = otpKeywordRegex.find(body)
-        if (otpKeywordMatch != null) {
-            val afterKeyword = body.substring(otpKeywordMatch.range.last + 1)
-            val isPatternMatch = otpIsPatternRegex.find(afterKeyword)
-            if (isPatternMatch != null) {
-                val code = isPatternMatch.groupValues[1]
-                // Verify it's not a monetary amount
-                val codeStartInOriginal = otpKeywordMatch.range.last + 1 + isPatternMatch.range.first + isPatternMatch.value.indexOf(code)
-                val lookbackStart = maxOf(0, codeStartInOriginal - 10)
-                val prefix = body.substring(lookbackStart, codeStartInOriginal)
-                if (!monetaryPrefixRegex.containsMatchIn(prefix + code[0])) {
-                    return code
-                }
-            }
-        }
-        
-        // Strategy 2: Proximity-based detection with increased window (80 chars)
-        val keywords = otpKeywordRegex.findAll(body).map { it.range }.toList()
-        if (keywords.isEmpty()) return null
-        val codes = otpCodeRegex.findAll(body).map { it }.toList()
-        
-        // Filter out codes that are part of monetary amounts
-        val validCodes = codes.filter { codeMatch ->
-            val codeStart = codeMatch.range.first
-            // Check if this code is preceded by a currency indicator (within 10 chars before)
-            val lookbackStart = maxOf(0, codeStart - 10)
-            val prefix = body.substring(lookbackStart, codeStart)
-            !monetaryPrefixRegex.containsMatchIn(prefix + body[codeStart])
-        }
-        
-        // First, try to find a code that appears AFTER an OTP keyword (most common pattern)
-        for (codeMatch in validCodes) {
-            val codeRange = codeMatch.range
-            val nearAfterKeyword = keywords.any { kw ->
-                // Code starts after keyword ends, within 80 chars
-                codeRange.first >= kw.last && (codeRange.first - kw.last) <= 80
-            }
-            if (nearAfterKeyword) return codeMatch.value
-        }
-        
-        // Fallback: check codes that appear before the keyword (less common)
-        for (codeMatch in validCodes) {
-            val codeRange = codeMatch.range
-            val nearBeforeKeyword = keywords.any { kw ->
-                // Code ends before keyword starts, within 40 chars
-                kw.first >= codeRange.last && (kw.first - codeRange.last) <= 40
-            }
-            if (nearBeforeKeyword) return codeMatch.value
-        }
-        
+
+        // Strategy 1: Explicit OTP keywords with proximity (highest confidence)
+        extractWithExplicitKeywords(body)?.let { return it }
+
+        // Strategy 2: Code-first patterns (e.g., "98094 is the authorization code")
+        extractCodeFirstPattern(body)?.let { return it }
+
+        // Strategy 3: Generic "code" with context validation
+        extractGenericCodePattern(body)?.let { return it }
+
+        // Strategy 4: Time-validity + do-not-share indicators (contextual signals)
+        extractWithContextualIndicators(body)?.let { return it }
+
         return null
+    }
+
+    /**
+     * Strategy 1: Look for explicit OTP keywords with code in proximity
+     */
+    private fun extractWithExplicitKeywords(body: String): String? {
+        if (!otpKeywordRegex.containsMatchIn(body)) return null
+
+        val otpKeywordMatch = otpKeywordRegex.find(body) ?: return null
+
+        // First, try "is XXXX" pattern after keyword
+        val afterKeyword = body.substring(minOf(otpKeywordMatch.range.last + 1, body.length))
+        val isPatternMatch = otpIsPatternRegex.find(afterKeyword)
+        if (isPatternMatch != null) {
+            val code = isPatternMatch.groupValues[1]
+            if (isValidOtpCode(body, otpKeywordMatch.range.last + 1 + isPatternMatch.range.first, code)) {
+                return code
+            }
+        }
+
+        // Proximity-based: find codes near keywords
+        val keywords = otpKeywordRegex.findAll(body).map { it.range }.toList()
+        val codes = otpCodeRegex.findAll(body).toList()
+
+        // Filter and find valid codes
+        for (codeMatch in codes) {
+            if (!isValidOtpCode(body, codeMatch.range.first, codeMatch.value)) continue
+
+            // Check if code is near a keyword (within 80 chars after, 40 chars before)
+            val nearKeyword = keywords.any { kw ->
+                val afterKeywordDistance = codeMatch.range.first - kw.last
+                val beforeKeywordDistance = kw.first - codeMatch.range.last
+                (afterKeywordDistance in 0..80) || (beforeKeywordDistance in 0..40)
+            }
+            if (nearKeyword) return codeMatch.value
+        }
+
+        return null
+    }
+
+    /**
+     * Strategy 2: Detect code-first patterns like "98094 is the authorization code"
+     */
+    private fun extractCodeFirstPattern(body: String): String? {
+        val match = codeFirstPattern.find(body) ?: return null
+        val code = match.groupValues[1]
+
+        // Check for excluded code types in the match context
+        val matchText = match.value.lowercase()
+        if (excludedCodeTypes.any { matchText.contains(it) }) return null
+
+        if (isValidOtpCode(body, match.range.first, code)) {
+            return code
+        }
+        return null
+    }
+
+    /**
+     * Strategy 3: Generic "code" patterns with context validation
+     */
+    private fun extractGenericCodePattern(body: String): String? {
+        // Try "the/your code is [DIGITS]" pattern
+        genericCodeContextPattern.find(body)?.let { match ->
+            val code = match.groupValues[1]
+            val matchText = match.value.lowercase()
+            if (!excludedCodeTypes.any { matchText.contains(it) } &&
+                isValidOtpCode(body, match.range.first, code)) {
+                return code
+            }
+        }
+
+        // Try "code for [service] is [DIGITS]" pattern
+        codeForPattern.find(body)?.let { match ->
+            val code = match.groupValues[1]
+            val matchText = match.value.lowercase()
+            if (!excludedCodeTypes.any { matchText.contains(it) } &&
+                isValidOtpCode(body, match.range.first, code)) {
+                return code
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Strategy 4: Use contextual indicators (time validity, do-not-share warnings)
+     * Combined with digit proximity for lower-confidence but still useful detection
+     */
+    private fun extractWithContextualIndicators(body: String): String? {
+        val hasTimeIndicator = timeValidityPattern.containsMatchIn(body)
+        val hasDoNotShare = doNotSharePattern.containsMatchIn(body)
+
+        // Need at least one strong contextual signal
+        if (!hasTimeIndicator && !hasDoNotShare) return null
+
+        // Find all digit sequences and pick the most likely OTP
+        val codes = otpCodeRegex.findAll(body).toList()
+        for (codeMatch in codes) {
+            if (isValidOtpCode(body, codeMatch.range.first, codeMatch.value)) {
+                return codeMatch.value
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Validate that a code is likely an OTP (not a monetary amount, phone number, etc.)
+     */
+    private fun isValidOtpCode(body: String, codeStart: Int, code: String): Boolean {
+        // Check if preceded by currency indicator
+        val lookbackStart = maxOf(0, codeStart - 10)
+        val prefix = body.substring(lookbackStart, codeStart)
+        if (monetaryPrefixRegex.containsMatchIn(prefix)) return false
+
+        // Check if it looks like a phone number (10+ consecutive digits in context)
+        val lookAround = body.substring(
+            maxOf(0, codeStart - 5),
+            minOf(body.length, codeStart + code.length + 5)
+        )
+        val digitCount = lookAround.count { it.isDigit() }
+        if (digitCount > 10) return false
+
+        return true
     }
 
     /**
