@@ -55,12 +55,26 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var contactLookupUri: String? = null
     private var messageCategory: MessageCategory = MessageCategory.UNKNOWN
     private var targetMessageId: Long? = null
-    
+    private var highlightInProgress = false
+    private var pendingObserverReload: Runnable? = null
+    private val observerDebounceMs = 300L
+
     private val smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             super.onChange(selfChange)
-            loadMessages()
+            // Debounce rapid ContentObserver notifications
+            pendingObserverReload?.let { handler.removeCallbacks(it) }
+            val reload = Runnable {
+                // Don't reload if highlight is in progress to avoid disrupting animation
+                if (!highlightInProgress) {
+                    loadMessages()
+                }
+            }
+            pendingObserverReload = reload
+            handler.postDelayed(reload, observerDebounceMs)
         }
+
+        private val handler = Handler(Looper.getMainLooper())
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -119,6 +133,11 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Cancel any pending debounced reloads
+        pendingObserverReload?.let {
+            Handler(Looper.getMainLooper()).removeCallbacks(it)
+        }
+        pendingObserverReload = null
         // Unregister content observer
         contentResolver.unregisterContentObserver(smsObserver)
     }
@@ -460,27 +479,29 @@ class ThreadDetailActivity : AppCompatActivity() {
             markThreadAsRead(threadId)
             runOnUiThread {
                 messageAdapter.updateMessages(messages)
-                val targetId = targetMessageId
-                if (targetId != null) {
-                    // Use adapter position which accounts for day indicators
-                    val adapterPosition = messageAdapter.getPositionForMessageId(targetId)
-                    if (adapterPosition >= 0) {
-                        messagesRecycler.scrollToPosition(adapterPosition)
-                        highlightMessage(adapterPosition)
+
+                // Post scroll/highlight to next frame after adapter update triggers layout
+                messagesRecycler.post {
+                    val targetId = targetMessageId
+                    if (targetId != null) {
+                        // Use adapter position which accounts for day indicators
+                        val adapterPosition = messageAdapter.getPositionForMessageId(targetId)
+                        if (adapterPosition >= 0) {
+                            highlightMessage(adapterPosition)
+                        } else {
+                            // Fall back to last message if target not found
+                            val lastPosition = messageAdapter.getLastMessagePosition()
+                            if (lastPosition >= 0) {
+                                highlightMessage(lastPosition)
+                            }
+                        }
+                        targetMessageId = null
                     } else {
-                        // Fall back to last message if target not found
+                        // Scroll to most recent message (last message, not last item which could be day indicator)
                         val lastPosition = messageAdapter.getLastMessagePosition()
                         if (lastPosition >= 0) {
                             messagesRecycler.scrollToPosition(lastPosition)
-                            highlightMessage(lastPosition)
                         }
-                    }
-                    targetMessageId = null
-                } else {
-                    // Scroll to most recent message (last message, not last item which could be day indicator)
-                    val lastPosition = messageAdapter.getLastMessagePosition()
-                    if (lastPosition >= 0) {
-                        messagesRecycler.scrollToPosition(lastPosition)
                     }
                 }
             }
@@ -488,21 +509,44 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun highlightMessage(position: Int) {
-        messagesRecycler.post { highlightMessageInternal(position, 0) }
+        // Mark highlight as in progress to prevent loadMessages() interruptions
+        highlightInProgress = true
+        // Wait for RecyclerView to complete its layout pass before attempting to highlight
+        messagesRecycler.post {
+            // Ensure the position is scrolled into view first
+            messagesRecycler.scrollToPosition(position)
+            // Then wait for next frame when scroll and layout are complete
+            messagesRecycler.post { highlightMessageInternal(position, 0) }
+        }
     }
 
     private fun highlightMessageInternal(position: Int, attempt: Int) {
         val holder = messagesRecycler.findViewHolderForAdapterPosition(position)
         if (holder == null) {
-            if (attempt < 5) {
-                messagesRecycler.postDelayed({ highlightMessageInternal(position, attempt + 1) }, 48)
+            if (attempt < 10) {
+                messagesRecycler.postDelayed({ highlightMessageInternal(position, attempt + 1) }, 50)
+            } else {
+                highlightInProgress = false
             }
             return
         }
+
         val targetView = holder.itemView.findViewById<android.view.View>(R.id.message_container) ?: holder.itemView
+
+        // Check if view is laid out with valid dimensions
+        if (targetView.width == 0 || targetView.height == 0) {
+            if (attempt < 10) {
+                messagesRecycler.postDelayed({ highlightMessageInternal(position, attempt + 1) }, 50)
+            } else {
+                highlightInProgress = false
+            }
+            return
+        }
+
         val fallbackColor = ContextCompat.getColor(this, R.color.md_theme_light_primaryContainer)
         val highlightColor = MaterialColors.getColor(targetView, com.google.android.material.R.attr.colorPrimaryContainer, fallbackColor)
         val cornerRadius = targetView.resources.getDimension(R.dimen.message_bubble_corner_radius)
+
         val overlay = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.RECTANGLE
             setCornerRadius(cornerRadius)
@@ -511,6 +555,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             setBounds(0, 0, targetView.width, targetView.height)
         }
         targetView.overlay.add(overlay)
+
         val animator = ValueAnimator.ofInt(0, 220).apply {
             duration = 420
             startDelay = 80
@@ -520,6 +565,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     targetView.overlay.remove(overlay)
+                    highlightInProgress = false
                 }
             })
         }
