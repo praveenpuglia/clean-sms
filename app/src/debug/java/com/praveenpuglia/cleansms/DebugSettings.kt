@@ -21,9 +21,52 @@ import kotlin.math.absoluteValue
  */
 object DebugSettings {
 
-    fun setupDebugSection(activity: SettingsActivity, container: ViewGroup) {
-        val inflater = LayoutInflater.from(activity)
+    // Random OTP message templates with placeholders
+    private val otpTemplates = listOf(
+        // Standard OTP formats
+        Triple("HDFCBANK", "Your OTP for transaction is {OTP}. Valid for 5 minutes. Do not share with anyone.", "standard"),
+        Triple("SBIBANK", "OTP: {OTP} for your SBI account login. Expires in 10 mins. Never share this code.", "standard"),
+        Triple("ICICI", "{OTP} is your one-time password for ICICI Bank. Valid for 3 minutes.", "standard"),
+        Triple("AMAZON", "Your Amazon verification code is {OTP}. Don't share this code with anyone.", "standard"),
+        Triple("GOOGLE", "{OTP} is your Google verification code.", "standard"),
+        Triple("PAYTM", "Your Paytm login code is {OTP}. Valid for 5 mins. Do NOT share.", "standard"),
 
+        // Code-first formats (like Medplus)
+        Triple("MEDPLUS", "{OTP} 2 hrs is the authorization code for your Medplus Login. Please use it within <#>. Thanks, Customer Care team", "code-first"),
+        Triple("APOLLO", "{OTP} is the access code for Apollo Pharmacy. Use within 10 minutes.", "code-first"),
+        Triple("IRCTC", "{OTP} is your authentication code for IRCTC booking. Valid for 5 mins.", "code-first"),
+
+        // Generic code patterns
+        Triple("FLIPKART", "The code for your Flipkart login is {OTP}. Keep it safe.", "generic"),
+        Triple("SWIGGY", "Your code: {OTP}. Use it to verify your Swiggy order.", "generic"),
+        Triple("ZOMATO", "Use {OTP} as your Zomato verification code. Expires in 5 min.", "generic"),
+
+        // Time-validity based
+        Triple("PHONEPE", "Use {OTP} within 3 minutes for PhonePe transaction. Never share this.", "time-validity"),
+        Triple("GPAY", "{OTP} - Google Pay code. Expires in 5 minutes.", "time-validity"),
+
+        // Authorization/Auth code formats
+        Triple("BOOKMYSHOW", "{OTP} is your authorization code for BookMyShow. Valid for 10 mins.", "auth"),
+        Triple("MAKEMYTRIP", "Your auth code is {OTP}. Use it to complete your MakeMyTrip booking.", "auth"),
+
+        // Edge cases
+        Triple("TESTBANK", "Dear Customer, {OTP} is the OTP for Rs. 5000 transaction. Do not share.", "with-amount"),
+        Triple("UNKNOWN", "Code {OTP} for login. Thanks.", "minimal"),
+    )
+
+    private fun generateRandomOtp(length: Int = 6): String {
+        return (1..length).map { (0..9).random() }.joinToString("")
+    }
+
+    private fun getRandomOtpMessage(): Triple<String, String, String> {
+        val template = otpTemplates.random()
+        val otpLength = listOf(4, 5, 6, 6, 6, 8).random() // Weighted towards 6 digits
+        val otp = generateRandomOtp(otpLength)
+        val body = template.second.replace("{OTP}", otp)
+        return Triple(template.first, body, template.third)
+    }
+
+    fun setupDebugSection(activity: SettingsActivity, container: ViewGroup) {
         // Add debug header
         val header = TextView(activity).apply {
             text = "Debug"
@@ -42,30 +85,33 @@ object DebugSettings {
         }
         container.addView(header)
 
-        // Add test OTP button
+        // Add random OTP test button
         val testButton = MaterialButton(
             activity,
             null,
             com.google.android.material.R.attr.materialButtonOutlinedStyle
         ).apply {
-            text = "Test OTP Notification"
+            text = "Test Random OTP"
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
             layoutParams = params
             setOnClickListener {
-                postTestOtpNotification(activity)
+                val (sender, body, type) = getRandomOtpMessage()
+                postTestOtpNotification(context = activity, sender = sender, body = body)
+                android.widget.Toast.makeText(activity, "Type: $type", android.widget.Toast.LENGTH_SHORT).show()
             }
         }
         container.addView(testButton)
     }
 
-    private fun postTestOtpNotification(context: Context) {
+    private fun postTestOtpNotification(context: Context, sender: String, body: String) {
         val channelId = "otp_sms"
-        val testOtp = "123456"
-        val testSender = "TEST-BANK"
-        val testBody = "Your OTP for transaction is $testOtp. Valid for 5 minutes. Do not share with anyone."
+        // Extract OTP using the actual classifier to test the detection logic
+        val testOtp = CategoryClassifier.extractHighPrecisionOtp(body) ?: "NO_OTP_FOUND"
+        val testSender = sender
+        val testBody = body
 
         // Ensure channel exists
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
