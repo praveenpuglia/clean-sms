@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.MenuItem
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -88,6 +89,7 @@ class SettingsActivity : AppCompatActivity() {
         setupThemeToggle()
         setupDefaultTabDropdown()
         setupAboutSection()
+        setupDebugSection()
     }
 
     private fun setupHeader() {
@@ -204,5 +206,10 @@ class SettingsActivity : AppCompatActivity() {
         } catch (e: Exception) {
             // Handle case where no browser is available
         }
+    }
+
+    private fun setupDebugSection() {
+        val container = findViewById<LinearLayout>(R.id.settings_content)
+        DebugSettings.setupDebugSection(this, container)
     }
 }

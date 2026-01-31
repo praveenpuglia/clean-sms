@@ -91,12 +91,35 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         category: MessageCategory,
         otpCode: String?
     ) {
-        val channelId = "incoming_sms"
+        val isOtp = !otpCode.isNullOrEmpty()
+        val channelId = if (isOtp) "otp_sms" else "incoming_sms"
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = context.getSystemService(NotificationManager::class.java)
-            if (nm.getNotificationChannel(channelId) == null) {
-                val ch = NotificationChannel(channelId, "Incoming SMS", NotificationManager.IMPORTANCE_DEFAULT)
-                ch.description = "Notifications for received SMS messages"
+
+            // Create OTP channel with HIGH importance for heads-up display
+            if (nm.getNotificationChannel("otp_sms") == null) {
+                val otpChannel = NotificationChannel(
+                    "otp_sms",
+                    "OTP Messages",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "High-priority notifications for OTP codes"
+                    enableVibration(true)
+                    setShowBadge(true)
+                }
+                nm.createNotificationChannel(otpChannel)
+            }
+
+            // Create regular SMS channel
+            if (nm.getNotificationChannel("incoming_sms") == null) {
+                val ch = NotificationChannel(
+                    "incoming_sms",
+                    "Incoming SMS",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Notifications for received SMS messages"
+                }
                 nm.createNotificationChannel(ch)
             }
         }
@@ -120,6 +143,12 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
+
+        // Set high priority for OTP notifications to show as heads-up
+        if (isOtp) {
+            builder.setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+        }
 
         if (!otpCode.isNullOrEmpty()) {
             // Don't override content text - keep the SMS body visible
