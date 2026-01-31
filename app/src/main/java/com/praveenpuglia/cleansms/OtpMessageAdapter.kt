@@ -88,6 +88,7 @@ class OtpMessageAdapter(
             Toast.makeText(context, context.getString(R.string.toast_otp_copied), Toast.LENGTH_SHORT).show()
         }
 
+        // OTP messages are service messages - only enable avatar click for saved contacts or selection mode
         val canOpenContact = item.hasSavedContact
         val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
         if (selectionMode || canOpenContact) {

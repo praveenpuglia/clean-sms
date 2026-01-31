@@ -733,6 +733,21 @@ class MainActivity : AppCompatActivity() {
         }
         if (item.hasSavedContact) {
             openContactFromThread(item)
+        } else if (item.category == MessageCategory.PERSONAL) {
+            // Only offer add-to-contacts for Personal category
+            openAddContactIntent(item.nameOrAddress)
+        }
+    }
+
+    private fun openAddContactIntent(phoneNumber: String) {
+        val intent = Intent(Intent.ACTION_INSERT).apply {
+            type = ContactsContract.Contacts.CONTENT_TYPE
+            putExtra(ContactsContract.Intents.Insert.PHONE, phoneNumber)
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -752,6 +767,7 @@ class MainActivity : AppCompatActivity() {
         if (item.hasSavedContact) {
             openContactFromOtp(item)
         }
+        // OTP messages are service messages - no add-to-contacts for unknown senders
     }
 
     private fun startThreadSelection(item: ThreadItem) {
