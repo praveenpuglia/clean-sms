@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.ContactsContract
 import android.provider.Telephony
 import android.telephony.SmsManager
 import android.telephony.SubscriptionInfo
@@ -277,6 +278,18 @@ class ThreadDetailActivity : AppCompatActivity() {
             contactLookupUri = resolvedUri.toString()
             launchContactIntent(resolvedUri)
         } else {
+            openAddContactIntent(address)
+        }
+    }
+
+    private fun openAddContactIntent(phoneNumber: String) {
+        val intent = Intent(Intent.ACTION_INSERT).apply {
+            type = ContactsContract.Contacts.CONTENT_TYPE
+            putExtra(ContactsContract.Intents.Insert.PHONE, phoneNumber)
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
             Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
         }
     }

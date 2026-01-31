@@ -124,19 +124,20 @@ class ThreadAdapter(
             AvatarColorResolver.applyTo(holder.avatarText, key)
         }
 
-        val canOpenContact = item.hasSavedContact
+        // Enable avatar click for: saved contacts (any category), Personal category (for add-to-contacts), or selection mode
+        val canInteract = item.hasSavedContact || item.category == MessageCategory.PERSONAL || selectionMode
         val avatarClickListener = View.OnClickListener { onAvatarClick(item) }
-        if (selectionMode || canOpenContact) {
+        if (canInteract) {
             holder.avatarText.setOnClickListener(avatarClickListener)
             holder.avatarImage.setOnClickListener(avatarClickListener)
         } else {
             holder.avatarText.setOnClickListener(null)
             holder.avatarImage.setOnClickListener(null)
         }
-        holder.avatarText.isClickable = selectionMode || canOpenContact
-        holder.avatarText.isFocusable = selectionMode || canOpenContact
-        holder.avatarImage.isClickable = selectionMode || canOpenContact
-        holder.avatarImage.isFocusable = selectionMode || canOpenContact
+        holder.avatarText.isClickable = canInteract
+        holder.avatarText.isFocusable = canInteract
+        holder.avatarImage.isClickable = canInteract
+        holder.avatarImage.isFocusable = canInteract
         
         // Show spam indicator if thread has spam
         holder.spamIndicator.visibility = if (item.hasSpam) View.VISIBLE else View.GONE

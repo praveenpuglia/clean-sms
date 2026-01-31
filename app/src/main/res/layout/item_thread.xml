@@ -30,6 +30,7 @@
             android:visibility="gone"
             android:contentDescription="Avatar"
             android:background="@drawable/circle_mask"
+            android:foreground="@drawable/avatar_ripple"
             android:clipToOutline="true" />
 
         <TextView
@@ -41,6 +42,7 @@
             android:textStyle="bold"
             android:textSize="16sp"
             android:background="@drawable/avatar_bg"
+            android:foreground="@drawable/avatar_ripple"
             android:visibility="visible" />
 
         <View
