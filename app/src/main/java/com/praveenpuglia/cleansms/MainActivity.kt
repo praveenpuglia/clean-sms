@@ -263,13 +263,6 @@ class MainActivity : AppCompatActivity() {
         updateSelectionUi()
 
         setupDefaultSmsUi()
-
-        if (hasReadPermission()) {
-            showThreadsUi()
-        } else {
-            showInstructionsUi()
-            ActivityCompat.requestPermissions(this, requestedPermissions, PERMISSION_REQUEST_CODE)
-        }
     }
 
     override fun onResume() {
@@ -380,11 +373,12 @@ class MainActivity : AppCompatActivity() {
                 findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
                 findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
                 
-                // Proceed with permission check/display
+                // Now that default handler is set, request runtime permissions
                 if (hasReadPermission()) {
                     showThreadsUi()
                 } else {
                     showInstructionsUi()
+                    ActivityCompat.requestPermissions(this@MainActivity, requestedPermissions, PERMISSION_REQUEST_CODE)
                 }
             }
         } else {
