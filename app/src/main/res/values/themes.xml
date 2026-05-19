@@ -32,5 +32,23 @@
         <!-- Status bar color. -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
+        <!-- Default font family. Overridden at runtime by ThemeOverlay.CleanSMS.Font.* -->
+        <item name="android:fontFamily">@font/google_sans_flex</item>
+        <item name="fontFamily">@font/google_sans_flex</item>
+    </style>
+
+    <style name="ThemeOverlay.CleanSMS.Font.SansSerif" parent="">
+        <item name="android:fontFamily">@font/google_sans_flex</item>
+        <item name="fontFamily">@font/google_sans_flex</item>
+    </style>
+
+    <style name="ThemeOverlay.CleanSMS.Font.Monospace" parent="">
+        <item name="android:fontFamily">@font/google_sans_code</item>
+        <item name="fontFamily">@font/google_sans_code</item>
+    </style>
+
+    <style name="ThemeOverlay.CleanSMS.Font.System" parent="">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="fontFamily">sans-serif</item>
     </style>
 </resources>

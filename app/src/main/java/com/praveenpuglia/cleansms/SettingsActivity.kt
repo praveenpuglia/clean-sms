@@ -27,12 +27,17 @@ class SettingsActivity : AppCompatActivity() {
         ALL
     }
 
+    enum class FontFamily {
+        SANS_SERIF, MONOSPACE, SYSTEM
+    }
+
     companion object {
         private const val PREFS_NAME = "CleanSmsPrefs"
         private const val KEY_THEME = "theme_mode"
         private const val KEY_DEFAULT_TAB = "default_tab"
         private const val KEY_PROMO_NOTIFICATIONS_ENABLED = "promo_notifications_enabled"
         private const val KEY_ALL_TAB_ENABLED = "all_tab_enabled"
+        private const val KEY_FONT_FAMILY = "font_family"
         const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
         const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
         const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
@@ -104,14 +109,27 @@ class SettingsActivity : AppCompatActivity() {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_ALL_TAB_ENABLED, enabled).apply()
         }
+
+        fun getFontFamily(context: Context): FontFamily {
+            val ordinal = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(KEY_FONT_FAMILY, FontFamily.SANS_SERIF.ordinal)
+            return FontFamily.values().getOrNull(ordinal) ?: FontFamily.SANS_SERIF
+        }
+
+        fun setFontFamily(context: Context, family: FontFamily) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putInt(KEY_FONT_FAMILY, family.ordinal).apply()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        FontThemeHelper.apply(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
         setupHeader()
         setupThemeToggle()
+        setupFontToggle()
         setupAllTabToggle()
         setupDefaultTabDropdown()
         setupNotificationsSection()
@@ -161,6 +179,37 @@ class SettingsActivity : AppCompatActivity() {
                 
                 // Apply theme immediately
                 AppCompatDelegate.setDefaultNightMode(newTheme)
+            }
+        }
+    }
+
+    private fun setupFontToggle() {
+        val toggleGroup = findViewById<MaterialButtonToggleGroup>(R.id.font_toggle_group)
+        val sansBtn = findViewById<MaterialButton>(R.id.font_sans_serif)
+        val monoBtn = findViewById<MaterialButton>(R.id.font_monospace)
+        val systemBtn = findViewById<MaterialButton>(R.id.font_system)
+        // MaterialButton's textAppearance overrides android:fontFamily set in XML; set typeface
+        // directly so each pill always renders in the font it represents.
+        sansBtn.typeface = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.google_sans_flex)
+        monoBtn.typeface = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.google_sans_code)
+        systemBtn.typeface = android.graphics.Typeface.SANS_SERIF
+
+        when (getFontFamily(this)) {
+            FontFamily.SANS_SERIF -> toggleGroup.check(R.id.font_sans_serif)
+            FontFamily.MONOSPACE -> toggleGroup.check(R.id.font_monospace)
+            FontFamily.SYSTEM -> toggleGroup.check(R.id.font_system)
+        }
+        toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val selected = when (checkedId) {
+                R.id.font_sans_serif -> FontFamily.SANS_SERIF
+                R.id.font_monospace -> FontFamily.MONOSPACE
+                R.id.font_system -> FontFamily.SYSTEM
+                else -> FontFamily.SANS_SERIF
+            }
+            if (selected != getFontFamily(this)) {
+                setFontFamily(this, selected)
+                recreate()
             }
         }
     }

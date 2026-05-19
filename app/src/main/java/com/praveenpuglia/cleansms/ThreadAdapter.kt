@@ -101,7 +101,9 @@ class ThreadAdapter(
         } else {
             holder.unreadBadge.visibility = View.GONE
         }
-        holder.name.setTypeface(null, if (hasUnread) Typeface.BOLD else Typeface.NORMAL)
+        // Preserve the themed font family while toggling bold (passing null resets to system default).
+        val nameBase = Typeface.create(holder.name.typeface, Typeface.NORMAL)
+        holder.name.setTypeface(nameBase, if (hasUnread) Typeface.BOLD else Typeface.NORMAL)
 
         val photo = item.contactPhotoUri
         var avatarApplied = false

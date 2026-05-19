@@ -79,6 +79,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        FontThemeHelper.apply(this)
         // Apply saved theme before setting content view
         AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
         

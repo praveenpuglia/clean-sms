@@ -51,6 +51,7 @@ class NewMessageActivity : AppCompatActivity() {
     private var selectedSimIndex: Int = 0 // Index into availableSims list
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        FontThemeHelper.apply(this)
         // Apply saved theme before setting content view
         AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
         

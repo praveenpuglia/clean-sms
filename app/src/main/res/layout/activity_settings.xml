@@ -90,7 +90,7 @@
                 android:textStyle="bold"
                 android:letterSpacing="0.05"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="4dp" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -98,7 +98,8 @@
                 android:text="Theme"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textSize="16sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/theme_toggle_group"
@@ -142,6 +143,52 @@
 
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_font_label"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="16sp"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/font_toggle_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:singleSelection="true"
+                app:selectionRequired="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/font_sans_serif"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_font_sample"
+                    android:fontFamily="@font/google_sans_flex" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/font_monospace"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_font_sample"
+                    android:fontFamily="@font/google_sans_code" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/font_system"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_font_sample"
+                    android:fontFamily="sans-serif" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
             <!-- Organization Section -->
             <TextView
                 android:layout_width="wrap_content"
@@ -151,15 +198,15 @@
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.05"
-                android:layout_marginTop="32dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="4dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="16dp">
+                android:paddingVertical="8dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -194,7 +241,7 @@
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingVertical="12dp">
+                android:paddingVertical="8dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -236,8 +283,8 @@
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.05"
-                android:layout_marginTop="32dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="4dp" />
 
             <LinearLayout
                 android:id="@+id/promo_notifications_row"
@@ -248,7 +295,7 @@
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingVertical="12dp">
+                android:paddingVertical="8dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -290,15 +337,15 @@
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.05"
-                android:layout_marginTop="32dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="4dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="?attr/selectableItemBackground"
-                android:paddingVertical="12dp">
+                android:paddingVertical="8dp">
 
                 <TextView
                     android:layout_width="wrap_content"

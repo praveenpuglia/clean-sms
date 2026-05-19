@@ -9,6 +9,7 @@ import android.content.Intent
 
 class ComposeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        FontThemeHelper.apply(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_compose)
 

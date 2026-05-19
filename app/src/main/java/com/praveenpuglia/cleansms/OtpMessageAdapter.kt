@@ -56,7 +56,8 @@ class OtpMessageAdapter(
         holder.avatarText.setOnLongClickListener(longPressListener)
         holder.avatarImage.setOnLongClickListener(longPressListener)
         holder.senderName.text = item.contactName ?: item.address
-        holder.senderName.setTypeface(null, if (item.isUnread) Typeface.BOLD else Typeface.NORMAL)
+        val senderBase = Typeface.create(holder.senderName.typeface, Typeface.NORMAL)
+        holder.senderName.setTypeface(senderBase, if (item.isUnread) Typeface.BOLD else Typeface.NORMAL)
         holder.messageDate.text = formatHumanReadableDate(item.date)
         val preview = item.body.trim()
         holder.messagePreview.text = preview

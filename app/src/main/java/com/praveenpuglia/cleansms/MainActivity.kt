@@ -138,6 +138,7 @@ class MainActivity : AppCompatActivity() {
     )
     private var pagerPages: List<InboxPage> = buildPagerPages(allTabEnabled = false)
     private var lastAppliedAllTabEnabled: Boolean = false
+    private var lastAppliedFontFamily: SettingsActivity.FontFamily = SettingsActivity.FontFamily.SANS_SERIF
 
     private fun buildPagerPages(allTabEnabled: Boolean): List<InboxPage> {
         val base = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) }
@@ -176,6 +177,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var unreadFilterChip: com.google.android.material.chip.Chip
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        FontThemeHelper.apply(this)
         // Apply saved theme before setting content view
         AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
         
@@ -228,6 +230,7 @@ class MainActivity : AppCompatActivity() {
         
         // Apply saved "All tab" preference before adapter is built
         lastAppliedAllTabEnabled = SettingsActivity.getAllTabEnabled(this)
+        lastAppliedFontFamily = SettingsActivity.getFontFamily(this)
         pagerPages = buildPagerPages(lastAppliedAllTabEnabled)
 
         // Set initial page based on user preference before data loads to prevent flicker
@@ -283,7 +286,8 @@ class MainActivity : AppCompatActivity() {
         // Re-check after potential default change
         setupDefaultSmsUi()
         // If the All-tab preference changed in Settings, simplest path is to rebuild the activity.
-        if (SettingsActivity.getAllTabEnabled(this) != lastAppliedAllTabEnabled) {
+        if (SettingsActivity.getAllTabEnabled(this) != lastAppliedAllTabEnabled ||
+            SettingsActivity.getFontFamily(this) != lastAppliedFontFamily) {
             recreate()
             return
         }
