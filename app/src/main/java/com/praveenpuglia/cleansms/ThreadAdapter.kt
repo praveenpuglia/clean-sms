@@ -101,9 +101,9 @@ class ThreadAdapter(
         } else {
             holder.unreadBadge.visibility = View.GONE
         }
-        // Preserve the themed font family while toggling bold (passing null resets to system default).
-        val nameBase = Typeface.create(holder.name.typeface, Typeface.NORMAL)
-        holder.name.setTypeface(nameBase, if (hasUnread) Typeface.BOLD else Typeface.NORMAL)
+        // Use the variable font's 'wght' axis directly. Typeface.create-with-weight on Android
+        // does not always interpolate the axis on bundled variable TTFs, so set the axis explicitly.
+        holder.name.fontVariationSettings = if (hasUnread) "'wght' 600" else "'wght' 400"
 
         val photo = item.contactPhotoUri
         var avatarApplied = false

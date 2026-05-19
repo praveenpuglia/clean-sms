@@ -878,6 +878,10 @@ class MainActivity : AppCompatActivity() {
         }
         if (::threadsPagerAdapter.isInitialized) {
             threadsPagerAdapter.updateSelectionState(selectionMode, selectedThreadIds, selectedMessageIds)
+            // notifyDataSetChanged inside updateSelectionState triggers TabLayoutMediator to
+            // re-populate tabs, which resets each tab's custom view to its XML defaults.
+            // Re-apply the unread dots and the Promotions mute icon so they survive selection.
+            updateTabBadges()
         }
     }
 

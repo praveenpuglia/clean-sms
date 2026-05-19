@@ -42,8 +42,7 @@ class SearchResultAdapter(
         val item = items[position]
 
         holder.sender.text = item.senderDisplay ?: item.sender
-        val senderBase = Typeface.create(holder.sender.typeface, Typeface.NORMAL)
-        holder.sender.setTypeface(senderBase, if (item.isUnread) Typeface.BOLD else Typeface.NORMAL)
+        holder.sender.fontVariationSettings = if (item.isUnread) "'wght' 600" else "'wght' 400"
         holder.unreadDot.visibility = if (item.isUnread) View.VISIBLE else View.GONE
 
         holder.date.text = formatDate(item.date)
