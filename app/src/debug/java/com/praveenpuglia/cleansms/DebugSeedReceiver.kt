@@ -1,9 +1,13 @@
 package com.praveenpuglia.cleansms
 
 import android.content.BroadcastReceiver
+import android.content.ContentProviderOperation
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.provider.ContactsContract
+import android.provider.ContactsContract.CommonDataKinds.Phone
+import android.provider.ContactsContract.CommonDataKinds.StructuredName
 import android.provider.Telephony
 import android.util.Log
 import android.widget.Toast
@@ -65,9 +69,63 @@ class DebugSeedReceiver : BroadcastReceiver() {
             }
         }
 
-        val summary = "Seeded $inserted msgs" + if (deleted > 0) " (cleared $deleted)" else ""
+        val contacts = seedContacts(context)
+
+        val summary = buildString {
+            append("Seeded $inserted msgs")
+            if (deleted > 0) append(" (cleared $deleted)")
+            if (contacts > 0) append(", $contacts contacts")
+        }
         Log.i(TAG, summary)
         Toast.makeText(context, summary, Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * Seed a small set of contacts so the Personal tab shows friendly names instead of raw numbers.
+     * Idempotent: skips numbers that already have a contact (so re-seeding the inbox doesn't keep
+     * adding duplicates). Requires WRITE_CONTACTS, granted via the debug manifest + adb pm grant.
+     */
+    private fun seedContacts(context: Context): Int {
+        val resolver = context.contentResolver
+        var added = 0
+        for ((name, number) in SEED_CONTACTS) {
+            if (contactExistsForNumber(context, number)) continue
+
+            val ops = arrayListOf<ContentProviderOperation>(
+                ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
+                    .build(),
+                ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                    .withValue(ContactsContract.Data.MIMETYPE, StructuredName.CONTENT_ITEM_TYPE)
+                    .withValue(StructuredName.DISPLAY_NAME, name)
+                    .build(),
+                ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                    .withValue(ContactsContract.Data.MIMETYPE, Phone.CONTENT_ITEM_TYPE)
+                    .withValue(Phone.NUMBER, number)
+                    .withValue(Phone.TYPE, Phone.TYPE_MOBILE)
+                    .build()
+            )
+            try {
+                resolver.applyBatch(ContactsContract.AUTHORITY, ops)
+                added++
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add contact $name <$number>", e)
+            }
+        }
+        return added
+    }
+
+    private fun contactExistsForNumber(context: Context, number: String): Boolean {
+        val uri = android.net.Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            android.net.Uri.encode(number)
+        )
+        return context.contentResolver
+            .query(uri, arrayOf(ContactsContract.PhoneLookup._ID), null, null, null)
+            ?.use { it.count > 0 } ?: false
     }
 
     private data class Seed(
@@ -86,6 +144,18 @@ class DebugSeedReceiver : BroadcastReceiver() {
         // Sentinel stored in `service_center` so we can find & wipe our seeded rows.
         // Real SMSCs are short numbers like "+919885005444"; this string is harmless if it leaks.
         private const val SEED_TAG = "CLEAN_SMS_DEBUG_SEED"
+
+        // Friendly names for the personal-thread phone numbers used above.
+        // Used only so the Personal tab shows recognizable names in screenshots.
+        private val SEED_CONTACTS = listOf(
+            "Mom" to "+919876543210",
+            "Anita" to "+918765432109",
+            "Dad" to "+917654321098",
+            "Riya Sharma" to "+919988776655",
+            "Vikram (Boss)" to "+918877665544",
+            "Priya Iyer" to "+919876512345",
+            "Aditi" to "+919812345678",
+        )
 
         // ageMinutes is "minutes ago"; spread across ~14 days for thread/list realism.
         private val SEED_MESSAGES = listOf(
