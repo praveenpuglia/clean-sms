@@ -13,6 +13,9 @@ data class SearchResultItem(
     val contactPhotoUri: String?,
     val contactLookupUri: String?,
     val category: MessageCategory,
+    val isUnread: Boolean = false,
+    val subscriptionId: Int? = null,
+    val simSlot: Int? = null,
     val relevanceScore: Double = 0.0  // For sorting by relevance
 )
 

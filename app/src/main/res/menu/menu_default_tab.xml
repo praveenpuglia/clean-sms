@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
+        android:id="@+id/tab_all"
+        android:title="@string/tab_all" />
+    <item
         android:id="@+id/tab_otps"
-        android:title="OTPs" />
+        android:title="@string/tab_otp" />
     <item
         android:id="@+id/tab_personal"
-        android:title="Personal" />
+        android:title="@string/category_personal" />
     <item
         android:id="@+id/tab_transactions"
-        android:title="Transactions" />
+        android:title="@string/category_transactions" />
     <item
         android:id="@+id/tab_services"
-        android:title="Services" />
+        android:title="@string/category_service" />
     <item
         android:id="@+id/tab_promotions"
-        android:title="Promotions" />
+        android:title="@string/category_promotions" />
     <item
         android:id="@+id/tab_governmental"
-        android:title="Governmental" />
+        android:title="@string/category_government" />
 </menu>

@@ -11,6 +11,9 @@
     <string name="category_government">Government</string>
     <string name="category_unknown">Unknown</string>
     <string name="tab_otp">OTPs</string>
+    <string name="tab_all">All</string>
+    <string name="settings_all_tab_title">All messages tab</string>
+    <string name="settings_all_tab_subtitle">Browse every message in one chronological list. The same view is also available from search.</string>
     <string name="toast_contact_not_found">Contact not available</string>
     <string name="toast_contact_permission_required">Allow contact access to open saved contacts</string>
     <string name="delete_selected_content_description">Delete selected conversations or messages</string>

@@ -136,7 +136,13 @@ class MainActivity : AppCompatActivity() {
         MessageCategory.PROMOTIONAL,
         MessageCategory.GOVERNMENT
     )
-    private val pagerPages: List<InboxPage> = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) }
+    private var pagerPages: List<InboxPage> = buildPagerPages(allTabEnabled = false)
+    private var lastAppliedAllTabEnabled: Boolean = false
+
+    private fun buildPagerPages(allTabEnabled: Boolean): List<InboxPage> {
+        val base = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) }
+        return if (allTabEnabled) listOf(InboxPage.All) + base else base
+    }
     private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
             super.onPageSelected(position)
@@ -220,10 +226,14 @@ class MainActivity : AppCompatActivity() {
             }
         })
         
+        // Apply saved "All tab" preference before adapter is built
+        lastAppliedAllTabEnabled = SettingsActivity.getAllTabEnabled(this)
+        pagerPages = buildPagerPages(lastAppliedAllTabEnabled)
+
         // Set initial page based on user preference before data loads to prevent flicker
         val defaultTab = SettingsActivity.getDefaultTab(this)
         val initialPageIndex = getInitialPageIndexForTab(defaultTab)
-        
+
         threadsPagerAdapter = ThreadCategoryPagerAdapter(
             pagerPages,
             onThreadClick = { threadItem -> handleThreadClick(threadItem) },
@@ -231,7 +241,8 @@ class MainActivity : AppCompatActivity() {
             onThreadAvatarLongPress = { threadItem -> startThreadSelection(threadItem) },
             onOtpClick = { otpItem -> handleOtpClick(otpItem) },
             onOtpAvatarClick = { otpItem -> handleOtpAvatarClick(otpItem) },
-            onOtpAvatarLongPress = { otpItem -> startOtpSelection(otpItem) }
+            onOtpAvatarLongPress = { otpItem -> startOtpSelection(otpItem) },
+            onAllItemClick = { item -> handleSearchResultClick(item) }
         )
         threadsPager.adapter = threadsPagerAdapter
         
@@ -271,6 +282,11 @@ class MainActivity : AppCompatActivity() {
         activeInstance = this
         // Re-check after potential default change
         setupDefaultSmsUi()
+        // If the All-tab preference changed in Settings, simplest path is to rebuild the activity.
+        if (SettingsActivity.getAllTabEnabled(this) != lastAppliedAllTabEnabled) {
+            recreate()
+            return
+        }
         if (hasReadPermission()) {
             refreshThreadsAsync()
         }
@@ -587,6 +603,9 @@ class MainActivity : AppCompatActivity() {
             filteredThreads.filter { it.category == category }
         }
         threadsPagerAdapter.updateAll(filteredOtp, grouped)
+        if (pagerPages.any { it is InboxPage.All }) {
+            loadAllItemsForAllTab()
+        }
         updateSelectionUi()
         updateTabBadges()
         val restoreIndex = restorePageIndex
@@ -611,6 +630,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun labelForPage(page: InboxPage): String = when (page) {
+        InboxPage.All -> getString(R.string.tab_all)
         InboxPage.Otp -> getString(R.string.tab_otp)
         is InboxPage.CategoryPage -> labelForCategory(page.category)
     }
@@ -624,6 +644,7 @@ class MainActivity : AppCompatActivity() {
             SettingsActivity.DefaultTab.PROMOTIONAL -> MessageCategory.PROMOTIONAL
             SettingsActivity.DefaultTab.GOVERNMENT -> MessageCategory.GOVERNMENT
             SettingsActivity.DefaultTab.OTP -> MessageCategory.PERSONAL // fallback for OTP
+            SettingsActivity.DefaultTab.ALL -> MessageCategory.PERSONAL // fallback for All
         }
     }
 
@@ -657,6 +678,9 @@ class MainActivity : AppCompatActivity() {
                     page is InboxPage.CategoryPage && page.category == MessageCategory.GOVERNMENT
                 }.takeIf { it >= 0 } ?: 0
             }
+            SettingsActivity.DefaultTab.ALL -> {
+                pagerPages.indexOfFirst { it is InboxPage.All }.takeIf { it >= 0 } ?: 0
+            }
         }
     }
 
@@ -671,6 +695,7 @@ class MainActivity : AppCompatActivity() {
         for (index in pagerPages.indices) {
             val tab = categoryTabs.getTabAt(index) ?: continue
             val hasUnread = when (val page = pagerPages[index]) {
+                is InboxPage.All -> allThreads.any { it.hasUnread } || otpMessages.any { it.isUnread }
                 is InboxPage.Otp -> otpMessages.any { it.isUnread }
                 is InboxPage.CategoryPage -> allThreads.any { it.category == page.category && it.hasUnread }
             }
@@ -879,6 +904,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         when (currentPage) {
+            is InboxPage.All -> {
+                // No selection mode on the All page (chronological view, mirrors search).
+            }
             is InboxPage.Otp -> {
                 val allOtpIds = filteredOtp.map { it.messageId }.toSet()
                 val allSelected = allOtpIds.isNotEmpty() && allOtpIds.all { it in selectedMessageIds }
@@ -1185,6 +1213,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private sealed class InboxPage {
+        object All : InboxPage()
         object Otp : InboxPage()
         data class CategoryPage(val category: MessageCategory) : InboxPage()
     }
@@ -1196,7 +1225,8 @@ class MainActivity : AppCompatActivity() {
         private val onThreadAvatarLongPress: (ThreadItem) -> Unit,
         private val onOtpClick: (OtpMessageItem) -> Unit,
         private val onOtpAvatarClick: (OtpMessageItem) -> Unit,
-        private val onOtpAvatarLongPress: (OtpMessageItem) -> Unit
+        private val onOtpAvatarLongPress: (OtpMessageItem) -> Unit,
+        private val onAllItemClick: (SearchResultItem) -> Unit
     ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
         private val itemsByCategory = pages
@@ -1204,8 +1234,10 @@ class MainActivity : AppCompatActivity() {
             .associate { it.category to emptyList<ThreadItem>() }
             .toMutableMap()
         private var otpItems: List<OtpMessageItem> = emptyList()
+        private var allItems: List<SearchResultItem> = emptyList()
         private val viewTypeOtp = 0
         private val viewTypeCategory = 1
+        private val viewTypeAll = 2
         private var selectionMode: Boolean = false
         private var selectedThreadIds: Set<Long> = emptySet()
         private var selectedOtpIds: Set<Long> = emptySet()
@@ -1239,6 +1271,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        private inner class AllPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+            private val recycler: RecyclerView = itemView.findViewById(R.id.all_recycler)
+            private val adapter = SearchResultAdapter(emptyList(), "", onAllItemClick)
+            private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
+
+            init {
+                recycler.layoutManager = LinearLayoutManager(itemView.context)
+                recycler.adapter = adapter
+                recycler.clipToPadding = false
+                ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
+                    val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                    view.setPadding(
+                        view.paddingLeft,
+                        view.paddingTop,
+                        view.paddingRight,
+                        baseBottomPadding + systemInsets.bottom
+                    )
+                    insets
+                }
+                ViewCompat.requestApplyInsets(recycler)
+            }
+
+            fun bind(items: List<SearchResultItem>) {
+                adapter.updateResults(items, "")
+            }
+        }
+
         private inner class OtpPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val recycler: RecyclerView = itemView.findViewById(R.id.otp_recycler)
             private val adapter = OtpMessageAdapter(emptyList(), onOtpClick, onOtpAvatarClick, onOtpAvatarLongPress)
@@ -1269,24 +1328,25 @@ class MainActivity : AppCompatActivity() {
 
         override fun getItemViewType(position: Int): Int {
             return when (pages[position]) {
+                is InboxPage.All -> viewTypeAll
                 is InboxPage.Otp -> viewTypeOtp
                 is InboxPage.CategoryPage -> viewTypeCategory
             }
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            return if (viewType == viewTypeOtp) {
-                val view = LayoutInflater.from(parent.context).inflate(R.layout.page_otp_list, parent, false)
-                OtpPageViewHolder(view)
-            } else {
-                val view = LayoutInflater.from(parent.context).inflate(R.layout.page_thread_list, parent, false)
-                CategoryPageViewHolder(view)
+            val inflater = LayoutInflater.from(parent.context)
+            return when (viewType) {
+                viewTypeAll -> AllPageViewHolder(inflater.inflate(R.layout.page_all_list, parent, false))
+                viewTypeOtp -> OtpPageViewHolder(inflater.inflate(R.layout.page_otp_list, parent, false))
+                else -> CategoryPageViewHolder(inflater.inflate(R.layout.page_thread_list, parent, false))
             }
         }
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
             boundViewHolders.put(position, holder)
             when (val page = pages[position]) {
+                is InboxPage.All -> (holder as AllPageViewHolder).bind(allItems)
                 is InboxPage.Otp -> (holder as OtpPageViewHolder).bind(otpItems)
                 is InboxPage.CategoryPage -> (holder as CategoryPageViewHolder).bind(page.category)
             }
@@ -1303,6 +1363,7 @@ class MainActivity : AppCompatActivity() {
         fun scrollToTop(position: Int) {
             val holder = boundViewHolders.get(position) ?: return
             val recycler = when (holder) {
+                is AllPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.all_recycler)
                 is OtpPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.otp_recycler)
                 is CategoryPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.category_recycler)
                 else -> null
@@ -1320,6 +1381,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             notifyDataSetChanged()
+        }
+
+        fun updateAllItems(items: List<SearchResultItem>) {
+            allItems = items
+            val allIndex = pages.indexOfFirst { it is InboxPage.All }
+            if (allIndex >= 0) notifyItemChanged(allIndex)
         }
 
         fun updateSelectionState(selectionEnabled: Boolean, threadIds: Set<Long>, otpIds: Set<Long>) {
@@ -1885,6 +1952,18 @@ class MainActivity : AppCompatActivity() {
         newMessageFab.visibility = View.GONE
     }
     
+    private fun loadAllItemsForAllTab() {
+        val unreadOnly = unreadOnlyFilter
+        Thread {
+            val messages = queryAllMessagesForSearch()
+                .let { if (unreadOnly) it.filter { item -> item.isUnread } else it }
+                .sortedByDescending { it.date }
+            runOnUiThread {
+                threadsPagerAdapter.updateAllItems(messages)
+            }
+        }.start()
+    }
+
     private fun loadAllMessagesForSearch() {
         Thread {
             val messages = queryAllMessagesForSearch()
@@ -1898,11 +1977,11 @@ class MainActivity : AppCompatActivity() {
     
     private fun queryAllMessagesForSearch(): List<SearchResultItem> {
         val uri = "content://sms".toUri()
-        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type")
+        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id")
         val sortOrder = "date DESC"
-        
+
         val results = mutableListOf<SearchResultItem>()
-        
+
         try {
             contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
                 val idxId = cursor.getColumnIndex("_id")
@@ -1910,23 +1989,29 @@ class MainActivity : AppCompatActivity() {
                 val idxAddress = cursor.getColumnIndex("address")
                 val idxBody = cursor.getColumnIndex("body")
                 val idxDate = cursor.getColumnIndex("date")
-                
+                val idxRead = cursor.getColumnIndex("read")
+                val idxSubId = cursor.getColumnIndex("sub_id")
+
                 while (cursor.moveToNext()) {
                     val messageId = if (idxId >= 0) cursor.getLong(idxId) else continue
                     val threadId = if (idxThreadId >= 0) cursor.getLong(idxThreadId) else -1L
                     val address = if (idxAddress >= 0) cursor.getString(idxAddress) ?: "" else ""
                     val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
                     val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
-                    
+                    val read = if (idxRead >= 0) cursor.getInt(idxRead) else 1
+                    val subIdRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
+                    val subscriptionId = if (subIdRaw >= 0) subIdRaw else null
+                    val simSlot = subscriptionId?.let { resolveSimSlot(it) }
+
                     if (body.isBlank()) continue
-                    
+
                     // Try to get contact info from cache or thread
                     val existingThread = allThreads.firstOrNull { it.threadId == threadId }
                     val contactName = existingThread?.contactName
                     val contactPhotoUri = existingThread?.contactPhotoUri
                     val contactLookupUri = existingThread?.contactLookupUri
                     val category = existingThread?.category ?: MessageCategory.UNKNOWN
-                    
+
                     results.add(SearchResultItem(
                         messageId = messageId,
                         threadId = threadId,
@@ -1936,14 +2021,17 @@ class MainActivity : AppCompatActivity() {
                         date = date,
                         contactPhotoUri = contactPhotoUri,
                         contactLookupUri = contactLookupUri,
-                        category = category
+                        category = category,
+                        isUnread = read == 0,
+                        subscriptionId = subscriptionId,
+                        simSlot = simSlot
                     ))
                 }
             }
         } catch (e: Exception) {
             Log.w("MainActivity", "Failed to query messages for search: ${e.message}")
         }
-        
+
         return results
     }
     

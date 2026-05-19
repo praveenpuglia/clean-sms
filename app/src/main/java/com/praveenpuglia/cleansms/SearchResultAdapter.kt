@@ -1,5 +1,6 @@
 package com.praveenpuglia.cleansms
 
+import android.graphics.Typeface
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.BackgroundColorSpan
@@ -23,8 +24,11 @@ class SearchResultAdapter(
         val avatarContainer: View = itemView.findViewById(R.id.search_result_avatar_container)
         val avatarImage: ImageView = itemView.findViewById(R.id.search_result_avatar_image)
         val avatarText: TextView = itemView.findViewById(R.id.search_result_avatar_text)
+        val unreadDot: View = itemView.findViewById(R.id.search_result_unread_dot)
         val sender: TextView = itemView.findViewById(R.id.search_result_sender)
         val date: TextView = itemView.findViewById(R.id.search_result_date)
+        val simIndicator: View = itemView.findViewById(R.id.search_result_sim_indicator)
+        val simSlotText: TextView = itemView.findViewById(R.id.search_result_sim_slot)
         val snippet: TextView = itemView.findViewById(R.id.search_result_snippet)
     }
 
@@ -36,20 +40,24 @@ class SearchResultAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        
-        // Set sender name
+
         holder.sender.text = item.senderDisplay ?: item.sender
-        
-        // Set date
+        holder.sender.setTypeface(null, if (item.isUnread) Typeface.BOLD else Typeface.NORMAL)
+        holder.unreadDot.visibility = if (item.isUnread) View.VISIBLE else View.GONE
+
         holder.date.text = formatDate(item.date)
-        
-        // Set snippet with highlighted search terms
+
+        if (item.simSlot != null || item.subscriptionId != null) {
+            holder.simIndicator.visibility = View.VISIBLE
+            holder.simSlotText.text = (item.simSlot ?: "?").toString()
+        } else {
+            holder.simIndicator.visibility = View.GONE
+        }
+
         holder.snippet.text = highlightSearchTerms(item.body, searchQuery, holder.itemView)
-        
-        // Set avatar
+
         setupAvatar(holder, item)
-        
-        // Click listener
+
         holder.itemView.setOnClickListener {
             onItemClick(item)
         }

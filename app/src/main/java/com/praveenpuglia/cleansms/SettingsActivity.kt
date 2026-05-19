@@ -23,7 +23,8 @@ class SettingsActivity : AppCompatActivity() {
         TRANSACTIONAL,
         SERVICE,
         PROMOTIONAL,
-        GOVERNMENT
+        GOVERNMENT,
+        ALL
     }
 
     companion object {
@@ -31,6 +32,7 @@ class SettingsActivity : AppCompatActivity() {
         private const val KEY_THEME = "theme_mode"
         private const val KEY_DEFAULT_TAB = "default_tab"
         private const val KEY_PROMO_NOTIFICATIONS_ENABLED = "promo_notifications_enabled"
+        private const val KEY_ALL_TAB_ENABLED = "all_tab_enabled"
         const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
         const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
         const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
@@ -66,6 +68,7 @@ class SettingsActivity : AppCompatActivity() {
                         "Service", "Services" -> DefaultTab.SERVICE
                         "Promotions" -> DefaultTab.PROMOTIONAL
                         "Government", "Governmental" -> DefaultTab.GOVERNMENT
+                        "All" -> DefaultTab.ALL
                         else -> DefaultTab.OTP
                     }
                     // Save in new format
@@ -91,6 +94,16 @@ class SettingsActivity : AppCompatActivity() {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, enabled).apply()
         }
+
+        fun getAllTabEnabled(context: Context): Boolean {
+            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_ALL_TAB_ENABLED, false)
+        }
+
+        fun setAllTabEnabled(context: Context, enabled: Boolean) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_ALL_TAB_ENABLED, enabled).apply()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,6 +112,7 @@ class SettingsActivity : AppCompatActivity() {
 
         setupHeader()
         setupThemeToggle()
+        setupAllTabToggle()
         setupDefaultTabDropdown()
         setupNotificationsSection()
         setupAboutSection()
@@ -153,18 +167,20 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun setupDefaultTabDropdown() {
         val button = findViewById<MaterialButton>(R.id.default_tab_button)
-        
-        // Set current selection
-        val currentTab = getDefaultTab(this)
-        button.text = getLabelForDefaultTab(currentTab)
-        
-        // Setup popup menu
+
+        fun refreshButtonText() {
+            button.text = getLabelForDefaultTab(getDefaultTab(this))
+        }
+        refreshButtonText()
+
         button.setOnClickListener { view ->
             val popup = PopupMenu(this, view)
             popup.menuInflater.inflate(R.menu.menu_default_tab, popup.menu)
-            
-            // Set current item checked
+            popup.menu.findItem(R.id.tab_all)?.isVisible = getAllTabEnabled(this)
+
+            val currentTab = getDefaultTab(this)
             val currentItemId = when (currentTab) {
+                DefaultTab.ALL -> R.id.tab_all
                 DefaultTab.OTP -> R.id.tab_otps
                 DefaultTab.PERSONAL -> R.id.tab_personal
                 DefaultTab.TRANSACTIONAL -> R.id.tab_transactions
@@ -173,9 +189,10 @@ class SettingsActivity : AppCompatActivity() {
                 DefaultTab.GOVERNMENT -> R.id.tab_governmental
             }
             popup.menu.findItem(currentItemId)?.isChecked = true
-            
+
             popup.setOnMenuItemClickListener { item: MenuItem ->
                 val selectedTab = when (item.itemId) {
+                    R.id.tab_all -> DefaultTab.ALL
                     R.id.tab_otps -> DefaultTab.OTP
                     R.id.tab_personal -> DefaultTab.PERSONAL
                     R.id.tab_transactions -> DefaultTab.TRANSACTIONAL
@@ -188,12 +205,29 @@ class SettingsActivity : AppCompatActivity() {
                 setDefaultTab(this, selectedTab)
                 true
             }
-            
+
             popup.show()
         }
     }
-    
+
+    private fun setupAllTabToggle() {
+        val allSwitch = findViewById<MaterialSwitch>(R.id.switch_all_tab)
+        val allRow = findViewById<LinearLayout>(R.id.all_tab_row)
+        allSwitch.isChecked = getAllTabEnabled(this)
+        allSwitch.setOnCheckedChangeListener { _, isChecked ->
+            setAllTabEnabled(this, isChecked)
+            // If disabling while the default was ALL, fall back so MainActivity has a valid target
+            if (!isChecked && getDefaultTab(this) == DefaultTab.ALL) {
+                setDefaultTab(this, DefaultTab.OTP)
+                findViewById<MaterialButton>(R.id.default_tab_button).text =
+                    getLabelForDefaultTab(DefaultTab.OTP)
+            }
+        }
+        allRow.setOnClickListener { allSwitch.toggle() }
+    }
+
     private fun getLabelForDefaultTab(tab: DefaultTab): String = when (tab) {
+        DefaultTab.ALL -> getString(R.string.tab_all)
         DefaultTab.OTP -> getString(R.string.tab_otp)
         DefaultTab.PERSONAL -> getString(R.string.category_personal)
         DefaultTab.TRANSACTIONAL -> getString(R.string.category_transactions)
