@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.PopupMenu
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.materialswitch.MaterialSwitch
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -29,6 +30,7 @@ class SettingsActivity : AppCompatActivity() {
         private const val PREFS_NAME = "CleanSmsPrefs"
         private const val KEY_THEME = "theme_mode"
         private const val KEY_DEFAULT_TAB = "default_tab"
+        private const val KEY_PROMO_NOTIFICATIONS_ENABLED = "promo_notifications_enabled"
         const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
         const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
         const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
@@ -79,6 +81,16 @@ class SettingsActivity : AppCompatActivity() {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putInt(KEY_DEFAULT_TAB, tab.ordinal).apply()
         }
+
+        fun getPromoNotificationsEnabled(context: Context): Boolean {
+            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, true)
+        }
+
+        fun setPromoNotificationsEnabled(context: Context, enabled: Boolean) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, enabled).apply()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,8 +100,19 @@ class SettingsActivity : AppCompatActivity() {
         setupHeader()
         setupThemeToggle()
         setupDefaultTabDropdown()
+        setupNotificationsSection()
         setupAboutSection()
         setupDebugSection()
+    }
+
+    private fun setupNotificationsSection() {
+        val promoSwitch = findViewById<MaterialSwitch>(R.id.switch_promo_notifications)
+        val promoRow = findViewById<LinearLayout>(R.id.promo_notifications_row)
+        promoSwitch.isChecked = getPromoNotificationsEnabled(this)
+        promoSwitch.setOnCheckedChangeListener { _, isChecked ->
+            setPromoNotificationsEnabled(this, isChecked)
+        }
+        promoRow.setOnClickListener { promoSwitch.toggle() }
     }
 
     private fun setupHeader() {

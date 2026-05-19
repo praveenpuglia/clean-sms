@@ -242,8 +242,9 @@ class MainActivity : AppCompatActivity() {
         
         threadsPager.registerOnPageChangeCallback(pageChangeCallback)
         tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager) { tab, position ->
-            tab.text = labelForPage(pagerPages[position])
+            applyTabCustomView(tab, pagerPages[position])
         }.also { it.attach() }
+        updateTabMuteIcons()
         
         // Scroll to top when re-tapping the current tab
         categoryTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
@@ -273,9 +274,39 @@ class MainActivity : AppCompatActivity() {
         if (hasReadPermission()) {
             refreshThreadsAsync()
         }
+        updateTabMuteIcons()
         // Restore search UI if we were in search mode (returning from thread detail)
         if (isSearchMode) {
             restoreSearchModeUi()
+        }
+    }
+
+    private fun applyTabCustomView(tab: TabLayout.Tab, page: InboxPage) {
+        if (tab.customView == null) {
+            tab.setCustomView(R.layout.tab_inbox)
+        }
+        val custom = tab.customView ?: return
+        custom.findViewById<TextView>(R.id.tab_text)?.text = labelForPage(page)
+        // Disable clipping on the parent TabView so the unread dot can overflow tab bounds
+        var parent = custom.parent as? android.view.ViewGroup
+        while (parent != null) {
+            parent.clipChildren = false
+            parent.clipToPadding = false
+            if (parent === categoryTabs) break
+            parent = parent.parent as? android.view.ViewGroup
+        }
+    }
+
+    private fun updateTabMuteIcons() {
+        if (categoryTabs.tabCount != pagerPages.size) return
+        val promoMuted = !SettingsActivity.getPromoNotificationsEnabled(this)
+        for (index in pagerPages.indices) {
+            val tab = categoryTabs.getTabAt(index) ?: continue
+            val page = pagerPages[index]
+            val showMute = promoMuted &&
+                page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL
+            tab.customView?.findViewById<android.widget.ImageView>(R.id.tab_mute_icon)?.visibility =
+                if (showMute) View.VISIBLE else View.GONE
         }
     }
 
@@ -636,33 +667,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateTabBadges() {
         if (categoryTabs.tabCount != pagerPages.size) return
+        updateTabMuteIcons()
         for (index in pagerPages.indices) {
             val tab = categoryTabs.getTabAt(index) ?: continue
             val hasUnread = when (val page = pagerPages[index]) {
                 is InboxPage.Otp -> otpMessages.any { it.isUnread }
                 is InboxPage.CategoryPage -> allThreads.any { it.category == page.category && it.hasUnread }
             }
-            if (hasUnread) {
-                val badge = tab.orCreateBadge
-                val fallbackColor = ContextCompat.getColor(this, R.color.md_theme_light_error)
-                val badgeColor = MaterialColors.getColor(
-                    categoryTabs,
-                    com.google.android.material.R.attr.colorError,
-                    fallbackColor
-                )
-                badge.backgroundColor = badgeColor
-                if (badge.hasNumber()) badge.clearNumber()
-                badge.badgeGravity = BadgeDrawable.TOP_END
-                val horizontalOffset = resources.getDimensionPixelOffset(R.dimen.tab_badge_horizontal_offset)
-                val verticalOffset = resources.getDimensionPixelOffset(R.dimen.tab_badge_vertical_offset)
-                badge.horizontalOffset = horizontalOffset
-                badge.verticalOffset = -verticalOffset
-                badge.isVisible = true
-            } else {
-                tab.removeBadge()
-            }
+            tab.removeBadge()
+            tab.customView?.findViewById<View>(R.id.tab_unread_dot)?.visibility =
+                if (hasUnread) View.VISIBLE else View.GONE
         }
     }
+
 
     private fun labelForCategory(category: MessageCategory): String = when (category) {
         MessageCategory.PERSONAL -> getString(R.string.category_personal)

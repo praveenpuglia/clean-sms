@@ -8,7 +8,7 @@
     <string name="category_transactions">Transactions</string>
     <string name="category_service">Services</string>
     <string name="category_promotions">Promotions</string>
-    <string name="category_government">Governmental</string>
+    <string name="category_government">Government</string>
     <string name="category_unknown">Unknown</string>
     <string name="tab_otp">OTPs</string>
     <string name="toast_contact_not_found">Contact not available</string>
