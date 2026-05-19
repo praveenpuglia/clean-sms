@@ -112,6 +112,24 @@ adb shell am start -n com.praveenpuglia.cleansms/.MainActivity
 ./gradlew installDebug && adb shell am start -n com.praveenpuglia.cleansms/.MainActivity
 ```
 
+### Seeding test messages (debug builds only)
+
+[DebugSeedReceiver](app/src/debug/java/com/praveenpuglia/cleansms/DebugSeedReceiver.kt) populates the inbox with ~56 curated messages covering every TRAI category, all 4 OTP detection strategies, OTP false-positive guards (PNRs, order numbers, monetary-only), Airtel-SPAM-prefixed spam, and a mix of read/unread. Useful for UI testing on a fresh emulator.
+
+One-time setup on a new device:
+```bash
+./gradlew installDebug
+# Grant the SMS role so the app has WRITE_SMS (required to insert into the SMS provider)
+adb shell cmd role add-role-holder android.app.role.SMS com.praveenpuglia.cleansms 0
+```
+
+Seed or re-seed (clears its own prior rows, leaves real messages alone):
+```bash
+adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED
+```
+
+Seeded rows are tagged via `service_center=CLEAN_SMS_DEBUG_SEED`. The receiver only exists in the `debug` source set, so release builds are unaffected.
+
 ## Project Principles
 
 Enduring rules that govern all changes. PR descriptions should call out any deviations.
