@@ -112,6 +112,48 @@ adb shell am start -n com.praveenpuglia.cleansms/.MainActivity
 ./gradlew installDebug && adb shell am start -n com.praveenpuglia.cleansms/.MainActivity
 ```
 
+## Project Principles
+
+Enduring rules that govern all changes. PR descriptions should call out any deviations.
+
+### Material Design 3 & Theming
+- Use Material Components views (`MaterialToolbar`, `MaterialCardView`, `TextInputLayout`/`TextInputEditText`, `Chip`, `MaterialButton`, `FloatingActionButton`). No plain `EditText` unless justified.
+- Typography follows the M3 type scale (Title Medium 16sp for primary text, Body Medium 14sp for metadata, Body Small 12sp for timestamps, Label Small 11sp for badges).
+- Icons: 24dp standard, 16dp only for inline metadata. **All icons/drawables must be theme-aware** — use `app:tint="?attr/colorOnSurface"` (or appropriate theme attribute), never `@android:color/white` or other hardcoded colors.
+- Reference theme attributes (`?attr/colorSurface`, `?attr/colorPrimary`) for semantic colors — no inline color literals.
+- Dynamic color (Material You) on Android 12+; static M3 palette as fallback. Dark theme must reach parity.
+- Use M3 shape tokens; avoid arbitrary corner radii. Elevation only where semantically meaningful.
+
+### UX & Interaction
+- **No implicit navigation side-effects**: sending a message does NOT auto-open the thread view. User stays in context.
+- OTP detection must be high precision — avoid aggressive heuristics that yield false positives. Filter monetary amounts.
+- Every send action gives immediate feedback (toast/snackbar) and reflects message state visually where possible.
+- Compose flow: supports multiple recipients; backspace on empty input removes last chip; raw numbers not in contacts are treated as valid recipients.
+- Accessibility: 48dp minimum touch targets, content descriptions on all icon-only buttons (Back, Send, FAB, Delete), TalkBack support, chips/text fields handle large font scaling.
+
+### Architecture & Performance
+- Separation of concerns: Activities/Fragments render and handle input; data access (ContentResolver queries) belongs in repository-style helpers as complexity grows.
+- Defensive queries: always null/empty-check cursor columns; close cursors with `use { }` blocks.
+- OTP detection and thread enrichment run off the UI thread (coroutines / structured concurrency — no ad hoc thread spawning).
+- Lazy/incremental loading for contacts and large lists; debounce/batch on-device queries.
+- `RecyclerView` with stable IDs and `ListAdapter`/`DiffUtil` for dynamic sets.
+
+### Code Style
+- Idiomatic Kotlin; data classes, extension functions sparingly, avoid long parameter lists.
+- Catch specific exceptions — no broad `catch (Exception)` unless wrapping/annotating and rethrowing.
+- Logging: structured tags, no PII (don't log full phone numbers, SMS bodies, or OTP values — use placeholders/shortened forms).
+- Strings in `strings.xml` with placeholders; don't concatenate user data with static phrases.
+
+### Privacy & Permissions
+- Read minimal data required — don't prefetch full SMS bodies where metadata suffices.
+- No external network calls for SMS/content enrichment without explicit user opt-in. Never transmit messages or OTPs off-device.
+- Runtime permissions requested only when needed; features requiring the Default SMS Role must degrade gracefully when not granted.
+
+### Build & Release
+- Use debug builds for iterative development (`./gradlew installDebug`). After install, auto-relaunch with `adb shell am start -n com.praveenpuglia.cleansms/.MainActivity` to verify.
+- Reserve release builds for final testing or production.
+- Builds must be lint-clean (or suppression justified). Deprecated APIs (e.g. `SmsManager.getDefault()`) tracked for replacement.
+
 ## Key Architecture Patterns
 
 ### Message Categorization (`CategoryClassifier.kt`)
