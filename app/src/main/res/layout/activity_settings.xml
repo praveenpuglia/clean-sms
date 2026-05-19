@@ -157,6 +157,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
+                android:baselineAligned="false"
                 app:singleSelection="true"
                 app:selectionRequired="true">
 
@@ -164,8 +165,9 @@
                     android:id="@+id/font_sans_serif"
                     style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:text="@string/settings_font_sample"
                     android:fontFamily="@font/google_sans_flex" />
 
@@ -173,8 +175,9 @@
                     android:id="@+id/font_monospace"
                     style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:text="@string/settings_font_sample"
                     android:fontFamily="@font/google_sans_code" />
 
@@ -182,8 +185,9 @@
                     android:id="@+id/font_system"
                     style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:text="@string/settings_font_sample"
                     android:fontFamily="sans-serif" />
 
