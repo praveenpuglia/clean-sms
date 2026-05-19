@@ -9,8 +9,8 @@ Clean SMS is a privacy-focused Android SMS messaging client written in Kotlin. I
 
 ## Tech Stack
 
-- **Language**: Kotlin 2.0.21
-- **Build System**: Gradle 8.13.0 with Kotlin DSL
+- **Language**: Kotlin 2.2.10
+- **Build System**: Gradle 9.3.1 with Kotlin DSL (AGP 9.1.0, JDK 21 toolchain)
 - **UI**: Material Design 3 with dynamic colors (Material You)
 - **Architecture**: Standard Android with Activities, Receivers, and Services
 - **Key Dependencies**: libphonenumber (phone parsing), AndroidX, Material Components
