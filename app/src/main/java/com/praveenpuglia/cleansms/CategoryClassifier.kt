@@ -222,6 +222,21 @@ object CategoryClassifier {
     }
 
     /**
+     * Extract the TRAI header segment (middle part) from a sender address.
+     * Returns e.g. "HDFCBK" for "VM-HDFCBK-T", null for phone numbers/short codes.
+     */
+    fun extractTraiHeader(address: String): String? {
+        val cleaned = address.trim().uppercase()
+        traiWithSuffixPattern.matcher(cleaned).apply {
+            if (matches()) return group(2)
+        }
+        traiNoSuffixPattern.matcher(cleaned).apply {
+            if (matches()) return group(2)
+        }
+        return null
+    }
+
+    /**
      * Categorize a sender address based on TRAI format or phone number
      */
     fun categorizeAddress(address: String): MessageCategory {

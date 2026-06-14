@@ -46,7 +46,8 @@ class ThreadDetailActivity : AppCompatActivity() {
     private lateinit var simToggle: View
     private lateinit var simNumber: TextView
     private var threadId: Long = -1
-    
+    private var allThreadIds: Set<Long> = emptySet()
+
     // SIM selection
     private var availableSims: List<SubscriptionInfo> = emptyList()
     private var selectedSimIndex: Int = 0
@@ -87,6 +88,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         setContentView(R.layout.activity_thread_detail)
 
         threadId = intent.getLongExtra("THREAD_ID", -1)
+        val extraIds = intent.getLongArrayExtra("MERGED_THREAD_IDS")
+        allThreadIds = if (extraIds != null && extraIds.isNotEmpty()) extraIds.toHashSet() else setOf(threadId)
         contactName = intent.getStringExtra("CONTACT_NAME")
         contactAddress = intent.getStringExtra("CONTACT_ADDRESS")
     contactPhotoUri = intent.getStringExtra("CONTACT_PHOTO_URI")
@@ -226,7 +229,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         messagesRecycler.layoutManager = LinearLayoutManager(this).apply {
             stackFromEnd = true // Start from bottom
         }
-        messageAdapter = MessageAdapter(emptyList())
+        messageAdapter = MessageAdapter(emptyList(), showSenderLabel = allThreadIds.size > 1)
         messagesRecycler.adapter = messageAdapter
         
         // Add sticky day header decoration
@@ -490,7 +493,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private fun loadMessages() {
         Thread {
             val messages = queryMessagesForThread(threadId)
-            markThreadAsRead(threadId)
+            markThreadAsRead(allThreadIds)
             runOnUiThread {
                 messageAdapter.updateMessages(messages)
 
@@ -587,11 +590,12 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
 
-    private fun queryMessagesForThread(threadId: Long): List<Message> {
+    private fun queryMessagesForThread(@Suppress("UNUSED_PARAMETER") threadId: Long): List<Message> {
         val uri = "content://sms".toUri()
         val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "sub_id", "status")
-        val selection = "thread_id = ?"
-        val selectionArgs = arrayOf(threadId.toString())
+        val placeholders = allThreadIds.joinToString(",") { "?" }
+        val selection = "thread_id IN ($placeholders)"
+        val selectionArgs = allThreadIds.map { it.toString() }.toTypedArray()
         val sortOrder = "date ASC"
 
         val messages = mutableListOf<Message>()
@@ -643,16 +647,15 @@ class ThreadDetailActivity : AppCompatActivity() {
         return slot
     }
 
-    private fun markThreadAsRead(threadId: Long) {
+    private fun markThreadAsRead(threadIds: Set<Long>) {
         try {
-            val values = ContentValues().apply {
-                put(Telephony.Sms.READ, 1)
-            }
+            val placeholders = threadIds.joinToString(",") { "?" }
+            val values = ContentValues().apply { put(Telephony.Sms.READ, 1) }
             contentResolver.update(
                 Telephony.Sms.Inbox.CONTENT_URI,
                 values,
-                "thread_id = ? AND read = 0",
-                arrayOf(threadId.toString())
+                "thread_id IN ($placeholders) AND read = 0",
+                threadIds.map { it.toString() }.toTypedArray()
             )
             MainActivity.refreshThreadsIfActive()
         } catch (e: Exception) {
