@@ -1252,7 +1252,7 @@ class MainActivity : AppCompatActivity() {
         private val boundViewHolders = android.util.SparseArray<RecyclerView.ViewHolder>()
 
         private inner class CategoryPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            private val recycler: RecyclerView = itemView.findViewById(R.id.category_recycler)
+            private val recycler: RecyclerView = itemView.findViewById(R.id.page_recycler)
             private val adapter = ThreadAdapter(emptyList(), onThreadClick, onThreadAvatarClick, onThreadAvatarLongPress)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
@@ -1280,7 +1280,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         private inner class AllPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            private val recycler: RecyclerView = itemView.findViewById(R.id.all_recycler)
+            private val recycler: RecyclerView = itemView.findViewById(R.id.page_recycler)
             private val adapter = SearchResultAdapter(emptyList(), "", onAllItemClick)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
@@ -1307,7 +1307,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         private inner class OtpPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            private val recycler: RecyclerView = itemView.findViewById(R.id.otp_recycler)
+            private val recycler: RecyclerView = itemView.findViewById(R.id.page_recycler)
             private val adapter = OtpMessageAdapter(emptyList(), onOtpClick, onOtpAvatarClick, onOtpAvatarLongPress)
             private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
 
@@ -1345,8 +1345,8 @@ class MainActivity : AppCompatActivity() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
             val inflater = LayoutInflater.from(parent.context)
             return when (viewType) {
-                viewTypeAll -> AllPageViewHolder(inflater.inflate(R.layout.page_all_list, parent, false))
-                viewTypeOtp -> OtpPageViewHolder(inflater.inflate(R.layout.page_otp_list, parent, false))
+                viewTypeAll -> AllPageViewHolder(inflater.inflate(R.layout.page_thread_list, parent, false))
+                viewTypeOtp -> OtpPageViewHolder(inflater.inflate(R.layout.page_thread_list, parent, false))
                 else -> CategoryPageViewHolder(inflater.inflate(R.layout.page_thread_list, parent, false))
             }
         }
@@ -1371,9 +1371,9 @@ class MainActivity : AppCompatActivity() {
         fun scrollToTop(position: Int) {
             val holder = boundViewHolders.get(position) ?: return
             val recycler = when (holder) {
-                is AllPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.all_recycler)
-                is OtpPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.otp_recycler)
-                is CategoryPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.category_recycler)
+                is AllPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.page_recycler)
+                is OtpPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.page_recycler)
+                is CategoryPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.page_recycler)
                 else -> null
             }
             recycler?.smoothScrollToPosition(0)
@@ -1432,7 +1432,7 @@ class MainActivity : AppCompatActivity() {
             while (c.moveToNext()) {
                 val threadId = if (idxThread >= 0) c.getLong(idxThread) else -1L
                 val body = if (idxBody >= 0) c.getString(idxBody) ?: "" else ""
-                
+
                 // Check if this message is spam
                 if (SpamDetector.isSpam(body)) {
                     threadsWithSpam.add(threadId)
