@@ -1,123 +1,138 @@
-name: Build and Release APK
+name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'  # Triggers on tags like v1.0.0, v2.1.3, etc.
-  release:
-    types: [created]  # Triggers when a release is created via GitHub UI
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to build (e.g., v1.0.0)'
+      bump:
+        description: 'Version bump'
         required: true
-        type: string
+        default: auto
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
 
-permissions: write-all
+permissions:
+  contents: write
 
 jobs:
-  build:
-    name: Build Signed APK
+  release:
+    name: Build and Release
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Checkout code
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
-      
+          ref: main
+          fetch-depth: 0  # need full history + tags to derive the version
+
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+
+          if LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+            RANGE="$LATEST_TAG..HEAD"
+          else
+            LATEST_TAG="v0.0.0"
+            RANGE="HEAD"
+          fi
+          echo "Last release: $LATEST_TAG"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_TAG#v}"
+
+          BUMP="${{ inputs.bump }}"
+          if [ "$BUMP" = "auto" ]; then
+            LOG=$(git log "$RANGE" --pretty=%B)
+            if grep -qE '^(BREAKING[ -]CHANGE|[a-z]+(\(.+\))?!:)' <<< "$LOG"; then
+              BUMP=major
+            elif grep -qE '^feat(\(.+\))?:' <<< "$LOG"; then
+              BUMP=minor
+            else
+              BUMP=patch
+            fi
+            echo "Detected bump from commits: $BUMP"
+          fi
+
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          VERSION="$MAJOR.$MINOR.$PATCH"
+          # ponytail: breaks if minor or patch ever exceeds 99; widen the multipliers if that happens
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists"
+            exit 1
+          fi
+
+          echo "Releasing v$VERSION (versionCode $VERSION_CODE)"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+
+      - name: Update version in build.gradle.kts
+        run: |
+          set -euo pipefail
+          sed -i \
+            -e "s/versionCode = [0-9]*/versionCode = ${{ steps.version.outputs.version_code }}/" \
+            -e "s/versionName = \"[^\"]*\"/versionName = \"${{ steps.version.outputs.version }}\"/" \
+            app/build.gradle.kts
+          grep -E "versionCode|versionName" app/build.gradle.kts
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
-          cache: 'gradle'
-      
-      - name: Extract version from tag
-        id: version
-        run: |
-          # Extract version from tag (e.g., v1.0.0 -> 1.0.0)
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          VERSION=${TAG#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
-          
-          # Generate version code from version (e.g., 1.0.0 -> 10000, 1.2.3 -> 10203)
-          IFS='.' read -r -a version_parts <<< "$VERSION"
-          MAJOR=${version_parts[0]:-0}
-          MINOR=${version_parts[1]:-0}
-          PATCH=${version_parts[2]:-0}
-          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
-          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "Version Code: $VERSION_CODE"
-      
-      - name: Update version in build.gradle.kts
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          VERSION_CODE="${{ steps.version.outputs.version_code }}"
-          
-          # Update versionCode and versionName in app/build.gradle.kts
-          sed -i "s/versionCode = [0-9]*/versionCode = $VERSION_CODE/" app/build.gradle.kts
-          sed -i "s/versionName = \"[^\"]*\"/versionName = \"$VERSION\"/" app/build.gradle.kts
-          
-          echo "Updated build.gradle.kts with version $VERSION (code: $VERSION_CODE)"
-          grep -A 2 "versionCode" app/build.gradle.kts
-      
-      - name: Decode Keystore
+          cache: gradle
+
+      - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > keystore.jks
-      
-      - name: Create keystore.properties
+          {
+            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+            echo "storeFile=keystore.jks"
+          } > keystore.properties
+
+      - name: Build release APK and AAB
         run: |
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > keystore.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> keystore.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> keystore.properties
-          echo "storeFile=keystore.jks" >> keystore.properties
-      
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-      
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
-      
-      - name: Build Release AAB
-        run: ./gradlew bundleRelease --stacktrace
-      
-      - name: Rename APK and AAB
+          chmod +x ./gradlew
+          ./gradlew assembleRelease bundleRelease --stacktrace
+          mv app/build/outputs/apk/release/app-release.apk "CleanSMS-v${{ steps.version.outputs.version }}.apk"
+          mv app/build/outputs/bundle/release/app-release.aab "CleanSMS-v${{ steps.version.outputs.version }}.aab"
+
+      # Only touch main once the build has actually succeeded.
+      - name: Commit version bump and tag
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          mv app/build/outputs/apk/release/app-release.apk "CleanSMS-v${VERSION}.apk"
-          mv app/build/outputs/bundle/release/app-release.aab "CleanSMS-v${VERSION}.aab"
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore: release v${{ steps.version.outputs.version }}"
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin main
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Clean SMS v${{ steps.version.outputs.version }}
+          generate_release_notes: true
           files: |
             CleanSMS-v${{ steps.version.outputs.version }}.apk
             CleanSMS-v${{ steps.version.outputs.version }}.aab
-          generate_release_notes: true
           body: |
-            ## Clean SMS v${{ steps.version.outputs.version }}
-            
             ### 📱 Installation
-            Download the APK file below and install it on your Android device.
-            
-            **Minimum Android Version:** Android 13 (API 33)
-            
-            ### 📝 Changes
-            See the release notes below for what's new in this version.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload APK and AAB as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: CleanSMS-v${{ steps.version.outputs.version }}
-          path: |
-            CleanSMS-v${{ steps.version.outputs.version }}.apk
-            CleanSMS-v${{ steps.version.outputs.version }}.aab
-          retention-days: 90
+
+            Download the APK below and install it on your Android device.
+
+            **Minimum Android version:** Android 13 (API 33)
