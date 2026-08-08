@@ -277,8 +277,19 @@ class DebugSeedReceiver : BroadcastReceiver() {
             Seed("JM-NETFLX-S",
                 "Your Netflix subscription renewed for Rs.499. Next billing date: 19-Jun-26. Manage at netflix.com/account",
                 ageMinutes = 2000, read = true),
-            Seed("DZ-IRCTC-S",
-                "Train 12951 Mumbai Rajdhani dep NDLS 16.55 on 22-May. PNR 8472938102. S6/24, LB. Travel safe. -IRCTC",
+            Seed("VM-IRSMSa-G",
+                """
+                    PNR-6503906054
+                    Trn:13017
+                    Dt:22-05-26 Dep.Time-06:05 Hrs.
+                    Frm HWH to SNT
+                    Cls:SL
+                    P1-S1,57
+                    Boarding allowed from HWH only
+                    Chart Prepared
+                    Url for coach position: https://enquiry.indianrail.gov.in/mntes/C?u=fheflNv4vNggejgkN8f
+                    Download RailOne for latest updates https://railone.indianrailways.gov.in
+                    For Enquiry/Complaint/Assistance, please dial 139 IR-CRIS""".trimIndent(),
                 ageMinutes = 3000, read = true),
             Seed("VM-INDIGO-S",
                 "Your Indigo flight 6E-234 BLR->DEL on 25-May dep 07.30 is on time. Web check-in open at goindigo.in/webcheckin",
