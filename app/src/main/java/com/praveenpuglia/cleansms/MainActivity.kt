@@ -1,6 +1,9 @@
 package com.praveenpuglia.cleansms
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.ContentUris
@@ -13,35 +16,22 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageButton
-import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import androidx.viewpager2.widget.ViewPager2
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import com.google.i18n.phonenumbers.NumberParseException
 import android.provider.ContactsContract
-import com.google.android.material.badge.BadgeDrawable
-import com.google.android.material.color.MaterialColors
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayoutMediator
+import com.praveenpuglia.cleansms.ui.inbox.InboxPage
+import com.praveenpuglia.cleansms.ui.inbox.InboxScreen
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingScreen
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingUiState
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
@@ -126,18 +116,10 @@ class MainActivity : AppCompatActivity() {
     
     // Category filtering state - will be initialized in onCreate
     private lateinit var selectedCategory: MessageCategory
-    private var allThreads: List<ThreadItem> = emptyList()
-    private var otpMessages: List<OtpMessageItem> = emptyList()
+    private var allThreads by mutableStateOf<List<ThreadItem>>(emptyList())
+    private var otpMessages by mutableStateOf<List<OtpMessageItem>>(emptyList())
+    private var allTabItems by mutableStateOf<List<SearchResultItem>>(emptyList())
     private var initialPageApplied = false
-
-    private lateinit var categoryTabs: TabLayout
-    private lateinit var threadsPager: ViewPager2
-    private lateinit var threadsPagerAdapter: ThreadCategoryPagerAdapter
-    private lateinit var headerTitle: TextView
-    private lateinit var deleteButton: ImageButton
-    private lateinit var selectAllButton: ImageButton
-    private lateinit var newMessageFab: com.google.android.material.floatingactionbutton.FloatingActionButton
-    private var tabLayoutMediator: TabLayoutMediator? = null
     private val categories = listOf(
         MessageCategory.PERSONAL,
         MessageCategory.TRANSACTIONAL,
@@ -148,157 +130,107 @@ class MainActivity : AppCompatActivity() {
     private var pagerPages: List<InboxPage> = buildPagerPages(allTabEnabled = false)
     private var lastAppliedAllTabEnabled: Boolean = false
     private var lastAppliedFontFamily: SettingsActivity.FontFamily = SettingsActivity.FontFamily.SANS_SERIF
+    private var selectedPageIndex by mutableIntStateOf(0)
+    private var scrollToTopRequest by mutableIntStateOf(0)
+    private var permissionRequired by mutableStateOf(false)
+    private var showOnboarding by mutableStateOf(true)
+    private var showDeleteDialog by mutableStateOf(false)
+    private var promoMuted by mutableStateOf(false)
 
     private fun buildPagerPages(allTabEnabled: Boolean): List<InboxPage> {
         val base = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) }
         return if (allTabEnabled) listOf(InboxPage.All) + base else base
     }
-    private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
-        override fun onPageSelected(position: Int) {
-            super.onPageSelected(position)
-            val page = pagerPages.getOrNull(position)
-            if (page is InboxPage.CategoryPage) {
-                selectedCategory = page.category
-            }
-        }
-    }
-
-    private var selectionMode: Boolean = false
-    private val selectedThreadIds = LinkedHashSet<Long>()
-    private val selectedMessageIds = LinkedHashSet<Long>()
+    private var selectionMode by mutableStateOf(false)
+    private var selectedThreadIds by mutableStateOf<Set<Long>>(emptySet())
+    private var selectedMessageIds by mutableStateOf<Set<Long>>(emptySet())
     
     // Search state
-    private var isSearchMode: Boolean = false
+    private var isSearchMode by mutableStateOf(false)
+    private var searchQuery by mutableStateOf("")
     private var allMessagesForSearch: List<SearchResultItem> = emptyList()
-    private lateinit var searchBarContainer: View
-    private lateinit var headerContainer: View
-    private lateinit var searchInput: android.widget.EditText
-    private lateinit var searchClearButton: ImageButton
-    private lateinit var searchResultsRecycler: RecyclerView
-    private var searchResultAdapter: SearchResultAdapter? = null
+    private var searchResults by mutableStateOf<List<SearchResultItem>>(emptyList())
     private val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var searchRunnable: Runnable? = null
     private val searchDebounceMs = 300L
 
     // Unread filter state
-    private var unreadOnlyFilter: Boolean = false
-    private lateinit var unreadFilterBar: View
-    private lateinit var unreadFilterChip: com.google.android.material.chip.Chip
+    private var unreadOnlyFilter by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         FontThemeHelper.apply(this)
-        // Apply saved theme before setting content view
         AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
-        
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        findViewById<ComposeView>(R.id.setup_screen).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                CleanSmsTheme {
+
+        selectedCategory = getInitialCategory()
+        lastAppliedAllTabEnabled = SettingsActivity.getAllTabEnabled(this)
+        lastAppliedFontFamily = SettingsActivity.getFontFamily(this)
+        pagerPages = buildPagerPages(lastAppliedAllTabEnabled)
+        selectedPageIndex = getInitialPageIndexForTab(SettingsActivity.getDefaultTab(this))
+
+        setContent {
+            CleanSmsTheme {
+                if (showOnboarding) {
                     OnboardingScreen(
                         state = onboardingUiState,
                         onSetDefault = ::requestDefaultSmsRole,
                         onAllowBackground = ::requestBatteryOptimizationExemption,
                         onContinue = ::completeOnboarding,
                     )
+                } else {
+                    InboxScreen(
+                        pages = pagerPages,
+                        selectedPageIndex = selectedPageIndex,
+                        scrollToTopRequest = scrollToTopRequest,
+                        allThreads = allThreads,
+                        otpMessages = otpMessages,
+                        allItems = allTabItems,
+                        searchResults = searchResults,
+                        searchMode = isSearchMode,
+                        searchQuery = searchQuery,
+                        unreadOnly = unreadOnlyFilter,
+                        selectionMode = selectionMode,
+                        selectedThreadIds = selectedThreadIds,
+                        selectedMessageIds = selectedMessageIds,
+                        promoMuted = promoMuted,
+                        permissionRequired = permissionRequired,
+                        showDeleteDialog = showDeleteDialog,
+                        onPageSelected = ::selectPage,
+                        onSearchModeChange = { enabled -> if (enabled) enterSearchMode() else exitSearchMode() },
+                        onSearchQueryChange = ::updateSearchQuery,
+                        onUnreadOnlyChange = ::setUnreadFilter,
+                        onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
+                        onNewMessage = { startActivity(Intent(this, NewMessageActivity::class.java)) },
+                        onThreadClick = ::handleThreadClick,
+                        onThreadAvatarClick = ::handleThreadAvatarClick,
+                        onThreadLongClick = ::startThreadSelection,
+                        onOtpClick = ::handleOtpClick,
+                        onOtpAvatarClick = ::handleOtpAvatarClick,
+                        onOtpLongClick = ::startOtpSelection,
+                        onCopyOtp = ::copyOtp,
+                        onMessageClick = ::handleSearchResultClick,
+                        onSelectAll = ::toggleSelectAll,
+                        onDeleteRequest = ::confirmDeleteSelection,
+                        onDeleteConfirm = ::performDeletion,
+                        onDeleteDismiss = { showDeleteDialog = false },
+                    )
                 }
             }
         }
 
-        // Initialize selectedCategory based on user preference
-        selectedCategory = getInitialCategory()
-
-        categoryTabs = findViewById(R.id.category_tabs)
-        threadsPager = findViewById(R.id.threads_pager)
-        headerTitle = findViewById(R.id.header_title)
-        deleteButton = findViewById(R.id.header_delete_button)
-        selectAllButton = findViewById(R.id.header_select_all_button)
-        newMessageFab = findViewById(R.id.new_message_fab)
-        
-        // Initialize unread filter views
-        unreadFilterBar = findViewById(R.id.unread_filter_bar)
-        unreadFilterChip = findViewById(R.id.unread_filter_chip)
-        unreadFilterChip.setOnCloseIconClickListener { setUnreadFilter(false) }
-        unreadFilterChip.setOnClickListener { setUnreadFilter(false) }
-        
-        newMessageFab.setOnClickListener {
-            val intent = Intent(this, NewMessageActivity::class.java)
-            startActivity(intent)
-        }
-        
-        // Setup overflow menu
-        setupOverflowMenu()
-        
-        // Initialize search views
-        setupSearch()
-        
-        // Handle back press with modern callback
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
                     isSearchMode -> exitSearchMode()
                     selectionMode -> exitSelectionMode()
                     else -> {
-                        // Temporarily disable to allow system back handling
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()
-                        // Re-enable for future back presses (in case activity isn't finished)
                         isEnabled = true
                     }
                 }
             }
         })
-        
-        // Apply saved "All tab" preference before adapter is built
-        lastAppliedAllTabEnabled = SettingsActivity.getAllTabEnabled(this)
-        lastAppliedFontFamily = SettingsActivity.getFontFamily(this)
-        pagerPages = buildPagerPages(lastAppliedAllTabEnabled)
-
-        // Set initial page based on user preference before data loads to prevent flicker
-        val defaultTab = SettingsActivity.getDefaultTab(this)
-        val initialPageIndex = getInitialPageIndexForTab(defaultTab)
-
-        threadsPagerAdapter = ThreadCategoryPagerAdapter(
-            pagerPages,
-            onThreadClick = { threadItem -> handleThreadClick(threadItem) },
-            onThreadAvatarClick = { threadItem -> handleThreadAvatarClick(threadItem) },
-            onThreadAvatarLongPress = { threadItem -> startThreadSelection(threadItem) },
-            onOtpClick = { otpItem -> handleOtpClick(otpItem) },
-            onOtpAvatarClick = { otpItem -> handleOtpAvatarClick(otpItem) },
-            onOtpAvatarLongPress = { otpItem -> startOtpSelection(otpItem) },
-            onAllItemClick = { item -> handleSearchResultClick(item) }
-        )
-        threadsPager.adapter = threadsPagerAdapter
-        
-        // Set initial page immediately to avoid flicker
-        if (initialPageIndex in pagerPages.indices) {
-            threadsPager.setCurrentItem(initialPageIndex, false)
-        }
-        
-        threadsPager.registerOnPageChangeCallback(pageChangeCallback)
-        tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager, false) { tab, position ->
-            applyTabCustomView(tab, pagerPages[position])
-        }.also { it.attach() }
-        updateTabMuteIcons()
-        
-        // Scroll to top when re-tapping the current tab
-        categoryTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab?) {}
-            override fun onTabUnselected(tab: TabLayout.Tab?) {}
-            override fun onTabReselected(tab: TabLayout.Tab?) {
-                tab?.position?.let { position ->
-                    threadsPagerAdapter.scrollToTop(position)
-                }
-            }
-        })
-        
-        categoryTabs.visibility = View.GONE
-
-        deleteButton.setOnClickListener { confirmDeleteSelection() }
-        selectAllButton.setOnClickListener { toggleSelectAll() }
-        updateSelectionUi()
-
         setupDefaultSmsUi()
     }
 
@@ -316,40 +248,7 @@ class MainActivity : AppCompatActivity() {
         if (hasReadPermission()) {
             refreshThreadsAsync()
         }
-        updateTabMuteIcons()
-        // Restore search UI if we were in search mode (returning from thread detail)
-        if (isSearchMode) {
-            restoreSearchModeUi()
-        }
-    }
-
-    private fun applyTabCustomView(tab: TabLayout.Tab, page: InboxPage) {
-        if (tab.customView == null) {
-            tab.setCustomView(R.layout.tab_inbox)
-        }
-        val custom = tab.customView ?: return
-        custom.findViewById<TextView>(R.id.tab_text)?.text = labelForPage(page)
-        // Disable clipping on the parent TabView so the unread dot can overflow tab bounds
-        var parent = custom.parent as? android.view.ViewGroup
-        while (parent != null) {
-            parent.clipChildren = false
-            parent.clipToPadding = false
-            if (parent === categoryTabs) break
-            parent = parent.parent as? android.view.ViewGroup
-        }
-    }
-
-    private fun updateTabMuteIcons() {
-        if (categoryTabs.tabCount != pagerPages.size) return
-        val promoMuted = !SettingsActivity.getPromoNotificationsEnabled(this)
-        for (index in pagerPages.indices) {
-            val tab = categoryTabs.getTabAt(index) ?: continue
-            val page = pagerPages[index]
-            val showMute = promoMuted &&
-                page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL
-            tab.customView?.findViewById<android.widget.ImageView>(R.id.tab_mute_icon)?.visibility =
-                if (showMute) View.VISIBLE else View.GONE
-        }
+        promoMuted = !SettingsActivity.getPromoNotificationsEnabled(this)
     }
 
     override fun onPause() {
@@ -358,8 +257,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        tabLayoutMediator?.detach()
-        threadsPager.unregisterOnPageChangeCallback(pageChangeCallback)
+        searchRunnable?.let(searchHandler::removeCallbacks)
         super.onDestroy()
     }
 
@@ -378,29 +276,11 @@ class MainActivity : AppCompatActivity() {
         
         Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored hasCompletedOnboarding=$hasCompletedOnboarding")
         
-        val setupScreen = findViewById<View>(R.id.setup_screen)
-        val header = findViewById<View>(R.id.header_container)
-        
-        // Show setup screen if not default SMS app OR if user hasn't clicked Continue yet
         if (!isDefault || !hasCompletedOnboarding) {
-            // Show setup screen, hide everything else
-            setupScreen.visibility = View.VISIBLE
-            header.visibility = View.GONE
-            categoryTabs.visibility = View.GONE
-            threadsPager.visibility = View.GONE
-            newMessageFab.visibility = View.GONE
-            findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
-            findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
-            findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
-            
+            showOnboarding = true
+            permissionRequired = false
         } else {
-            // Hide setup screen, show normal UI
-            setupScreen.visibility = View.GONE
-            header.visibility = View.VISIBLE
-            findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
-            findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
-            
-            // Proceed with permission check/display
+            showOnboarding = false
             if (hasReadPermission()) {
                 showThreadsUi()
             } else {
@@ -442,11 +322,7 @@ class MainActivity : AppCompatActivity() {
             .edit()
             .putBoolean(PREF_ONBOARDING_COMPLETED, true)
             .apply()
-
-        findViewById<View>(R.id.setup_screen).visibility = View.GONE
-        findViewById<View>(R.id.header_container).visibility = View.VISIBLE
-        findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
-        findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
+        showOnboarding = false
 
         if (hasReadPermission()) {
             showThreadsUi()
@@ -461,7 +337,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun reloadInboxData() {
-        val restorePageIndex = if (initialPageApplied) threadsPager.currentItem else null
+        val restorePageIndex = if (initialPageApplied) selectedPageIndex else null
         Thread {
             val threads = loadSmsThreads()
             val otpRaw = loadOtpMessages()
@@ -584,46 +460,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showThreadsUi() {
-        findViewById<TextView>(R.id.permission_instructions).visibility = View.GONE
-        // Don't show threads UI if we're in search mode
-        if (!isSearchMode) {
-            categoryTabs.visibility = View.VISIBLE
-            threadsPager.visibility = View.VISIBLE
-            newMessageFab.visibility = View.VISIBLE
-        }
-        ViewCompat.requestApplyInsets(threadsPager)
+        permissionRequired = false
         reloadInboxData()
     }
 
     private fun updatePagerContent(restorePageIndex: Int?) {
         pruneSelection()
-        
-        // Apply unread filter if enabled
-        val filteredThreads = if (unreadOnlyFilter) {
-            allThreads.filter { it.hasUnread }
-        } else {
-            allThreads
-        }
-        val filteredOtp = if (unreadOnlyFilter) {
-            otpMessages.filter { it.isUnread }
-        } else {
-            otpMessages
-        }
-        
-        val grouped = categories.associateWith { category ->
-            filteredThreads.filter { it.category == category }
-        }
-        threadsPagerAdapter.updateAll(filteredOtp, grouped)
-        if (pagerPages.any { it is InboxPage.All }) {
-            loadAllItemsForAllTab()
-        }
+        if (pagerPages.any { it is InboxPage.All }) loadAllItemsForAllTab()
         updateSelectionUi()
-        updateTabBadges()
         val restoreIndex = restorePageIndex
         if (restoreIndex != null && restoreIndex in pagerPages.indices) {
-            if (threadsPager.currentItem != restoreIndex) {
-                threadsPager.setCurrentItem(restoreIndex, false)
-            }
+            selectedPageIndex = restoreIndex
             return
         }
         if (!initialPageApplied) {
@@ -632,18 +479,7 @@ class MainActivity : AppCompatActivity() {
         val desiredIndex = pagerPages.indexOfFirst { page ->
             page is InboxPage.CategoryPage && page.category == selectedCategory
         }
-        if (desiredIndex >= 0) {
-            val currentPage = pagerPages.getOrNull(threadsPager.currentItem)
-            if (currentPage is InboxPage.CategoryPage && threadsPager.currentItem != desiredIndex) {
-                threadsPager.setCurrentItem(desiredIndex, false)
-            }
-        }
-    }
-
-    private fun labelForPage(page: InboxPage): String = when (page) {
-        InboxPage.All -> getString(R.string.tab_all)
-        InboxPage.Otp -> getString(R.string.tab_otp)
-        is InboxPage.CategoryPage -> labelForCategory(page.category)
+        if (desiredIndex >= 0 && pagerPages.getOrNull(selectedPageIndex) is InboxPage.CategoryPage) selectedPageIndex = desiredIndex
     }
 
     private fun getInitialCategory(): MessageCategory {
@@ -698,32 +534,6 @@ class MainActivity : AppCompatActivity() {
     private fun applyInitialPageIfNeeded() {
         if (initialPageApplied) return
         initialPageApplied = true
-    }
-
-    private fun updateTabBadges() {
-        if (categoryTabs.tabCount != pagerPages.size) return
-        updateTabMuteIcons()
-        for (index in pagerPages.indices) {
-            val tab = categoryTabs.getTabAt(index) ?: continue
-            val hasUnread = when (val page = pagerPages[index]) {
-                is InboxPage.All -> allThreads.any { it.hasUnread } || otpMessages.any { it.isUnread }
-                is InboxPage.Otp -> otpMessages.any { it.isUnread }
-                is InboxPage.CategoryPage -> allThreads.any { it.category == page.category && it.hasUnread }
-            }
-            tab.removeBadge()
-            tab.customView?.findViewById<View>(R.id.tab_unread_dot)?.visibility =
-                if (hasUnread) View.VISIBLE else View.GONE
-        }
-    }
-
-
-    private fun labelForCategory(category: MessageCategory): String = when (category) {
-        MessageCategory.PERSONAL -> getString(R.string.category_personal)
-        MessageCategory.TRANSACTIONAL -> getString(R.string.category_transactions)
-        MessageCategory.SERVICE -> getString(R.string.category_service)
-        MessageCategory.PROMOTIONAL -> getString(R.string.category_promotions)
-        MessageCategory.GOVERNMENT -> getString(R.string.category_government)
-        MessageCategory.UNKNOWN -> getString(R.string.category_unknown)
     }
 
     private fun openThreadDetail(threadItem: ThreadItem, targetMessageId: Long? = null) {
@@ -820,21 +630,19 @@ class MainActivity : AppCompatActivity() {
     private fun startThreadSelection(item: ThreadItem) {
         if (!selectionMode) {
             selectionMode = true
-            selectedThreadIds.clear()
-            selectedMessageIds.clear()
+            selectedThreadIds = emptySet()
+            selectedMessageIds = emptySet()
         }
-        selectedThreadIds.add(item.threadId)
-        updateSelectionUi()
+        selectedThreadIds = selectedThreadIds + item.threadId
     }
 
     private fun startOtpSelection(item: OtpMessageItem) {
         if (!selectionMode) {
             selectionMode = true
-            selectedThreadIds.clear()
-            selectedMessageIds.clear()
+            selectedThreadIds = emptySet()
+            selectedMessageIds = emptySet()
         }
-        selectedMessageIds.add(item.messageId)
-        updateSelectionUi()
+        selectedMessageIds = selectedMessageIds + item.messageId
     }
 
     private fun toggleThreadSelection(item: ThreadItem) {
@@ -842,13 +650,10 @@ class MainActivity : AppCompatActivity() {
             startThreadSelection(item)
             return
         }
-        if (!selectedThreadIds.add(item.threadId)) {
-            selectedThreadIds.remove(item.threadId)
-        }
+        selectedThreadIds = if (item.threadId in selectedThreadIds) selectedThreadIds - item.threadId else selectedThreadIds + item.threadId
         if (selectionMode && selectionCount() == 0) {
             exitSelectionMode()
         } else {
-            updateSelectionUi()
         }
     }
 
@@ -857,54 +662,30 @@ class MainActivity : AppCompatActivity() {
             startOtpSelection(item)
             return
         }
-        if (!selectedMessageIds.add(item.messageId)) {
-            selectedMessageIds.remove(item.messageId)
-        }
+        selectedMessageIds = if (item.messageId in selectedMessageIds) selectedMessageIds - item.messageId else selectedMessageIds + item.messageId
         if (selectionMode && selectionCount() == 0) {
             exitSelectionMode()
         } else {
-            updateSelectionUi()
         }
     }
 
     private fun selectionCount(): Int = selectedThreadIds.size + selectedMessageIds.size
 
     private fun updateSelectionUi() {
-        if (!::headerTitle.isInitialized || !::deleteButton.isInitialized || !::selectAllButton.isInitialized) return
-        val count = selectionCount()
-        if (selectionMode) {
-            headerTitle.text = getString(R.string.selection_count, count)
-            deleteButton.visibility = View.VISIBLE
-            deleteButton.isEnabled = count > 0
-            selectAllButton.visibility = View.VISIBLE
-        } else {
-            headerTitle.text = getString(R.string.header_messages)
-            deleteButton.visibility = View.INVISIBLE
-            deleteButton.isEnabled = false
-            selectAllButton.visibility = View.INVISIBLE
-        }
-        if (::threadsPagerAdapter.isInitialized) {
-            threadsPagerAdapter.updateSelectionState(selectionMode, selectedThreadIds, selectedMessageIds)
-            // notifyDataSetChanged inside updateSelectionState triggers TabLayoutMediator to
-            // re-populate tabs, which resets each tab's custom view to its XML defaults.
-            // Re-apply the unread dots and the Promotions mute icon so they survive selection.
-            updateTabBadges()
-        }
+        if (selectionMode && selectionCount() == 0) exitSelectionMode()
     }
 
     private fun exitSelectionMode() {
         if (!selectionMode && selectedThreadIds.isEmpty() && selectedMessageIds.isEmpty()) return
         selectionMode = false
-        selectedThreadIds.clear()
-        selectedMessageIds.clear()
-        updateSelectionUi()
+        selectedThreadIds = emptySet()
+        selectedMessageIds = emptySet()
     }
 
     private fun toggleSelectAll() {
         if (!selectionMode) return
 
-        val currentPageIndex = threadsPager.currentItem
-        val currentPage = pagerPages.getOrNull(currentPageIndex) ?: return
+        val currentPage = pagerPages.getOrNull(selectedPageIndex) ?: return
 
         // Get filtered items based on unread filter
         val filteredThreads = if (unreadOnlyFilter) {
@@ -928,14 +709,14 @@ class MainActivity : AppCompatActivity() {
 
                 if (allSelected) {
                     // Deselect all OTP messages
-                    selectedMessageIds.removeAll(allOtpIds)
+                    selectedMessageIds = selectedMessageIds - allOtpIds
                     if (selectionCount() == 0) {
                         exitSelectionMode()
                         return
                     }
                 } else {
                     // Select all OTP messages
-                    selectedMessageIds.addAll(allOtpIds)
+                    selectedMessageIds = selectedMessageIds + allOtpIds
                 }
             }
             is InboxPage.CategoryPage -> {
@@ -945,18 +726,17 @@ class MainActivity : AppCompatActivity() {
 
                 if (allSelected) {
                     // Deselect all threads in this category
-                    selectedThreadIds.removeAll(allThreadIdsInCategory)
+                    selectedThreadIds = selectedThreadIds - allThreadIdsInCategory
                     if (selectionCount() == 0) {
                         exitSelectionMode()
                         return
                     }
                 } else {
                     // Select all threads in this category
-                    selectedThreadIds.addAll(allThreadIdsInCategory)
+                    selectedThreadIds = selectedThreadIds + allThreadIdsInCategory
                 }
             }
         }
-        updateSelectionUi()
     }
 
     private fun confirmDeleteSelection() {
@@ -965,20 +745,11 @@ class MainActivity : AppCompatActivity() {
             exitSelectionMode()
             return
         }
-        val message = if (totalSelected == 1) {
-            getString(R.string.dialog_delete_message_single)
-        } else {
-            getString(R.string.dialog_delete_message_multiple, totalSelected)
-        }
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.dialog_delete_title)
-            .setMessage(message)
-            .setNegativeButton(R.string.dialog_delete_negative, null)
-            .setPositiveButton(R.string.dialog_delete_positive) { _, _ -> performDeletion() }
-            .show()
+        showDeleteDialog = true
     }
 
     private fun performDeletion() {
+        showDeleteDialog = false
         val threadIds = selectedThreadIds.toSet()
         val messageIds = selectedMessageIds.toSet()
         if (threadIds.isEmpty() && messageIds.isEmpty()) {
@@ -1029,8 +800,16 @@ class MainActivity : AppCompatActivity() {
         var changed = false
         val validThreadIds = allThreads.map { it.threadId }.toSet()
         val validMessageIds = otpMessages.map { it.messageId }.toSet()
-        if (selectedThreadIds.retainAll(validThreadIds)) changed = true
-        if (selectedMessageIds.retainAll(validMessageIds)) changed = true
+        val retainedThreads = selectedThreadIds.intersect(validThreadIds)
+        val retainedMessages = selectedMessageIds.intersect(validMessageIds)
+        if (retainedThreads != selectedThreadIds) {
+            selectedThreadIds = retainedThreads
+            changed = true
+        }
+        if (retainedMessages != selectedMessageIds) {
+            selectedMessageIds = retainedMessages
+            changed = true
+        }
         if (selectionMode && selectionCount() == 0) {
             exitSelectionMode()
             return true
@@ -1203,9 +982,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showInstructionsUi() {
-        findViewById<TextView>(R.id.permission_instructions).visibility = View.VISIBLE
-        categoryTabs.visibility = View.GONE
-        threadsPager.visibility = View.GONE
+        permissionRequired = true
     }
 
     private fun hasReadPermission(): Boolean {
@@ -1224,194 +1001,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 showInstructionsUi()
             }
-        }
-    }
-
-    private sealed class InboxPage {
-        object All : InboxPage()
-        object Otp : InboxPage()
-        data class CategoryPage(val category: MessageCategory) : InboxPage()
-    }
-
-    private inner class ThreadCategoryPagerAdapter(
-        private val pages: List<InboxPage>,
-        private val onThreadClick: (ThreadItem) -> Unit,
-        private val onThreadAvatarClick: (ThreadItem) -> Unit,
-        private val onThreadAvatarLongPress: (ThreadItem) -> Unit,
-        private val onOtpClick: (OtpMessageItem) -> Unit,
-        private val onOtpAvatarClick: (OtpMessageItem) -> Unit,
-        private val onOtpAvatarLongPress: (OtpMessageItem) -> Unit,
-        private val onAllItemClick: (SearchResultItem) -> Unit
-    ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
-        private val itemsByCategory = pages
-            .filterIsInstance<InboxPage.CategoryPage>()
-            .associate { it.category to emptyList<ThreadItem>() }
-            .toMutableMap()
-        private var otpItems: List<OtpMessageItem> = emptyList()
-        private var allItems: List<SearchResultItem> = emptyList()
-        private val viewTypeOtp = 0
-        private val viewTypeCategory = 1
-        private val viewTypeAll = 2
-        private var selectionMode: Boolean = false
-        private var selectedThreadIds: Set<Long> = emptySet()
-        private var selectedOtpIds: Set<Long> = emptySet()
-        private val boundViewHolders = android.util.SparseArray<RecyclerView.ViewHolder>()
-
-        private inner class CategoryPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            private val recycler: RecyclerView = itemView.findViewById(R.id.category_recycler)
-            private val adapter = ThreadAdapter(emptyList(), onThreadClick, onThreadAvatarClick, onThreadAvatarLongPress)
-            private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
-
-            init {
-                recycler.layoutManager = LinearLayoutManager(itemView.context)
-                recycler.adapter = adapter
-                recycler.clipToPadding = false
-                ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
-                    val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                    view.setPadding(
-                        view.paddingLeft,
-                        view.paddingTop,
-                        view.paddingRight,
-                        baseBottomPadding + systemInsets.bottom
-                    )
-                    insets
-                }
-                ViewCompat.requestApplyInsets(recycler)
-            }
-
-            fun bind(category: MessageCategory) {
-                adapter.updateItems(itemsByCategory[category] ?: emptyList())
-                adapter.updateSelectionState(selectionMode, selectedThreadIds)
-            }
-        }
-
-        private inner class AllPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            private val recycler: RecyclerView = itemView.findViewById(R.id.all_recycler)
-            private val adapter = SearchResultAdapter(emptyList(), "", onAllItemClick)
-            private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
-
-            init {
-                recycler.layoutManager = LinearLayoutManager(itemView.context)
-                recycler.adapter = adapter
-                recycler.clipToPadding = false
-                ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
-                    val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                    view.setPadding(
-                        view.paddingLeft,
-                        view.paddingTop,
-                        view.paddingRight,
-                        baseBottomPadding + systemInsets.bottom
-                    )
-                    insets
-                }
-                ViewCompat.requestApplyInsets(recycler)
-            }
-
-            fun bind(items: List<SearchResultItem>) {
-                adapter.updateResults(items, "")
-            }
-        }
-
-        private inner class OtpPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            private val recycler: RecyclerView = itemView.findViewById(R.id.otp_recycler)
-            private val adapter = OtpMessageAdapter(emptyList(), onOtpClick, onOtpAvatarClick, onOtpAvatarLongPress)
-            private val baseBottomPadding = itemView.resources.getDimensionPixelSize(R.dimen.thread_list_bottom_padding)
-
-            init {
-                recycler.layoutManager = LinearLayoutManager(itemView.context)
-                recycler.adapter = adapter
-                recycler.clipToPadding = false
-                ViewCompat.setOnApplyWindowInsetsListener(recycler) { view, insets ->
-                    val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                    view.setPadding(
-                        view.paddingLeft,
-                        view.paddingTop,
-                        view.paddingRight,
-                        baseBottomPadding + systemInsets.bottom
-                    )
-                    insets
-                }
-                ViewCompat.requestApplyInsets(recycler)
-            }
-
-            fun bind(items: List<OtpMessageItem>) {
-                adapter.updateItems(items)
-                adapter.updateSelectionState(selectionMode, selectedOtpIds)
-            }
-        }
-
-        override fun getItemViewType(position: Int): Int {
-            return when (pages[position]) {
-                is InboxPage.All -> viewTypeAll
-                is InboxPage.Otp -> viewTypeOtp
-                is InboxPage.CategoryPage -> viewTypeCategory
-            }
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            val inflater = LayoutInflater.from(parent.context)
-            return when (viewType) {
-                viewTypeAll -> AllPageViewHolder(inflater.inflate(R.layout.page_all_list, parent, false))
-                viewTypeOtp -> OtpPageViewHolder(inflater.inflate(R.layout.page_otp_list, parent, false))
-                else -> CategoryPageViewHolder(inflater.inflate(R.layout.page_thread_list, parent, false))
-            }
-        }
-
-        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            boundViewHolders.put(position, holder)
-            when (val page = pages[position]) {
-                is InboxPage.All -> (holder as AllPageViewHolder).bind(allItems)
-                is InboxPage.Otp -> (holder as OtpPageViewHolder).bind(otpItems)
-                is InboxPage.CategoryPage -> (holder as CategoryPageViewHolder).bind(page.category)
-            }
-        }
-
-        override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
-            super.onViewRecycled(holder)
-            val key = boundViewHolders.indexOfValue(holder)
-            if (key >= 0) {
-                boundViewHolders.removeAt(key)
-            }
-        }
-
-        fun scrollToTop(position: Int) {
-            val holder = boundViewHolders.get(position) ?: return
-            val recycler = when (holder) {
-                is AllPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.all_recycler)
-                is OtpPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.otp_recycler)
-                is CategoryPageViewHolder -> holder.itemView.findViewById<RecyclerView>(R.id.category_recycler)
-                else -> null
-            }
-            recycler?.smoothScrollToPosition(0)
-        }
-
-        override fun getItemCount(): Int = pages.size
-
-        fun updateAll(otp: List<OtpMessageItem>, grouped: Map<MessageCategory, List<ThreadItem>>) {
-            otpItems = otp
-            grouped.forEach { (category, items) ->
-                if (itemsByCategory.containsKey(category)) {
-                    itemsByCategory[category] = items
-                }
-            }
-            notifyDataSetChanged()
-        }
-
-        fun updateAllItems(items: List<SearchResultItem>) {
-            allItems = items
-            val allIndex = pages.indexOfFirst { it is InboxPage.All }
-            if (allIndex >= 0) notifyItemChanged(allIndex)
-        }
-
-        fun updateSelectionState(selectionEnabled: Boolean, threadIds: Set<Long>, otpIds: Set<Long>) {
-            val threadCopy = threadIds.toSet()
-            val otpCopy = otpIds.toSet()
-            val changed = selectionMode != selectionEnabled || selectedThreadIds != threadCopy || selectedOtpIds != otpCopy
-            selectionMode = selectionEnabled
-            selectedThreadIds = threadCopy
-            selectedOtpIds = otpCopy
-            if (changed) notifyDataSetChanged()
         }
     }
 
@@ -1797,174 +1386,44 @@ class MainActivity : AppCompatActivity() {
     
     // ========== Overflow Menu ==========
     
-    private fun setupOverflowMenu() {
-        val overflowButton = findViewById<ImageButton>(R.id.overflow_menu_button)
-        overflowButton.setOnClickListener { view ->
-            showOverflowMenu(view)
-        }
-    }
-    
-    private fun showOverflowMenu(anchor: View) {
-        val popup = android.widget.PopupMenu(this, anchor)
-        popup.menuInflater.inflate(R.menu.menu_main_overflow, popup.menu)
-        
-        // Set checkbox state
-        popup.menu.findItem(R.id.menu_unread_only)?.isChecked = unreadOnlyFilter
-        
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.menu_unread_only -> {
-                    setUnreadFilter(!unreadOnlyFilter)
-                    true
-                }
-                R.id.menu_settings -> {
-                    startActivity(Intent(this, SettingsActivity::class.java))
-                    true
-                }
-                else -> false
-            }
-        }
-        popup.show()
-    }
-    
     private fun setUnreadFilter(enabled: Boolean) {
         unreadOnlyFilter = enabled
-        
-        if (enabled) {
-            // Slide down animation
-            unreadFilterBar.visibility = View.VISIBLE
-            unreadFilterBar.alpha = 0f
-            unreadFilterBar.translationY = -unreadFilterBar.height.toFloat().coerceAtLeast(50f)
-            unreadFilterBar.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(200)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .start()
+        updatePagerContent(selectedPageIndex)
+    }
+
+    private fun selectPage(index: Int) {
+        if (index !in pagerPages.indices) return
+        if (selectedPageIndex == index) {
+            scrollToTopRequest++
         } else {
-            // Slide up animation
-            unreadFilterBar.animate()
-                .alpha(0f)
-                .translationY(-unreadFilterBar.height.toFloat().coerceAtLeast(50f))
-                .setDuration(150)
-                .setInterpolator(android.view.animation.AccelerateInterpolator())
-                .withEndAction { unreadFilterBar.visibility = View.GONE }
-                .start()
+            selectedPageIndex = index
         }
-        
-        updatePagerContent(threadsPager.currentItem)
+        (pagerPages[index] as? InboxPage.CategoryPage)?.let { selectedCategory = it.category }
     }
-    
-    // ========== Search Functionality ==========
-    
-    private fun setupSearch() {
-        searchBarContainer = findViewById(R.id.search_bar_container)
-        headerContainer = findViewById(R.id.header_container)
-        searchInput = findViewById(R.id.search_input)
-        searchClearButton = findViewById(R.id.search_clear_button)
-        searchResultsRecycler = findViewById(R.id.search_results_recycler)
-        
-        searchResultsRecycler.layoutManager = LinearLayoutManager(this)
-        
-        // Search button click
-        findViewById<ImageButton>(R.id.search_button).setOnClickListener {
-            enterSearchMode()
-        }
-        
-        // Back button in search bar
-        findViewById<ImageButton>(R.id.search_back_button).setOnClickListener {
-            exitSearchMode()
-        }
-        
-        // Clear button
-        searchClearButton.setOnClickListener {
-            searchInput.text.clear()
-        }
-        
-        // Text change listener for search with debouncing
-        searchInput.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val query = s?.toString() ?: ""
-                searchClearButton.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
-                
-                // Cancel any pending search
-                searchRunnable?.let { searchHandler.removeCallbacks(it) }
-                
-                // Debounce the search
-                searchRunnable = Runnable { performSearch(query) }
-                searchHandler.postDelayed(searchRunnable!!, searchDebounceMs)
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
-        
-        // Handle search action on keyboard
-        searchInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
-                // Hide keyboard
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
-                true
-            } else {
-                false
-            }
-        }
+
+    private fun updateSearchQuery(query: String) {
+        searchQuery = query
+        searchRunnable?.let(searchHandler::removeCallbacks)
+        searchRunnable = Runnable { performSearch(query) }
+        searchHandler.postDelayed(searchRunnable!!, searchDebounceMs)
     }
-    
+
+    private fun copyOtp(code: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
+        clipboard?.setPrimaryClip(ClipData.newPlainText("OTP", code))
+        Toast.makeText(this, R.string.toast_otp_copied, Toast.LENGTH_SHORT).show()
+    }
+
     private fun enterSearchMode() {
         isSearchMode = true
-        
-        // Show search bar, hide normal header and tabs
-        searchBarContainer.visibility = View.VISIBLE
-        headerContainer.visibility = View.GONE
-        categoryTabs.visibility = View.GONE
-        
-        // Show search results, hide pager
-        threadsPager.visibility = View.GONE
-        searchResultsRecycler.visibility = View.VISIBLE
-        newMessageFab.visibility = View.GONE
-        
-        // Focus input and show keyboard
-        searchInput.requestFocus()
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(searchInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-        
-        // Load all messages for search
         loadAllMessagesForSearch()
     }
-    
+
     private fun exitSearchMode() {
         isSearchMode = false
-        
-        // Cancel any pending search
         searchRunnable?.let { searchHandler.removeCallbacks(it) }
-        
-        // Hide keyboard
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
-        
-        // Clear search
-        searchInput.text.clear()
-        
-        // Hide search bar, show normal header and tabs
-        searchBarContainer.visibility = View.GONE
-        headerContainer.visibility = View.VISIBLE
-        categoryTabs.visibility = View.VISIBLE
-        
-        // Hide search results, show pager
-        searchResultsRecycler.visibility = View.GONE
-        threadsPager.visibility = View.VISIBLE
-        newMessageFab.visibility = View.VISIBLE
-    }
-    
-    private fun restoreSearchModeUi() {
-        // Restore search mode UI without triggering keyboard or reloading
-        searchBarContainer.visibility = View.VISIBLE
-        headerContainer.visibility = View.GONE
-        categoryTabs.visibility = View.GONE
-        threadsPager.visibility = View.GONE
-        searchResultsRecycler.visibility = View.VISIBLE
-        newMessageFab.visibility = View.GONE
+        searchQuery = ""
+        searchResults = emptyList()
     }
     
     private fun loadAllItemsForAllTab() {
@@ -1974,7 +1433,7 @@ class MainActivity : AppCompatActivity() {
                 .let { if (unreadOnly) it.filter { item -> item.isUnread } else it }
                 .sortedByDescending { it.date }
             runOnUiThread {
-                threadsPagerAdapter.updateAllItems(messages)
+                allTabItems = messages
             }
         }.start()
     }
@@ -1985,7 +1444,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 allMessagesForSearch = messages
                 // Show all messages initially in chronological order
-                updateSearchResults(messages.sortedByDescending { it.date }, "")
+                updateSearchResults(messages.sortedByDescending { it.date })
             }
         }.start()
     }
@@ -2053,19 +1512,16 @@ class MainActivity : AppCompatActivity() {
     private fun performSearch(query: String) {
         if (query.isBlank()) {
             // Show all messages in chronological order when no query
-            updateSearchResults(allMessagesForSearch.sortedByDescending { it.date }, "")
+            updateSearchResults(allMessagesForSearch.sortedByDescending { it.date })
         } else {
             // Perform fuzzy search
             val results = FuzzySearch.search(allMessagesForSearch, query)
-            updateSearchResults(results, query)
+            updateSearchResults(results)
         }
     }
     
-    private fun updateSearchResults(results: List<SearchResultItem>, query: String) {
-        searchResultAdapter = SearchResultAdapter(results, query) { item ->
-            handleSearchResultClick(item)
-        }
-        searchResultsRecycler.adapter = searchResultAdapter
+    private fun updateSearchResults(results: List<SearchResultItem>) {
+        searchResults = results
     }
     
     private fun handleSearchResultClick(item: SearchResultItem) {
@@ -2082,11 +1538,6 @@ class MainActivity : AppCompatActivity() {
             category = item.category
         )
         
-        // Hide keyboard before navigating (but stay in search mode)
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
-        
-        // Open thread with target message - don't exit search mode so user can return to it
         openThreadDetail(threadItem, item.messageId)
     }
 }

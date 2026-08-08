@@ -2,13 +2,13 @@ package com.praveenpuglia.cleansms
 
 import android.content.Context
 import android.content.Intent
+import android.content.ClipboardManager
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Telephony
 import android.text.Spanned
 import android.text.style.URLSpan
-import android.view.View
 import android.widget.TextView
 import androidx.compose.ui.input.key.Key
 import androidx.test.core.app.ActivityScenario
@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -25,24 +26,18 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.pressKey
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
-import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.replaceText
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.isEnabled
-import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
-import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.android.material.tabs.TabLayout
+import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingTestTags
 import com.praveenpuglia.cleansms.ui.newmessage.NewMessageTestTags
 import com.praveenpuglia.cleansms.ui.thread.ThreadDetailTestTags
-import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Rule
 import org.junit.Assert.assertEquals
@@ -157,31 +152,43 @@ class PhaseZeroUiRegressionTest {
         prepareSeededInbox()
         SettingsActivity.setAllTabEnabled(context, true)
         SettingsActivity.setDefaultTab(context, SettingsActivity.DefaultTab.OTP)
+        val momThreadId = threadIdFor("+919876543210")
+        val googleMessageId = messageIdFor("VK-GOOGLE-T", "G-892341")
 
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+        ActivityScenario.launch(MainActivity::class.java).use {
             SystemClock.sleep(2_000)
-            onView(withText("All")).check(matches(isDisplayed()))
-            onView(withText("OTPs")).check(matches(isDisplayed()))
-            onView(withText("Personal")).check(matches(isDisplayed()))
-            scenario.onActivity { activity ->
-                val tabs = activity.findViewById<TabLayout>(R.id.category_tabs)
-                val allUnreadDot = tabs.getTabAt(0)?.customView
-                    ?.findViewById<View>(R.id.tab_unread_dot)
-                assertEquals(View.VISIBLE, allUnreadDot?.visibility)
-            }
-            onView(withContentDescription("Search messages")).perform(click())
-            onView(withId(R.id.search_input)).check(matches(isDisplayed()))
-            onView(withId(R.id.search_input)).perform(replaceText("RATNADEEP"))
-            onView(withContentDescription("Clear search")).check(matches(isDisplayed()))
-            // First Back dismisses the IME; the next Back exits search mode.
+            composeRule.onNodeWithText("All").assertIsDisplayed()
+            composeRule.onNodeWithText("OTPs").assertIsDisplayed()
+            composeRule.onNodeWithText("Personal").assertIsDisplayed()
+            composeRule.onNodeWithTag(MainInboxTestTags.tab(1)).assertIsSelected()
+            composeRule.onNodeWithTag(MainInboxTestTags.tabUnread(0), useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithTag(MainInboxTestTags.otpCode(googleMessageId)).performClick()
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals("892341", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+
+            composeRule.onNodeWithText("Personal").performClick()
+            composeRule.onNodeWithTag(MainInboxTestTags.thread(momThreadId)).assertIsDisplayed()
+                .performTouchInput { longClick() }
+            composeRule.onNodeWithText("1 selected").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Delete selected conversations or messages").performClick()
+            composeRule.onNodeWithTag(MainInboxTestTags.DELETE_DIALOG).assertIsDisplayed()
+            composeRule.onNodeWithText("Cancel").performClick()
+            pressBack()
+
+            composeRule.onNodeWithContentDescription("More options").performClick()
+            composeRule.onNodeWithText("Unread only").performClick()
+            composeRule.onNodeWithTag(MainInboxTestTags.UNREAD_CHIP).assertIsDisplayed().performClick()
+
+            composeRule.onNodeWithTag(MainInboxTestTags.SEARCH).performClick()
+            composeRule.onNodeWithTag(MainInboxTestTags.SEARCH_INPUT).performTextReplacement("RATNADEEP")
+            composeRule.onNodeWithTag(MainInboxTestTags.CLEAR_SEARCH).assertIsDisplayed()
             pressBack()
             pressBack()
-            onView(withText("Messages")).check(matches(isDisplayed()))
+            composeRule.onNodeWithText("Messages").assertIsDisplayed()
         }
 
-        val threadId = threadIdFor("+919876543210")
         val intent = Intent(context, ThreadDetailActivity::class.java).apply {
-            putExtra("THREAD_ID", threadId)
+            putExtra("THREAD_ID", momThreadId)
             putExtra("CONTACT_NAME", "Mom")
             putExtra("CONTACT_ADDRESS", "+919876543210")
             putExtra("CATEGORY", MessageCategory.PERSONAL.name)
