@@ -161,6 +161,7 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 - Catch specific exceptions — no broad `catch (Exception)` unless wrapping/annotating and rethrowing.
 - Logging: structured tags, no PII (don't log full phone numbers, SMS bodies, or OTP values — use placeholders/shortened forms).
 - Strings in `strings.xml` with placeholders; don't concatenate user data with static phrases.
+- Always use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
 ### Privacy & Permissions
 - Read minimal data required — don't prefetch full SMS bodies where metadata suffices.

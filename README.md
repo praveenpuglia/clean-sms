@@ -32,6 +32,9 @@ Download the latest APK from the [Releases](https://github.com/praveenpuglia/cle
 git clone https://github.com/praveenpuglia/clean-sms.git
 cd clean-sms
 
+# Enable the pre-commit unit tests
+git config core.hooksPath .githooks
+
 # Build release APK
 ./gradlew assembleRelease
 ```
