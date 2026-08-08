@@ -116,7 +116,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add app/build.gradle.kts
-          git commit -m "chore: release v${{ steps.version.outputs.version }}"
+          # build.gradle.kts can already be at the target version, in which case
+          # there is nothing to commit and we just tag the current HEAD.
+          if git diff --cached --quiet; then
+            echo "build.gradle.kts already at v${{ steps.version.outputs.version }}, tagging HEAD"
+          else
+            git commit -m "chore: release v${{ steps.version.outputs.version }}"
+          fi
           git tag "v${{ steps.version.outputs.version }}"
           git push origin main
           git push origin "v${{ steps.version.outputs.version }}"
