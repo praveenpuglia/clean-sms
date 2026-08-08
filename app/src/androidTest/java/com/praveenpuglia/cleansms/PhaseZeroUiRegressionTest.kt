@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Telephony
 import android.view.KeyEvent
+import android.view.View
 import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -33,6 +34,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.tabs.TabLayout
 import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Rule
@@ -145,11 +147,17 @@ class PhaseZeroUiRegressionTest {
         SettingsActivity.setAllTabEnabled(context, true)
         SettingsActivity.setDefaultTab(context, SettingsActivity.DefaultTab.OTP)
 
-        ActivityScenario.launch(MainActivity::class.java).use {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             SystemClock.sleep(2_000)
             onView(withText("All")).check(matches(isDisplayed()))
             onView(withText("OTPs")).check(matches(isDisplayed()))
             onView(withText("Personal")).check(matches(isDisplayed()))
+            scenario.onActivity { activity ->
+                val tabs = activity.findViewById<TabLayout>(R.id.category_tabs)
+                val allUnreadDot = tabs.getTabAt(0)?.customView
+                    ?.findViewById<View>(R.id.tab_unread_dot)
+                assertEquals(View.VISIBLE, allUnreadDot?.visibility)
+            }
             onView(withContentDescription("Search messages")).perform(click())
             onView(withId(R.id.search_input)).check(matches(isDisplayed()))
             onView(withId(R.id.search_input)).perform(replaceText("RATNADEEP"))

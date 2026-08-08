@@ -255,7 +255,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         threadsPager.registerOnPageChangeCallback(pageChangeCallback)
-        tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager) { tab, position ->
+        tabLayoutMediator = TabLayoutMediator(categoryTabs, threadsPager, false) { tab, position ->
             applyTabCustomView(tab, pagerPages[position])
         }.also { it.attach() }
         updateTabMuteIcons()
@@ -2083,4 +2083,3 @@ class MainActivity : AppCompatActivity() {
         openThreadDetail(threadItem, item.messageId)
     }
 }
-
