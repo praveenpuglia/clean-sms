@@ -351,7 +351,7 @@ class DebugSeedReceiver : BroadcastReceiver() {
 
             // ===== Airtel SPAM prefix (tests SpamDetector) =====
             Seed("+911140404040",
-                "Airtel SPAM: Get a personal loan up to Rs.10 Lakh with no documents. Call 9999988888 now!",
+                "Airtel Warning: SPAM|Get a personal loan up to Rs.10 Lakh with no documents. Call 9999988888 now!",
                 ageMinutes = 7500, read = true),
 
             // ===== Edge cases for OTP false-positive guarding =====
