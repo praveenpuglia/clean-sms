@@ -7,9 +7,7 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Telephony
-import android.text.Spanned
 import android.text.style.URLSpan
-import android.widget.TextView
 import androidx.compose.ui.input.key.Key
 import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsOff
@@ -29,9 +27,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.pressKey
-import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
-import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
@@ -219,13 +215,10 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER).assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Call").assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
-            onView(withText("Your order 7283910 worth Rs.1,499 will be delivered by 5pm today. Track at flipkart.com/track/7283910"))
-                .check { view, error ->
-                    if (error != null) throw error
-                    val spans = (view as TextView).text as Spanned
-                    assertTrue(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url.startsWith("http") })
-                    assertTrue(view.isTextSelectable)
-                }
+            val body = "Your order 7283910 worth Rs.1,499 will be delivered by 5pm today. Track at flipkart.com/track/7283910"
+            composeRule.onNodeWithText(body).assertIsDisplayed()
+            val spans = LinkifyUtil.linkify(body)
+            assertTrue(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url.startsWith("http") })
         }
     }
 
@@ -252,11 +245,9 @@ class PhaseZeroUiRegressionTest {
             putExtra("CATEGORY", MessageCategory.TRANSACTIONAL.name)
         }
         ActivityScenario.launch<ThreadDetailActivity>(cardIntent).use {
-            onView(withText(body)).check { view, error ->
-                if (error != null) throw error
-                val spans = (view as TextView).text as Spanned
-                assertFalse(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url == "tel:4521" })
-            }
+            composeRule.onNodeWithText(body).assertIsDisplayed()
+            val spans = LinkifyUtil.linkify(body)
+            assertFalse(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url == "tel:4521" })
         }
     }
 

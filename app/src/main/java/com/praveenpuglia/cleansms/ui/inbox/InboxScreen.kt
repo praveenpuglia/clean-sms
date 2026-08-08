@@ -76,6 +76,7 @@ import com.praveenpuglia.cleansms.SearchResultItem
 import com.praveenpuglia.cleansms.ThreadItem
 import com.praveenpuglia.cleansms.ui.ContactAvatar
 import java.util.Calendar
+import java.util.Locale
 
 sealed interface InboxPage {
     data object All : InboxPage
@@ -751,7 +752,7 @@ fun formatInboxDate(timestamp: Long, nowMillis: Long = System.currentTimeMillis(
     val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
     val message = Calendar.getInstance().apply { timeInMillis = timestamp }
     val hour = message.get(Calendar.HOUR).takeUnless { it == 0 } ?: 12
-    val time = String.format("%d:%02d %s", hour, message.get(Calendar.MINUTE), if (message.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM")
+    val time = String.format(Locale.US, "%d:%02d %s", hour, message.get(Calendar.MINUTE), if (message.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM")
     if (sameDay(message, now)) return time
     val yesterday = Calendar.getInstance().apply {
         timeInMillis = nowMillis

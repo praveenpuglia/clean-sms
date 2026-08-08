@@ -80,7 +80,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugCompileOnly(libs.androidx.compose.ui.tooling)
-    implementation("androidx.recyclerview:recyclerview:1.3.1")
     // libphonenumber for robust phone number parsing/matching
     implementation("com.googlecode.libphonenumber:libphonenumber:8.13.22")
     testImplementation(libs.junit)

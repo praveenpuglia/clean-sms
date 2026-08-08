@@ -1,9 +1,6 @@
 package com.praveenpuglia.cleansms.ui.thread
 
-import android.graphics.Color.TRANSPARENT
-import android.text.method.LinkMovementMethod
-import android.util.TypedValue
-import android.widget.TextView
+import android.text.style.URLSpan
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -27,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -45,9 +43,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -55,11 +51,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.praveenpuglia.cleansms.AvatarColorResolver
 import com.praveenpuglia.cleansms.LinkifyUtil
 import com.praveenpuglia.cleansms.Message
@@ -70,6 +69,7 @@ import com.praveenpuglia.cleansms.SpamDetector
 import com.praveenpuglia.cleansms.ui.ContactAvatar
 import kotlinx.coroutines.delay
 import java.util.Calendar
+import java.util.Locale
 
 object ThreadDetailTestTags {
     const val CONTACT_NAME = "thread_contact_name"
@@ -305,29 +305,26 @@ private fun MessageBubble(
 
 @Composable
 private fun MessageBody(body: String, color: Color) {
-    val density = LocalDensity.current
-    val linkColor = MaterialTheme.colorScheme.primary.toArgb()
-    AndroidView(
-        factory = { context ->
-            TextView(context).apply {
-                setBackgroundColor(TRANSPARENT)
-                setTextIsSelectable(true)
-                linksClickable = true
-                movementMethod = LinkMovementMethod.getInstance()
-                includeFontPadding = false
+    val linkColor = MaterialTheme.colorScheme.primary
+    val text = remember(body, linkColor) {
+        val linked = LinkifyUtil.linkify(body)
+        buildAnnotatedString {
+            append(body)
+            linked.getSpans(0, linked.length, URLSpan::class.java).forEach { span ->
+                addLink(
+                    LinkAnnotation.Url(
+                        span.url,
+                        TextLinkStyles(style = androidx.compose.ui.text.SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)),
+                    ),
+                    linked.getSpanStart(span),
+                    linked.getSpanEnd(span),
+                )
             }
-        },
-        update = { view ->
-            view.setTextColor(color.toArgb())
-            view.setLinkTextColor(linkColor)
-            view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            view.setLineSpacing(with(density) { 2.dp.toPx() }, 1f)
-            if (view.text.toString() != body) {
-                view.text = body
-                LinkifyUtil.linkify(view)
-            }
-        },
-    )
+        }
+    }
+    SelectionContainer {
+        Text(text, color = color, fontSize = 15.sp, lineHeight = 17.sp)
+    }
 }
 
 @Composable
@@ -506,7 +503,7 @@ private fun formatMessageTime(timestamp: Long): String {
     val hour = message.get(Calendar.HOUR).takeUnless { it == 0 } ?: 12
     val minute = message.get(Calendar.MINUTE)
     val amPm = if (message.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
-    val time = String.format("%d:%02d %s", hour, minute, amPm)
+    val time = String.format(Locale.US, "%d:%02d %s", hour, minute, amPm)
     return if (isSameDay(timestamp, now.timeInMillis)) time else {
         val month = MONTH_NAMES[message.get(Calendar.MONTH)]
         "${message.get(Calendar.DAY_OF_MONTH)} $month, $time"

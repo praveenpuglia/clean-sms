@@ -100,11 +100,25 @@ The following are frozen unless a difference is explicitly reviewed and approved
 
 Each phase uses conventional commits and must be independently reviewable and revertible. Prefer one PR per phase after Phase 0. A phase is not considered complete until its tests and emulator evidence pass.
 
+### Completion status
+
+All phases completed on 2026-08-08:
+
+| Phase | Result |
+|---|---|
+| 0 | Regression baseline, emulator suite, and CI gate established |
+| 1 | Compose foundation and Settings migrated |
+| 2 | Default-SMS onboarding migrated |
+| 3 | New Message migrated |
+| 4 | Thread Detail migrated |
+| 5 | Main inbox migrated |
+| 6 | Legacy UI removed and final verification passed |
+
 ### Phase 0: Establish the regression baseline
 
 No production UI changes.
 
-Execution status (2026-08-08): the clean-state/manual baseline, 65-screenshot manifest, six-scenario emulator regression suite, and PR emulator job are in place. Unit tests, debug assembly, installation, and API 37 instrumented tests pass. The phase remains blocked on the existing lint gate: `lintDebug` reports 12 errors in pre-existing production/debug files; none are in the Phase 0 changes. See `compose-migration/baseline/README.md` for evidence and exact reproduction steps.
+Execution status (2026-08-08): complete. The clean-state/manual baseline, 65-screenshot manifest, emulator regression suite, and PR emulator job are in place. The inherited lint debt recorded during this phase was resolved in Phase 6.
 
 1. Reset the existing emulator to a true first run:
    - Clear the app package data.

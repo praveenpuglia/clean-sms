@@ -2,14 +2,11 @@ package com.praveenpuglia.cleansms
 
 import android.text.Spannable
 import android.text.SpannableString
-import android.text.method.LinkMovementMethod
 import android.text.util.Linkify
-import android.widget.TextView
 import androidx.core.text.util.LinkifyCompat
 
 /**
- * Applies linkification to a TextView for: web URLs, phone numbers, emails, map addresses.
- * Constitution §6 separation: keeps UI binding lean. §5 UX: makes actionable data tappable.
+ * Produces linkified text for web URLs, phone numbers, and email addresses.
  * We rely on Android's built-in Linkify for reliability & locale coverage instead of manual regex sets.
  */
 object LinkifyUtil {
@@ -25,9 +22,8 @@ object LinkifyUtil {
     // Context pattern to detect card last‑four references; if match found around a 4‑digit tel span, we remove that span.
     private val cardContextRegex = Regex("card\\s*(?:ending\\s*in\\s*)?(\\d{4})", RegexOption.IGNORE_CASE)
 
-    fun linkify(tv: TextView) {
-        val rawText = tv.text?.toString() ?: return
-        if (rawText.isEmpty() || rawText.length > 8000) return
+    fun linkify(rawText: String): Spannable {
+        if (rawText.isEmpty() || rawText.length > 8000) return SpannableString(rawText)
         // Cache hit: clone cached spannable to avoid sharing mutable spans across views
         val cached = cache[rawText]
         val spannable = if (cached != null) {
@@ -46,9 +42,7 @@ object LinkifyUtil {
             cache[rawText] = s
             s
         }
-        tv.text = spannable
-        tv.movementMethod = LinkMovementMethod.getInstance()
-        // Note: Don't set highlightColor to TRANSPARENT as it breaks text selection highlighting
+        return spannable
     }
 
     private fun stripCardLastFourPhoneSpans(spannable: Spannable, fullText: String) {
