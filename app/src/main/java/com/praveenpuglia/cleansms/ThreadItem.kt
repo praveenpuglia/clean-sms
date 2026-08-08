@@ -5,6 +5,8 @@ data class ThreadItem(
     val nameOrAddress: String,
     val date: Long,
     val snippet: String,
+    val mergedThreadIds: Set<Long> = emptySet(),
+    val traiHeader: String? = null,
     val contactName: String? = null,
     val contactPhotoUri: String? = null,
     val contactLookupUri: String? = null,

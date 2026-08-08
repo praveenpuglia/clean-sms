@@ -87,7 +87,7 @@ class ThreadAdapter(
         holder.itemView.setOnLongClickListener(longPressListener)
         holder.avatarText.setOnLongClickListener(longPressListener)
         holder.avatarImage.setOnLongClickListener(longPressListener)
-        holder.name.text = item.contactName ?: item.nameOrAddress
+        holder.name.text = item.contactName ?: item.traiHeader ?: item.nameOrAddress
         holder.date.text = formatHumanReadableDate(item.date)
         holder.snippet.text = item.snippet
         holder.divider.visibility = if (position == itemCount - 1) View.GONE else View.VISIBLE
@@ -119,7 +119,7 @@ class ThreadAdapter(
         }
 
         if (!avatarApplied) {
-            val (label, key) = resolveAvatarLabel(item.contactName, item.nameOrAddress)
+            val (label, key) = resolveAvatarLabel(item.contactName, item.traiHeader ?: item.nameOrAddress)
             holder.avatarText.text = label
             holder.avatarText.visibility = View.VISIBLE
             holder.avatarImage.visibility = View.GONE

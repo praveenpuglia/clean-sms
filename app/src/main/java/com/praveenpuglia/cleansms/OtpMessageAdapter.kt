@@ -55,7 +55,7 @@ class OtpMessageAdapter(
         holder.itemView.setOnLongClickListener(longPressListener)
         holder.avatarText.setOnLongClickListener(longPressListener)
         holder.avatarImage.setOnLongClickListener(longPressListener)
-        holder.senderName.text = item.contactName ?: item.address
+        holder.senderName.text = item.contactName ?: CategoryClassifier.extractTraiHeader(item.address) ?: item.address
         holder.senderName.fontVariationSettings = if (item.isUnread) "'wght' 600" else "'wght' 400"
         holder.messageDate.text = formatHumanReadableDate(item.date)
         val preview = item.body.trim()
@@ -143,7 +143,7 @@ class OtpMessageAdapter(
             }
         }
 
-        val (label, key) = resolveAvatarLabel(contactName, item.address)
+        val (label, key) = resolveAvatarLabel(contactName, CategoryClassifier.extractTraiHeader(item.address) ?: item.address)
         holder.avatarText.text = label
         holder.avatarText.visibility = View.VISIBLE
         holder.avatarImage.visibility = View.GONE

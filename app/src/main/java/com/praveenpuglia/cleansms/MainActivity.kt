@@ -602,11 +602,12 @@ class MainActivity : AppCompatActivity() {
         } else {
             otpMessages
         }
-        
+        val groupedOtp = deduplicateOtpByHeader(filteredOtp)
+
         val grouped = categories.associateWith { category ->
             filteredThreads.filter { it.category == category }
         }
-        threadsPagerAdapter.updateAll(filteredOtp, grouped)
+        threadsPagerAdapter.updateAll(groupedOtp, grouped)
         if (pagerPages.any { it is InboxPage.All }) {
             loadAllItemsForAllTab()
         }
@@ -723,10 +724,13 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, ThreadDetailActivity::class.java).apply {
             putExtra("THREAD_ID", threadItem.threadId)
             putExtra("CONTACT_NAME", threadItem.contactName)
-            putExtra("CONTACT_ADDRESS", threadItem.nameOrAddress)
+            putExtra("CONTACT_ADDRESS", threadItem.traiHeader ?: threadItem.nameOrAddress)
             putExtra("CONTACT_PHOTO_URI", threadItem.contactPhotoUri)
             putExtra("CONTACT_LOOKUP_URI", threadItem.contactLookupUri)
             putExtra("CATEGORY", threadItem.category.name)
+            if (threadItem.mergedThreadIds.isNotEmpty()) {
+                putExtra("MERGED_THREAD_IDS", threadItem.mergedThreadIds.toLongArray())
+            }
             if (targetMessageId != null) {
                 putExtra("TARGET_MESSAGE_ID", targetMessageId)
             }
@@ -735,7 +739,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openThreadDetailFromOtp(item: OtpMessageItem) {
-        val existingThread = allThreads.firstOrNull { it.threadId == item.threadId }
+        val existingThread = allThreads.firstOrNull {
+            it.threadId == item.threadId || it.mergedThreadIds.contains(item.threadId)
+        }
         val threadItem = if (existingThread != null) {
             existingThread.copy(
                 contactName = existingThread.contactName ?: item.contactName,
@@ -1454,11 +1460,61 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        return map.values.map { item ->
+        val items = map.values.map { item ->
             val unread = unreadCounts[item.threadId] ?: 0
             val hasSpam = threadsWithSpam.contains(item.threadId)
             item.copy(unreadCount = unread, hasSpam = hasSpam)
         }
+        return mergeTraiThreads(items)
+    }
+
+    private fun mergeTraiThreads(threads: List<ThreadItem>): List<ThreadItem> {
+        val result = mutableListOf<ThreadItem>()
+        val headerGroups = mutableMapOf<String, MutableList<ThreadItem>>()
+
+        for (thread in threads) {
+            val header = CategoryClassifier.extractTraiHeader(thread.nameOrAddress)
+            if (header != null) {
+                headerGroups.getOrPut(header) { mutableListOf() }.add(thread)
+            } else {
+                result.add(thread)
+            }
+        }
+
+        for ((header, group) in headerGroups) {
+            val representative = group.maxByOrNull { it.date }!!
+            val allIds = group.map { it.threadId }.toSet()
+            val totalUnread = group.sumOf { it.unreadCount }
+            val anySpam = group.any { it.hasSpam }
+            result.add(
+                representative.copy(
+                    mergedThreadIds = allIds,
+                    traiHeader = header,
+                    unreadCount = totalUnread,
+                    hasSpam = anySpam
+                )
+            )
+        }
+
+        return result.sortedByDescending { it.date }
+    }
+
+    private fun deduplicateOtpByHeader(items: List<OtpMessageItem>): List<OtpMessageItem> {
+        val result = mutableListOf<OtpMessageItem>()
+        val seen = mutableMapOf<String, OtpMessageItem>()
+        for (item in items) {
+            val key = CategoryClassifier.extractTraiHeader(item.address) ?: item.address
+            val existing = seen[key]
+            if (existing == null || item.date > existing.date) {
+                seen[key] = item
+            }
+        }
+        // Preserve original order by filtering
+        val seenValues = seen.values.toSet()
+        for (item in items) {
+            if (item in seenValues) result.add(item)
+        }
+        return result
     }
 
     private fun loadOtpMessages(): List<OtpMessageItem> {

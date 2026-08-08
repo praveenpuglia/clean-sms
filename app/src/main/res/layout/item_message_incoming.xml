@@ -57,6 +57,16 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/message_sender_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold"
+            android:layout_marginBottom="2dp"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/message_body"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

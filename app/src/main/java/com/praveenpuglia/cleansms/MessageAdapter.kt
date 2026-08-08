@@ -11,7 +11,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class MessageAdapter(
-    private var items: List<MessageListItem>
+    private var items: List<MessageListItem>,
+    private val showSenderLabel: Boolean = false
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -21,6 +22,7 @@ class MessageAdapter(
     }
 
     class IncomingVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val senderLabel: TextView = itemView.findViewById(R.id.message_sender_label)
         val body: TextView = itemView.findViewById(R.id.message_body)
         val time: TextView = itemView.findViewById(R.id.message_time)
         val simIndicator: View = itemView.findViewById(R.id.message_sim_indicator)
@@ -126,6 +128,12 @@ class MessageAdapter(
                 when (holder) {
                     is IncomingVH -> {
                         bindCommon(holder.body, holder.time, holder.simIndicator, holder.simSlotText)
+                        if (showSenderLabel && msg.address.isNotBlank()) {
+                            holder.senderLabel.text = msg.address
+                            holder.senderLabel.visibility = View.VISIBLE
+                        } else {
+                            holder.senderLabel.visibility = View.GONE
+                        }
                         // Show spam badge for incoming spam messages
                         holder.spamBadge.visibility = if (isSpam) View.VISIBLE else View.GONE
                         // Bind railway preview
