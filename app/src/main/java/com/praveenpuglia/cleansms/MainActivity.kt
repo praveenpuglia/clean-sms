@@ -19,6 +19,11 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.app.ActivityCompat
@@ -37,6 +42,9 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import com.praveenpuglia.cleansms.ui.onboarding.OnboardingScreen
+import com.praveenpuglia.cleansms.ui.onboarding.OnboardingUiState
+import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 import java.util.LinkedHashMap
 import java.util.LinkedHashSet
 import java.util.Locale
@@ -114,6 +122,7 @@ class MainActivity : AppCompatActivity() {
     // SharedPreferences for persistent onboarding state
     private val PREFS_NAME = "CleanSmsPrefs"
     private val PREF_ONBOARDING_COMPLETED = "onboarding_completed"
+    private var onboardingUiState by mutableStateOf(OnboardingUiState())
     
     // Category filtering state - will be initialized in onCreate
     private lateinit var selectedCategory: MessageCategory
@@ -183,6 +192,19 @@ class MainActivity : AppCompatActivity() {
         
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        findViewById<ComposeView>(R.id.setup_screen).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                CleanSmsTheme {
+                    OnboardingScreen(
+                        state = onboardingUiState,
+                        onSetDefault = ::requestDefaultSmsRole,
+                        onAllowBackground = ::requestBatteryOptimizationExemption,
+                        onContinue = ::completeOnboarding,
+                    )
+                }
+            }
+        }
 
         // Initialize selectedCategory based on user preference
         selectedCategory = getInitialCategory()
@@ -348,6 +370,7 @@ class MainActivity : AppCompatActivity() {
         val isDefault = DefaultSmsHelper.isDefaultSmsApp(this)
         val powerManager = getSystemService(PowerManager::class.java)
         val isBatteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
+        onboardingUiState = OnboardingUiState(isDefault, isBatteryOptimizationIgnored)
         
         // Check if onboarding has been completed (persisted)
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -370,68 +393,6 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
             findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
             
-            // Update UI based on completion status
-            val step1Check = setupScreen.findViewById<View>(R.id.step1_check)
-            val step2Check = setupScreen.findViewById<View>(R.id.step2_check)
-            val setDefaultButton = setupScreen.findViewById<View>(R.id.set_default_button)
-            val allowBackgroundButton = setupScreen.findViewById<View>(R.id.allow_background_button)
-            val continueButton = setupScreen.findViewById<View>(R.id.continue_button)
-            
-            // Step 1: Default SMS App (required)
-            step1Check?.visibility = if (isDefault) View.VISIBLE else View.GONE
-            setDefaultButton?.isEnabled = !isDefault
-            setDefaultButton?.setOnClickListener {
-                try {
-                    val roleManager = getSystemService(RoleManager::class.java)
-                    if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
-                        val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
-                        requestSmsRoleLauncher.launch(intent)
-                    } else {
-                        val legacy = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
-                        legacy.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-                        requestSmsRoleLauncher.launch(legacy)
-                    }
-                } catch (e: Exception) {
-                    Log.w("DefaultSms", "Role request failed: ${e.message}")
-                }
-            }
-            
-            // Step 2: Battery Optimization (optional)
-            step2Check?.visibility = if (isBatteryOptimizationIgnored) View.VISIBLE else View.GONE
-            allowBackgroundButton?.isEnabled = !isBatteryOptimizationIgnored
-            allowBackgroundButton?.setOnClickListener {
-                try {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    Log.w("BatteryOptimization", "Request failed: ${e.message}")
-                    Toast.makeText(this, "Please allow battery optimization exemption in settings", Toast.LENGTH_LONG).show()
-                }
-            }
-            
-            // Continue button: enabled once default SMS app is set, doesn't wait for background permission
-            continueButton?.isEnabled = isDefault
-            continueButton?.setOnClickListener {
-                // Mark onboarding as complete and persist it
-                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                prefs.edit().putBoolean(PREF_ONBOARDING_COMPLETED, true).apply()
-                
-                // Hide setup screen and show main UI
-                setupScreen.visibility = View.GONE
-                header.visibility = View.VISIBLE
-                findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
-                findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
-                
-                // Now that default handler is set, request runtime permissions
-                if (hasReadPermission()) {
-                    showThreadsUi()
-                } else {
-                    showInstructionsUi()
-                    ActivityCompat.requestPermissions(this@MainActivity, requestedPermissions, PERMISSION_REQUEST_CODE)
-                }
-            }
         } else {
             // Hide setup screen, show normal UI
             setupScreen.visibility = View.GONE
@@ -446,6 +407,52 @@ class MainActivity : AppCompatActivity() {
                 showInstructionsUi()
                 ActivityCompat.requestPermissions(this, requestedPermissions, PERMISSION_REQUEST_CODE)
             }
+        }
+    }
+
+    private fun requestDefaultSmsRole() {
+        try {
+            val roleManager = getSystemService(RoleManager::class.java)
+            val intent = if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
+                roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
+            } else {
+                Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
+                    putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+                }
+            }
+            requestSmsRoleLauncher.launch(intent)
+        } catch (e: RuntimeException) {
+            Log.w("DefaultSms", "Role request failed: ${e.message}")
+        }
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        try {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            })
+        } catch (e: RuntimeException) {
+            Log.w("BatteryOptimization", "Request failed: ${e.message}")
+            Toast.makeText(this, R.string.toast_battery_optimization_settings, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun completeOnboarding() {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putBoolean(PREF_ONBOARDING_COMPLETED, true)
+            .apply()
+
+        findViewById<View>(R.id.setup_screen).visibility = View.GONE
+        findViewById<View>(R.id.header_container).visibility = View.VISIBLE
+        findViewById<TextView>(R.id.default_sms_status).visibility = View.GONE
+        findViewById<View>(R.id.set_default_sms_button).visibility = View.GONE
+
+        if (hasReadPermission()) {
+            showThreadsUi()
+        } else {
+            showInstructionsUi()
+            ActivityCompat.requestPermissions(this, requestedPermissions, PERMISSION_REQUEST_CODE)
         }
     }
 

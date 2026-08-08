@@ -12,10 +12,13 @@ import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
@@ -35,6 +38,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.tabs.TabLayout
+import com.praveenpuglia.cleansms.ui.onboarding.OnboardingTestTags
 import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Rule
@@ -67,10 +71,10 @@ class PhaseZeroUiRegressionTest {
         prefs.edit().putBoolean("onboarding_completed", false).commit()
 
         ActivityScenario.launch(MainActivity::class.java).use {
-            onView(withText("Welcome to Clean SMS")).check(matches(isDisplayed()))
-            onView(withId(R.id.set_default_button)).check(matches(not(isEnabled())))
-            onView(withId(R.id.continue_button)).check(matches(isEnabled()))
-            onView(withContentDescription("Clean SMS logo")).check(matches(isDisplayed()))
+            composeRule.onNodeWithText("Welcome to Clean SMS").assertIsDisplayed()
+            composeRule.onNodeWithTag(OnboardingTestTags.SET_DEFAULT).assertIsNotEnabled()
+            composeRule.onNodeWithTag(OnboardingTestTags.CONTINUE).assertIsEnabled()
+            composeRule.onNodeWithContentDescription("Clean SMS logo").assertIsDisplayed()
         }
     }
 

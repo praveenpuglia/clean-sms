@@ -47,4 +47,17 @@
     <string name="action_select_text">Select text</string>
     <string name="action_copy">Copy</string>
     <string name="toast_message_copied">Message copied</string>
+    <string name="onboarding_logo_description">Clean SMS logo</string>
+    <string name="onboarding_title">Welcome to Clean SMS</string>
+    <string name="onboarding_description">Let\'s set up Clean SMS to manage your messages seamlessly.</string>
+    <string name="onboarding_default_title">Set as Default SMS App</string>
+    <string name="onboarding_default_description">Required to send and receive messages</string>
+    <string name="onboarding_set_default">Set as Default</string>
+    <string name="onboarding_background_title">Allow Running in Background</string>
+    <string name="onboarding_background_description">Ensures you receive messages even when the app is closed</string>
+    <string name="onboarding_allow">Allow</string>
+    <string name="onboarding_privacy_note">You can change this anytime in your device settings.</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_completed">Completed</string>
+    <string name="toast_battery_optimization_settings">Please allow battery optimization exemption in settings</string>
 </resources>
