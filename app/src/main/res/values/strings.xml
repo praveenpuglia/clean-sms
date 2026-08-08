@@ -1,5 +1,12 @@
 <resources>
     <string name="new_message_title">New message</string>
+    <string name="new_message_body_hint">Type your message…</string>
+    <string name="new_message_to">To:</string>
+    <string name="new_message_add_recipient">Add recipient</string>
+    <string name="new_message_remove_recipient">Remove %1$s</string>
+    <string name="new_message_send">Send</string>
+    <string name="new_message_send_to">Send SMS to %1$s</string>
+    <string name="new_message_sim">Send using SIM %1$d</string>
     <string name="app_name">Clean SMS</string>
     <string name="header_messages">Messages</string>
     <string name="notification_copy_otp">Copy OTP</string>

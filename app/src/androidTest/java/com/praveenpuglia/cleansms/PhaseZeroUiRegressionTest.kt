@@ -6,8 +6,8 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Telephony
-import android.view.KeyEvent
 import android.view.View
+import androidx.compose.ui.input.key.Key
 import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -20,10 +20,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.pressKey
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.pressKey
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.Visibility.GONE
@@ -35,10 +37,9 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.android.material.chip.ChipGroup
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.tabs.TabLayout
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingTestTags
+import com.praveenpuglia.cleansms.ui.newmessage.NewMessageTestTags
 import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Rule
@@ -109,39 +110,42 @@ class PhaseZeroUiRegressionTest {
             NewMessageActivity::class.java
         )
 
-        ActivityScenario.launch<NewMessageActivity>(intent).use {
-            onView(withText("9988776655")).check(matches(isDisplayed()))
-            onView(withId(R.id.new_message_body_input)).check(matches(withText("Hello from intent")))
-            onView(withId(R.id.new_message_send_button)).check(matches(isEnabled()))
-            onView(withContentDescription("Back")).check(matches(isDisplayed()))
-            onView(withContentDescription("Send")).check(matches(isDisplayed()))
+        ActivityScenario.launch<NewMessageActivity>(intent).use { scenario ->
+            composeRule.onNodeWithText("9988776655").assertIsDisplayed()
+            composeRule.onNodeWithTag(NewMessageTestTags.BODY).assertTextContains("Hello from intent")
+            composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsEnabled()
+            composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
 
-            onView(withId(R.id.new_message_body_input)).perform(replaceText("a".repeat(161)))
-            onView(withId(R.id.new_message_counter)).check(matches(withText("145")))
-            onView(withId(R.id.new_message_sms_parts)).check(matches(withText("2 SMS")))
+            composeRule.onNodeWithTag(NewMessageTestTags.BODY).performTextReplacement("a".repeat(161))
+            composeRule.onNodeWithTag(NewMessageTestTags.COUNTER).assertTextContains("145")
+            composeRule.onNodeWithTag(NewMessageTestTags.PARTS).assertTextContains("2 SMS")
 
-            onView(withId(R.id.new_message_body_input)).perform(replaceText("₹".repeat(71)))
-            onView(withId(R.id.new_message_counter)).check(matches(withText("63")))
-            onView(withId(R.id.new_message_sms_parts)).check(matches(withText("2 SMS")))
+            composeRule.onNodeWithTag(NewMessageTestTags.BODY).performTextReplacement("₹".repeat(71))
+            composeRule.onNodeWithTag(NewMessageTestTags.COUNTER).assertTextContains("63")
+            composeRule.onNodeWithTag(NewMessageTestTags.PARTS).assertTextContains("2 SMS")
+
+            scenario.recreate()
+            composeRule.onNodeWithText("9988776655").assertIsDisplayed()
+            composeRule.onNodeWithTag(NewMessageTestTags.BODY).assertTextContains("₹".repeat(71))
+            composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsEnabled()
         }
     }
 
     @Test
     fun rawRecipientCanBeAddedAndRemovedWithBackspace() {
-        ActivityScenario.launch(NewMessageActivity::class.java).use { scenario ->
-            onView(withId(R.id.new_message_send_button)).check(matches(not(isEnabled())))
-            onView(withId(R.id.new_message_recipient_input)).perform(click(), replaceText("9988776655"))
-            SystemClock.sleep(500)
-            onView(withText("Send SMS to 9988776655")).perform(click())
-            onView(withId(R.id.new_message_body_input)).perform(replaceText("Hello"))
-            onView(withId(R.id.new_message_send_button)).check(matches(isEnabled()))
+        ActivityScenario.launch(NewMessageActivity::class.java).use {
+            composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsNotEnabled()
+            composeRule.onNodeWithTag(NewMessageTestTags.RECIPIENT_INPUT).performTextReplacement("9988776655")
+            composeRule.onNodeWithText("Send SMS to 9988776655").performClick()
+            composeRule.onNodeWithTag(NewMessageTestTags.BODY).performTextReplacement("Hello")
+            composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsEnabled()
 
-            onView(withId(R.id.new_message_recipient_input)).perform(click(), pressKey(KeyEvent.KEYCODE_DEL))
-            onView(withId(R.id.new_message_send_button)).check(matches(not(isEnabled())))
-            scenario.onActivity { activity ->
-                assertEquals(0, activity.findViewById<ChipGroup>(R.id.new_message_recipients_chip_group).childCount)
-                assertFalse(activity.findViewById<FloatingActionButton>(R.id.new_message_send_button).isEnabled)
-            }
+            composeRule.onNodeWithTag(NewMessageTestTags.RECIPIENT_INPUT)
+                .performClick()
+                .performKeyInput { pressKey(Key.Backspace) }
+            composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsNotEnabled()
+            composeRule.onNodeWithText("9988776655").assertDoesNotExist()
         }
     }
 
