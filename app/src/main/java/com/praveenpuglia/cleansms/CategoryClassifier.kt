@@ -28,7 +28,7 @@ object CategoryClassifier {
     // Strategy 1: Explicit OTP keywords (highest confidence)
     // Comprehensive list including authorization, auth, access, confirmation, etc.
     private val otpKeywordRegex = Regex(
-        """(?i)\b(otp|one[\s-]*time[\s-]*password|verification[\s-]*code|security[\s-]*code|login[\s-]*code|authorization[\s-]*code|auth[\s-]*code|access[\s-]*code|confirmation[\s-]*code|authentication[\s-]*code|passcode|pin[\s-]*code|secret[\s-]*code|temporary[\s-]*code|dynamic[\s-]*code)\b"""
+        """(?i)\b(otp|one[\s-]*time[\s-]*password|verification[\s-]*code|security[\s-]*code|login[\s-]*code|authorization[\s-]*code|auth[\s-]*code|access[\s-]*code|confirmation[\s-]*code|authentication[\s-]*code|passcode|pin[\s-]*code|delivery[\s-]*code|share[\s-]*(?:the[\s-]*)?pin|secret[\s-]*code|temporary[\s-]*code|dynamic[\s-]*code)\b"""
     )
 
     // Code pattern: 4-8 digits (standard OTP length range)
@@ -61,9 +61,11 @@ object CategoryClassifier {
         """(?i)\b(?:do\s+not\s+share|don'?t\s+share|never\s+share|keep\s+(?:it\s+)?(?:safe|secret|confidential)|not\s+share\s+(?:it\s+)?with\s+anyone)\b"""
     )
 
-    // Pattern to detect monetary amounts - numbers preceded by currency indicators
+    // Pattern to detect monetary amounts by currency or explicit amount wording
     // Used to filter out false positives
-    private val monetaryPrefixRegex = Regex("""(?i)(rs\.?|inr|₹)\s*\d""")
+    private val monetaryPrefixRegex = Regex(
+        """(?i)(?:(?:\b(?:rs\.?|inr)|₹)\s*|(?:transaction\s+)?amount(?:\s+of)?\s*(?:(?:\b(?:rs\.?|inr)|₹)\s*)?(?:is|:)?\s*)$"""
+    )
 
     // Excluded code types (to avoid false positives)
     private val excludedCodeTypes = setOf(
@@ -110,7 +112,8 @@ object CategoryClassifier {
         val isPatternMatch = otpIsPatternRegex.find(afterKeyword)
         if (isPatternMatch != null) {
             val code = isPatternMatch.groupValues[1]
-            if (isValidOtpCode(body, otpKeywordMatch.range.last + 1 + isPatternMatch.range.first, code)) {
+            val codeStart = otpKeywordMatch.range.last + 1 + isPatternMatch.groups[1]!!.range.first
+            if (isValidOtpCode(body, codeStart, code)) {
                 return code
             }
         }
@@ -205,8 +208,8 @@ object CategoryClassifier {
      * Validate that a code is likely an OTP (not a monetary amount, phone number, etc.)
      */
     private fun isValidOtpCode(body: String, codeStart: Int, code: String): Boolean {
-        // Check if preceded by currency indicator
-        val lookbackStart = maxOf(0, codeStart - 10)
+        // Check if preceded by currency or explicit amount wording
+        val lookbackStart = maxOf(0, codeStart - 24)
         val prefix = body.substring(lookbackStart, codeStart)
         if (monetaryPrefixRegex.containsMatchIn(prefix)) return false
 

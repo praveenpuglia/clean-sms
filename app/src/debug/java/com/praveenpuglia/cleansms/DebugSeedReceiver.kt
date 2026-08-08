@@ -222,6 +222,15 @@ class DebugSeedReceiver : BroadcastReceiver() {
             Seed("VM-MSACCT-T",
                 "Use 384921 as the Microsoft account security code. Do not share this code with anyone. Microsoft will never ask for it.",
                 ageMinutes = 720, read = true),
+            Seed("JD-SHDFAX-T",
+                "Delivery Code: Share Pin 3693 with rider to accept delivery of Namma QE Bread.. order from Meesho. Get help @ https://lnk.shadowfax.in/SFXFWD/d0fl95ps -Shadowfax",
+                ageMinutes = 12),
+            Seed("VM-ZETA-T",
+                "The OTP for your transaction amount of Rs. 1325 at RATNADEEP is 4011. - Zeta",
+                ageMinutes = 18),
+            Seed("VM-ZETA-T",
+                "For a transaction of Rs. 9876 at RATNADEEP, use OTP 4011. - Zeta",
+                ageMinutes = 22),
 
             // ===== PROMOTIONAL — e-commerce, food, travel =====
             Seed("DZ-AMAZN-P",
@@ -342,7 +351,7 @@ class DebugSeedReceiver : BroadcastReceiver() {
 
             // ===== Airtel SPAM prefix (tests SpamDetector) =====
             Seed("+911140404040",
-                "Airtel SPAM: Get a personal loan up to Rs.10 Lakh with no documents. Call 9999988888 now!",
+                "Airtel Warning: SPAM|Get a personal loan up to Rs.10 Lakh with no documents. Call 9999988888 now!",
                 ageMinutes = 7500, read = true),
 
             // ===== Edge cases for OTP false-positive guarding =====
