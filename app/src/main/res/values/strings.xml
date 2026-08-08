@@ -67,4 +67,14 @@
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_completed">Completed</string>
     <string name="toast_battery_optimization_settings">Please allow battery optimization exemption in settings</string>
+    <string name="thread_unknown_contact">Unknown</string>
+    <string name="thread_contact_avatar">Contact avatar</string>
+    <string name="thread_call">Call</string>
+    <string name="thread_sent_status">Sent</string>
+    <string name="thread_spam_warning">Spam warning</string>
+    <string name="thread_spam">SPAM</string>
+    <string name="thread_message_hint">Message</string>
+    <string name="toast_sms_permission_required">SMS permission not granted</string>
+    <string name="toast_message_sent">Message sent%1$s</string>
+    <string name="toast_message_send_failed">Failed to send: %1$s</string>
 </resources>

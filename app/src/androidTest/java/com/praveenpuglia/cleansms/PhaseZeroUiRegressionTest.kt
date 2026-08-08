@@ -6,7 +6,10 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Telephony
+import android.text.Spanned
+import android.text.style.URLSpan
 import android.view.View
+import android.widget.TextView
 import androidx.compose.ui.input.key.Key
 import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsOff
@@ -28,11 +31,9 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.Visibility.GONE
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
-import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -40,11 +41,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.tabs.TabLayout
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingTestTags
 import com.praveenpuglia.cleansms.ui.newmessage.NewMessageTestTags
+import com.praveenpuglia.cleansms.ui.thread.ThreadDetailTestTags
 import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Rule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -185,10 +188,10 @@ class PhaseZeroUiRegressionTest {
         }
         ActivityScenario.launch<ThreadDetailActivity>(intent).use {
             SystemClock.sleep(1_000)
-            onView(withText("Mom")).check(matches(isDisplayed()))
-            onView(withId(R.id.composer_message_input)).check(matches(isDisplayed()))
-            onView(withContentDescription("Call")).check(matches(isDisplayed()))
-            onView(withContentDescription("Send")).check(matches(isDisplayed()))
+            composeRule.onNodeWithTag(ThreadDetailTestTags.CONTACT_NAME).assertTextContains("Mom")
+            composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER_INPUT).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Call").assertIsDisplayed()
+            composeRule.onNodeWithTag(ThreadDetailTestTags.SEND).assertIsDisplayed()
         }
     }
 
@@ -205,10 +208,48 @@ class PhaseZeroUiRegressionTest {
 
         ActivityScenario.launch<ThreadDetailActivity>(intent).use {
             SystemClock.sleep(1_000)
-            onView(withId(R.id.thread_contact_name)).check(matches(withText("BP-FLPKRT-S")))
-            onView(withId(R.id.composer_message_input)).check(matches(withEffectiveVisibility(GONE)))
-            onView(withId(R.id.call_button)).check(matches(withEffectiveVisibility(GONE)))
-            onView(withContentDescription("Back")).check(matches(isDisplayed()))
+            composeRule.onNodeWithTag(ThreadDetailTestTags.CONTACT_NAME).assertTextContains("BP-FLPKRT-S")
+            composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER).assertDoesNotExist()
+            composeRule.onNodeWithContentDescription("Call").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
+            onView(withText("Your order 7283910 worth Rs.1,499 will be delivered by 5pm today. Track at flipkart.com/track/7283910"))
+                .check { view, error ->
+                    if (error != null) throw error
+                    val spans = (view as TextView).text as Spanned
+                    assertTrue(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url.startsWith("http") })
+                    assertTrue(view.isTextSelectable)
+                }
+        }
+    }
+
+    @Test
+    fun threadTargetAndCardLastFourLinkGuardStayStable() {
+        prepareSeededInbox()
+        val targetId = messageIdFor("VM-HDFCBK-T", "Rs.1,250.00 credited")
+        val targetIntent = Intent(context, ThreadDetailActivity::class.java).apply {
+            putExtra("THREAD_ID", threadIdFor("VM-HDFCBK-T"))
+            putExtra("CONTACT_NAME", "VM-HDFCBK-T")
+            putExtra("CONTACT_ADDRESS", "VM-HDFCBK-T")
+            putExtra("CATEGORY", MessageCategory.TRANSACTIONAL.name)
+            putExtra("TARGET_MESSAGE_ID", targetId)
+        }
+        ActivityScenario.launch<ThreadDetailActivity>(targetIntent).use {
+            composeRule.onNodeWithTag(ThreadDetailTestTags.message(targetId)).assertIsDisplayed()
+        }
+
+        val body = "OTP for txn of Rs.2,500 to AMAZON on card ending 4521 is 458291. Valid for 5 min. Do not share. -Axis Bank"
+        val cardIntent = Intent(context, ThreadDetailActivity::class.java).apply {
+            putExtra("THREAD_ID", threadIdFor("VK-AXISBK-T"))
+            putExtra("CONTACT_NAME", "VK-AXISBK-T")
+            putExtra("CONTACT_ADDRESS", "VK-AXISBK-T")
+            putExtra("CATEGORY", MessageCategory.TRANSACTIONAL.name)
+        }
+        ActivityScenario.launch<ThreadDetailActivity>(cardIntent).use {
+            onView(withText(body)).check { view, error ->
+                if (error != null) throw error
+                val spans = (view as TextView).text as Spanned
+                assertFalse(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url == "tel:4521" })
+            }
         }
     }
 
@@ -258,6 +299,17 @@ class PhaseZeroUiRegressionTest {
             SystemClock.sleep(250)
         }
         error("No seeded thread found for the requested fixture")
+    }
+
+    private fun messageIdFor(address: String, bodyPrefix: String): Long {
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(Telephony.Sms._ID),
+            "${Telephony.Sms.ADDRESS} = ? AND ${Telephony.Sms.BODY} LIKE ?",
+            arrayOf(address, "$bodyPrefix%"),
+            null,
+        )?.use { cursor -> if (cursor.moveToFirst()) return cursor.getLong(0) }
+        error("No seeded message found for the requested fixture")
     }
 
     private fun ensureSmsRole() {

@@ -62,7 +62,7 @@ object AvatarColorResolver {
         textView.setTextColor(foreground)
     }
 
-    private fun resolve(context: Context, key: String): Pair<Int, Int> {
+    fun resolve(context: Context, key: String): Pair<Int, Int> {
         if (palette.isEmpty()) {
             val defaultBg = ContextCompat.getColor(context, R.color.avatar_fallback_bg_primary)
             val defaultFg = ContextCompat.getColor(context, R.color.avatar_fallback_fg_primary)

@@ -1,9 +1,5 @@
 package com.praveenpuglia.cleansms.ui.newmessage
 
-import android.graphics.BitmapFactory
-import android.net.Uri
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,22 +28,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -62,8 +50,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.praveenpuglia.cleansms.ContactSuggestion
 import com.praveenpuglia.cleansms.R
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.praveenpuglia.cleansms.ui.ContactAvatar
 
 object NewMessageTestTags {
     const val BODY = "new_message_body"
@@ -276,7 +263,15 @@ private fun RecipientBar(
                     selected = false,
                     onClick = { onRecipientRemoved(recipient) },
                     label = { Text(if (recipient.isRawNumber) recipient.phoneNumber else recipient.name) },
-                    avatar = { ContactAvatar(recipient, 24.dp) },
+                    avatar = {
+                        ContactAvatar(
+                            label = recipient.name,
+                            photoUri = recipient.photoUri,
+                            size = 24.dp,
+                            background = MaterialTheme.colorScheme.primary,
+                            foreground = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    },
                     trailingIcon = {
                         Icon(
                             painter = painterResource(R.drawable.ic_close),
@@ -363,7 +358,13 @@ private fun ContactSuggestionRow(contact: ContactSuggestion, onClick: () -> Unit
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ContactAvatar(contact, 48.dp)
+        ContactAvatar(
+            label = contact.name,
+            photoUri = contact.photoUri,
+            size = 48.dp,
+            background = MaterialTheme.colorScheme.primary,
+            foreground = MaterialTheme.colorScheme.onPrimary,
+        )
         Spacer(Modifier.width(12.dp))
         Column {
             Text(
@@ -379,43 +380,6 @@ private fun ContactSuggestionRow(contact: ContactSuggestion, onClick: () -> Unit
                 contact.phoneNumber,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ContactAvatar(contact: ContactSuggestion, size: androidx.compose.ui.unit.Dp) {
-    val context = LocalContext.current
-    val bitmap by produceState<ImageBitmap?>(null, contact.photoUri) {
-        value = contact.photoUri?.let { photo ->
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openInputStream(Uri.parse(photo)).use { stream ->
-                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                    }
-                }.getOrNull()
-            }
-        }
-    }
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(
-                painter = BitmapPainter(bitmap!!),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Text(
-                contact.name.take(1).uppercase(),
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold,
             )
         }
     }
