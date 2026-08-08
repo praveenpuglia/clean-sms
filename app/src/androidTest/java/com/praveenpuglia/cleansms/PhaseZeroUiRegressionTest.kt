@@ -8,6 +8,14 @@ import android.os.SystemClock
 import android.provider.Telephony
 import android.view.KeyEvent
 import androidx.test.core.app.ActivityScenario
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
@@ -15,10 +23,8 @@ import androidx.test.espresso.action.ViewActions.pressKey
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.Visibility.GONE
-import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
-import androidx.test.espresso.matcher.ViewMatchers.isNotChecked
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -29,6 +35,7 @@ import com.google.android.material.chip.ChipGroup
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import org.hamcrest.Matchers.not
 import org.junit.After
+import org.junit.Rule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -36,6 +43,9 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class PhaseZeroUiRegressionTest {
+    @get:Rule
+    val composeRule = createEmptyComposeRule()
+
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val packageName = context.packageName
@@ -69,14 +79,14 @@ class PhaseZeroUiRegressionTest {
         SettingsActivity.setPromoNotificationsEnabled(context, true)
 
         ActivityScenario.launch(SettingsActivity::class.java).use {
-            onView(withId(R.id.switch_all_tab)).check(matches(isChecked()))
-            onView(withId(R.id.default_tab_button)).check(matches(withText("All")))
-            onView(withId(R.id.switch_promo_notifications)).perform(click())
-            onView(withId(R.id.switch_promo_notifications)).check(matches(isNotChecked()))
-            onView(withId(R.id.all_tab_row)).perform(click())
-            onView(withId(R.id.switch_all_tab)).check(matches(isNotChecked()))
-            onView(withId(R.id.default_tab_button)).check(matches(withText("OTPs")))
-            onView(withContentDescription("Back")).check(matches(isDisplayed()))
+            composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).assertIsOn()
+            composeRule.onNodeWithTag(SettingsTestTags.DEFAULT_TAB).assertTextContains("All")
+            composeRule.onNodeWithTag(SettingsTestTags.PROMO_NOTIFICATIONS).performClick()
+            composeRule.onNodeWithTag(SettingsTestTags.PROMO_NOTIFICATIONS).assertIsOff()
+            composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).performClick()
+            composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).assertIsOff()
+            composeRule.onNodeWithTag(SettingsTestTags.DEFAULT_TAB).assertTextContains("OTPs")
+            composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
         }
 
         assertFalse(SettingsActivity.getAllTabEnabled(context))
@@ -184,6 +194,28 @@ class PhaseZeroUiRegressionTest {
             onView(withId(R.id.call_button)).check(matches(withEffectiveVisibility(GONE)))
             onView(withContentDescription("Back")).check(matches(isDisplayed()))
         }
+    }
+
+    @Test
+    fun performanceSeedHonorsMessageAndThreadCounts() {
+        ensureSmsRole()
+        shell(
+            "am broadcast -n $packageName/.DebugSeedReceiver " +
+                "-a com.praveenpuglia.cleansms.DEBUG_SEED --ei count 120"
+        )
+
+        val threadIds = mutableSetOf<Long>()
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(Telephony.Sms.THREAD_ID),
+            "${Telephony.Sms.SERVICE_CENTER} = ?",
+            arrayOf("CLEAN_SMS_DEBUG_SEED"),
+            null
+        )!!.use { cursor ->
+            assertEquals(120, cursor.count)
+            while (cursor.moveToNext()) threadIds += cursor.getLong(0)
+        }
+        assertEquals(12, threadIds.size)
     }
 
     private fun prepareSeededInbox() {

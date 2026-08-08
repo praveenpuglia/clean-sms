@@ -114,7 +114,7 @@ adb shell am start -n com.praveenpuglia.cleansms/.MainActivity
 
 ### Seeding test messages (debug builds only)
 
-[DebugSeedReceiver](app/src/debug/java/com/praveenpuglia/cleansms/DebugSeedReceiver.kt) populates the inbox with ~56 curated messages covering every TRAI category, all 4 OTP detection strategies, OTP false-positive guards (PNRs, order numbers, monetary-only), Airtel-SPAM-prefixed spam, and a mix of read/unread. Useful for UI testing on a fresh emulator.
+[DebugSeedReceiver](app/src/debug/java/com/praveenpuglia/cleansms/DebugSeedReceiver.kt) populates the inbox with curated messages covering every TRAI category, all 4 OTP detection strategies, OTP false-positive guards (PNRs, order numbers, monetary-only), Airtel-SPAM-prefixed spam, and a mix of read/unread. Useful for UI testing on a fresh emulator.
 
 One-time setup on a new device:
 ```bash
@@ -126,6 +126,11 @@ adb shell cmd role add-role-holder android.app.role.SMS com.praveenpuglia.cleans
 Seed or re-seed (clears its own prior rows, leaves real messages alone):
 ```bash
 adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED
+```
+
+For performance testing, generate up to 5,000 messages across 500 threads. Keep the app open until the completion toast appears:
+```bash
+adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED --ei count 5000
 ```
 
 Seeded rows are tagged via `service_center=CLEAN_SMS_DEBUG_SEED`. The receiver only exists in the `debug` source set, so release builds are unaffected.

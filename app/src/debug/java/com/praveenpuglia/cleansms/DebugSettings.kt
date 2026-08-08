@@ -6,14 +6,23 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.view.LayoutInflater
-import android.view.ViewGroup
-import android.widget.LinearLayout
 import android.widget.RemoteViews
-import android.widget.TextView
+import android.widget.Toast
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.google.android.material.button.MaterialButton
 import kotlin.math.absoluteValue
 
 /**
@@ -66,44 +75,36 @@ object DebugSettings {
         return Triple(template.first, body, template.third)
     }
 
-    fun setupDebugSection(activity: SettingsActivity, container: ViewGroup) {
-        // Add debug header
-        val header = TextView(activity).apply {
-            text = "Debug"
-            setTextColor(activity.getColor(com.google.android.material.R.color.design_default_color_error))
-            textSize = 14f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-            letterSpacing = 0.05f
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (32 * activity.resources.displayMetrics.density).toInt()
-                bottomMargin = (12 * activity.resources.displayMetrics.density).toInt()
-            }
-            layoutParams = params
-        }
-        container.addView(header)
-
-        // Add random OTP test button
-        val testButton = MaterialButton(
-            activity,
-            null,
-            com.google.android.material.R.attr.materialButtonOutlinedStyle
-        ).apply {
-            text = "Test Random OTP"
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            layoutParams = params
-            setOnClickListener {
+    @Composable
+    fun Content() {
+        val context = LocalContext.current
+        Spacer(Modifier.height(32.dp))
+        Text(
+            text = stringResource(R.string.settings_debug),
+            color = MaterialTheme.colorScheme.error,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.7.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = {
                 val (sender, body, type) = getRandomOtpMessage()
-                postTestOtpNotification(context = activity, sender = sender, body = body)
-                android.widget.Toast.makeText(activity, "Type: $type", android.widget.Toast.LENGTH_SHORT).show()
-            }
+                postTestOtpNotification(context, sender, body)
+                showTypeToast(context, type)
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.settings_test_random_otp))
         }
-        container.addView(testButton)
+    }
+
+    private fun showTypeToast(context: Context, type: String) {
+        Toast.makeText(
+            context,
+            context.getString(R.string.settings_test_random_otp_type, type),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 
     private fun postTestOtpNotification(context: Context, sender: String, body: String) {
