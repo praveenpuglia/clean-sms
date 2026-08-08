@@ -20,6 +20,7 @@ import android.widget.Toast
  *   adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED
  * Optional extras:
  *   --ez clear true      // wipe previously-seeded test rows first (default: true)
+ *   --ez seed false      // clear without inserting a new seed set
  */
 class DebugSeedReceiver : BroadcastReceiver() {
 
@@ -42,6 +43,13 @@ class DebugSeedReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 Log.e(TAG, "Clear failed", e)
             }
+        }
+
+        if (!intent.getBooleanExtra(EXTRA_SEED, true)) {
+            val summary = "Cleared $deleted seeded msgs"
+            Log.i(TAG, summary)
+            Toast.makeText(context, summary, Toast.LENGTH_LONG).show()
+            return
         }
 
         val now = System.currentTimeMillis()
@@ -140,6 +148,7 @@ class DebugSeedReceiver : BroadcastReceiver() {
         private const val TAG = "DebugSeedReceiver"
         const val ACTION_DEBUG_SEED = "com.praveenpuglia.cleansms.DEBUG_SEED"
         const val EXTRA_CLEAR = "clear"
+        const val EXTRA_SEED = "seed"
 
         // Sentinel stored in `service_center` so we can find & wipe our seeded rows.
         // Real SMSCs are short numbers like "+919885005444"; this string is harmless if it leaks.

@@ -19,5 +19,4 @@ keystore.jks
 keystore.properties
 *.keystore
 
-.agents
 skills-lock.json
