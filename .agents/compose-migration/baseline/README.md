@@ -1,6 +1,6 @@
 # Phase 0 Regression Baseline
 
-This directory freezes the existing View-based UI before any Compose production code is introduced. The screenshots are reference evidence, not pixel-golden tests: device/system UI changes can move pixels even when app behavior is unchanged.
+This directory records the View-based UI regression baseline used before Compose production code was introduced. The temporary screenshot assets were removed after the migration completed; behavioral tests are the durable regression gate.
 
 ## Baseline identity
 
@@ -18,9 +18,6 @@ This directory freezes the existing View-based UI before any Compose production 
 | Additional appearances | Light; Google Sans Code; system font |
 | Orientation | Portrait, plus representative landscape main/compose states |
 | Seed fixture | 59 debug-owned SMS rows plus debug contacts |
-| Screenshot count | 65 PNGs |
-
-The screenshots contain only curated fake seed data. The role chooser, battery prompt, keyboard, and notification shade are Android system UI and are intentionally included where they form part of the user flow.
 
 ## Reproducing the baseline
 
@@ -65,83 +62,9 @@ adb shell am broadcast \
 
 The receiver performs provider/contact work synchronously and took roughly nine seconds on this AVD. Do not force-stop the app until the broadcast reports completion.
 
-## Screenshot manifest
+## Visual baseline
 
-### Onboarding (`screenshots/onboarding`)
-
-- `01-initial-dark.png`: genuine clean first frame; SMS role absent; Continue disabled.
-- `02-default-sms-role-chooser.png`: Android role chooser before selection.
-- `03-default-sms-role-selected.png`: Clean SMS selected in the role chooser.
-- `04-default-sms-granted.png`: required step complete; Continue enabled.
-- `05-battery-optimization-dialog.png`: Android background-exemption prompt.
-- `06-both-steps-complete.png`: both setup checks complete.
-- `07-empty-inbox-after-onboarding-dark.png`: first inbox with zero provider rows.
-
-The complete onboarding content fits one portrait viewport on this device, so separate top/middle/bottom crops would duplicate the same content.
-
-### Main inbox (`screenshots/main`)
-
-- `01`–`03`: OTP top, middle, and bottom.
-- `04`–`05`: Personal top and bottom.
-- `06`–`07`: Transactions top and bottom.
-- `08`–`09`: Services top and bottom.
-- `10`–`11`: Promotions top and bottom.
-- `12`–`13`: Government top and bottom.
-- `14`: overflow menu.
-- `15`: unread-only filter.
-- `16`: empty search with keyboard.
-- `17`: RATNADEEP results and term highlighting.
-- `18`: no-results search.
-- `19`–`21`: one, multiple, and select-all selection states.
-- `22`: destructive confirmation dialog; Cancel was used and no data was deleted.
-- `23`: optional All tab visible and Promotions notifications muted.
-- `24`–`25`: All top and bottom.
-- `26`: 1.5× system text.
-- `27`: verified light-theme OTP screen.
-- `28`: landscape OTP screen.
-
-### Thread detail (`screenshots/thread`)
-
-- `01`: Personal header, incoming bubbles, SIM marker, call action, and composer.
-- `02`: focused composer and keyboard.
-- `03`: GSM multipart counter at 161 characters.
-- `04`: native text selection handles and Copy/Share/Select-all toolbar.
-- `05`: alphanumeric service thread with a linkified URL and no reply composer.
-- `06`–`07`: long `VM-IRSMSa-G` railway SMS, including the complete plain message bubble and both URLs; no railway-specific card.
-- `08`: Personal thread at 1.5× system text.
-- `09`: verified light-theme Personal thread.
-- `10`: Airtel SPAM badge and current message-body presentation.
-
-### New message (`screenshots/new-message`)
-
-- `01`: initial focus, contacts overlay, disabled send, and keyboard.
-- `02`: valid raw-number suggestion.
-- `03`: one recipient chip.
-- `04`: contact search result.
-- `05`: multiple recipient chips.
-- `06`: body entered and send enabled.
-- `07`: empty recipient-input Backspace removed the last chip.
-- `08`: external `smsto:` recipient and body prefill.
-- `09`: SENDTO at 1.5× system text.
-- `10`: representative landscape SENDTO state.
-
-GSM and Unicode single/multipart counter boundaries are enforced by instrumentation tests. A real send was intentionally not performed, and this AVD exposes only one subscription, so no dual-SIM screenshot exists.
-
-### Settings (`screenshots/settings`)
-
-- `01`: top/default dark state using Google Sans Flex.
-- `02`: default-tab menu with all seven destinations, including optional All.
-- `03`: All disabled and promotional notifications disabled.
-- `04`: complete lower content, About links, version, privacy/terms, and debug control.
-- `05`: All enabled while promotional notifications remain disabled.
-- `06`: light theme with Google Sans Flex.
-- `07`: light theme with Google Sans Code.
-- `08`: light theme with system font.
-- `09`: dark Settings at 1.5× system text.
-
-### Notifications (`screenshots/notifications`)
-
-- `01-random-otp-dark.png`: debug OTP custom notification in the expanded shade, including its copy affordance. Other emulator system notifications remain visible because the shade itself is part of the captured state.
+The migration was manually checked against temporary captures covering onboarding, every inbox tab, search, selection, thread detail, new message, settings, notifications, light/dark themes, fonts, large text, and representative landscape states. Those image assets were removed after the migration completed.
 
 ## Automated baseline
 
@@ -184,7 +107,7 @@ Installed on 1 device
 BUILD SUCCESSFUL
 ```
 
-`./gradlew lintDebug` is not green at the baseline commit. It reports 12 errors in files untouched by Phase 0: three notification permission checks, two suspicious-indent findings, one protected-permission declaration, and six legacy XML `android:tint` findings. No error points to the new regression test, debug seed control, workflow, plan, manifest, or screenshots. These inherited errors must be resolved separately before Phase 0 can satisfy the plan's lint-clean acceptance gate; they were not suppressed with a lint baseline because that would hide real debt.
+`./gradlew lintDebug` is not green at the baseline commit. It reports 12 errors in files untouched by Phase 0: three notification permission checks, two suspicious-indent findings, one protected-permission declaration, and six legacy XML `android:tint` findings. No error points to the new regression test, debug seed control, workflow, plan, or manifest. These inherited errors must be resolved separately before Phase 0 can satisfy the plan's lint-clean acceptance gate; they were not suppressed with a lint baseline because that would hide real debt.
 
 ## Performance checkpoint
 
@@ -204,4 +127,4 @@ The first nine rendered frames included asynchronous inbox startup work and repo
 - The AVD has one active/no usable dual-SIM configuration.
 - No real recipient was contacted and no send action was pressed.
 - External Terms/Privacy/Contacts destinations were not navigated beyond their app-owned launch controls.
-- Screenshots are manual reference evidence; behavioral assertions are the durable CI gate.
+- Behavioral assertions are the durable CI gate.

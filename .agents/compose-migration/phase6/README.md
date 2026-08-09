@@ -27,7 +27,4 @@ AppCompat and Material Components remain because the Activity/window theme and n
 - Performance testing was not repeated, per the explicit performance-test waiver after the large debug-seed pass.
 - No build was installed on the physical phone during this phase.
 
-## Screenshots
-
-- `screenshots/thread`: Compose links and native text selection.
-- `screenshots/notifications`: retained OTP `RemoteViews` notification.
+The temporary screenshots used for final manual verification were removed after migration completion.

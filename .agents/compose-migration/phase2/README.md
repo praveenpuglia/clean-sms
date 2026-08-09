@@ -11,18 +11,9 @@ Phase 2 replaces `screen_setup_default_sms.xml` with a Compose subtree hosted by
 - All onboarding text is moved to `strings.xml`, and the three actions have stable Compose test tags.
 - `screen_setup_default_sms.xml` is deleted after parity verification.
 
-## Emulator evidence
+## Visual verification
 
-All captures use the API 37 Pixel 10 AVD at 1080 × 2424:
-
-1. `screenshots/onboarding/01-initial-dark.png` — true first run, no SMS role, dark theme.
-2. `screenshots/onboarding/02-default-sms-role-chooser.png` — system role chooser.
-3. `screenshots/onboarding/03-default-sms-granted.png` — required step completed and Continue enabled.
-4. `screenshots/onboarding/04-battery-optimization-dialog.png` — system background-exemption prompt.
-5. `screenshots/onboarding/05-both-steps-complete.png` — both completion ticks.
-6. `screenshots/onboarding/06-after-continue.png` — inbox after persisted completion.
-7. `screenshots/onboarding/07-initial-light.png` — true first run in light theme.
-8. `screenshots/onboarding/08-large-text-light.png` — 1.5× text with scrollable content and fixed footer.
+Onboarding was checked on the API 37 Pixel 10 AVD from true first run through both system setup steps and inbox entry, in dark/light themes and large text. The temporary screenshot assets were removed after migration completion.
 
 ## Verification
 

@@ -19,12 +19,4 @@ The legacy pager adapter, three RecyclerView adapters, eight layouts, the tab la
 
 `lintDebug` improved from the inherited Phase 4 result to 6 errors/107 warnings. The remaining errors are pre-existing non-inbox findings and are reserved for the final cleanup gate.
 
-## Screenshots
-
-The `screenshots/main` directory contains:
-
-- OTP, Personal, Transactions, Services, Promotions, Government, and All tabs.
-- Overflow menu and unread-only filter.
-- Search results with the keyboard.
-- Selection mode and delete confirmation.
-- Representative light-theme and large-text states.
+The temporary screenshots used for manual comparison were removed after migration completion.

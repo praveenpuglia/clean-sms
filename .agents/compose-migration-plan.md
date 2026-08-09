@@ -118,7 +118,7 @@ All phases completed on 2026-08-08:
 
 No production UI changes.
 
-Execution status (2026-08-08): complete. The clean-state/manual baseline, 65-screenshot manifest, emulator regression suite, and PR emulator job are in place. The inherited lint debt recorded during this phase was resolved in Phase 6.
+Execution status (2026-08-08): complete. The clean-state/manual baseline, emulator regression suite, and PR emulator job were completed. The temporary screenshot assets were removed after the migration finished, and the inherited lint debt recorded during this phase was resolved in Phase 6.
 
 1. Reset the existing emulator to a true first run:
    - Clear the app package data.
@@ -140,7 +140,7 @@ Execution status (2026-08-08): complete. The clean-state/manual baseline, 65-scr
 
 #### Phase 0 screenshot inventory
 
-Screenshots are stored below `.agents/compose-migration/baseline/` with a manifest recording emulator identity, build commit, theme, font, font scale, and setup commands.
+These states were captured temporarily for comparison during the migration; the image assets were removed after completion.
 
 Onboarding and permissions:
 

@@ -12,19 +12,9 @@ Phase 3 replaces the New Message Activity and contact-suggestion row XML with Co
 - Backspace removal, chip removal, multi-recipient selection, raw-number entry, Activity recreation, accessible icon labels, system-bar insets, light/dark colors, large text, and landscape were checked on the emulator.
 - `activity_new_message.xml`, `item_contact_suggestion.xml`, and `ContactSuggestionAdapter` are deleted.
 
-## Emulator evidence
+## Visual verification
 
-All captures use the API 37 Pixel 10 AVD at 1080 × 2424 in portrait unless noted:
-
-1. `screenshots/new-message/01-empty-dark.png` — initial editor, disabled Send, and empty GSM counter.
-2. `screenshots/new-message/02-raw-number-suggestion-dark.png` — matching local contact plus raw-number action.
-3. `screenshots/new-message/03-recipient-and-message-dark.png` — selected recipient, message content, and enabled Send.
-4. `screenshots/new-message/04-gsm-multipart-dark.png` — 161-character GSM message with `145` remaining and `2 SMS`.
-5. `screenshots/new-message/05-sendto-prefill-light.png` — external SENDTO recipient/body prefill in light mode.
-6. `screenshots/new-message/06-large-text-light.png` — empty editor at 1.5× system text.
-7. `screenshots/new-message/07-landscape-dark.png` — SENDTO prefill in landscape.
-8. `screenshots/new-message/08-multiple-recipients-dark.png` — two recipient chips and horizontally scrolled input.
-9. `screenshots/new-message/09-backspace-removes-last-dark.png` — last recipient removed through Backspace.
+New Message was checked on the API 37 Pixel 10 AVD for empty/valid states, raw and multiple recipients, Backspace removal, SENDTO prefill, multipart counters, dark/light themes, large text, and landscape. The temporary screenshot assets were removed after migration completion.
 
 The emulator has one active subscription, so dual-SIM visibility/toggling cannot be reproduced there. No real SMS was sent; the production send path and provider insertion remain unchanged and the debug tests deliberately stop before the send action.
 

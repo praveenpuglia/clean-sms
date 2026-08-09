@@ -15,21 +15,9 @@ Phase 1 introduces Jetpack Compose without changing the app's Activity-based nav
 
 Dependency choices follow the official [Compose setup guide](https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler), [Compose BOM guidance](https://developer.android.com/develop/ui/compose/bom), and [Activity release notes](https://developer.android.com/jetpack/androidx/releases/activity).
 
-## Screenshot evidence
+## Visual verification
 
-All captures use the existing API 37 Pixel 10 AVD at 1080 × 2424 in portrait:
-
-1. `screenshots/settings/01-top-dark-sans.png` — top, dark, Google Sans Flex.
-2. `screenshots/settings/02-default-tab-menu-dark.png` — all seven destinations, original order, no added selection decoration.
-3. `screenshots/settings/03-all-tab-off-promotions-off-dark.png` — both optional switches disabled.
-4. `screenshots/settings/04-bottom-dark.png` — footer links and debug-only control.
-5. `screenshots/settings/05-all-tab-enabled-dark.png` — All enabled.
-6. `screenshots/settings/06-top-light-sans.png` — light, Google Sans Flex.
-7. `screenshots/settings/07-top-light-monospace.png` — light, Google Sans Code.
-8. `screenshots/settings/08-top-light-system-font.png` — light, system font.
-9. `screenshots/settings/09-top-large-text-dark.png` — dark at 1.5× system text.
-
-The emulator was restored to font scale 1.0, portrait rotation, SMS role holder, seeded debug inbox, and a running `MainActivity` after verification.
+Settings was checked on the API 37 Pixel 10 AVD in dark/light themes, all supported fonts, large text, optional-tab states, and the default-tab menu. The temporary screenshot assets were removed after migration completion.
 
 ## Verification
 
