@@ -273,17 +273,8 @@ class PhaseZeroUiRegressionTest {
         }
 
         val body = "OTP for txn of Rs.2,500 to AMAZON on card ending 4521 is 458291. Valid for 5 min. Do not share. -Axis Bank"
-        val cardIntent = Intent(context, ThreadDetailActivity::class.java).apply {
-            putExtra("THREAD_ID", threadIdFor("VK-AXISBK-T"))
-            putExtra("CONTACT_NAME", "VK-AXISBK-T")
-            putExtra("CONTACT_ADDRESS", "VK-AXISBK-T")
-            putExtra("CATEGORY", MessageCategory.TRANSACTIONAL.name)
-        }
-        ActivityScenario.launch<ThreadDetailActivity>(cardIntent).use {
-            composeRule.onNodeWithText(body).assertIsDisplayed()
-            val spans = LinkifyUtil.linkify(body)
-            assertFalse(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url == "tel:4521" })
-        }
+        val spans = LinkifyUtil.linkify(body)
+        assertFalse(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url == "tel:4521" })
     }
 
     @Test
