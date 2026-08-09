@@ -92,6 +92,8 @@ object MainInboxTestTags {
     const val SEARCH = "main_search"
     const val SEARCH_INPUT = "main_search_input"
     const val CLEAR_SEARCH = "main_clear_search"
+    const val MORE = "main_more"
+    const val STATS = "main_stats"
     const val UNREAD_CHIP = "main_unread_chip"
     const val FAB = "main_fab"
     const val DELETE_DIALOG = "main_delete_dialog"
@@ -125,6 +127,7 @@ fun InboxScreen(
     onSearchModeChange: (Boolean) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onUnreadOnlyChange: (Boolean) -> Unit,
+    onOpenStats: () -> Unit,
     onOpenSettings: () -> Unit,
     onNewMessage: () -> Unit,
     onThreadClick: (ThreadItem) -> Unit,
@@ -178,6 +181,7 @@ fun InboxScreen(
                     onPageSelected = onPageSelected,
                     onSearch = { onSearchModeChange(true) },
                     onUnreadOnlyChange = onUnreadOnlyChange,
+                    onOpenStats = onOpenStats,
                     onOpenSettings = onOpenSettings,
                     onSelectAll = onSelectAll,
                     onDelete = onDeleteRequest,
@@ -286,6 +290,7 @@ private fun InboxHeader(
     onPageSelected: (Int) -> Unit,
     onSearch: () -> Unit,
     onUnreadOnlyChange: (Boolean) -> Unit,
+    onOpenStats: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAll: () -> Unit,
     onDelete: () -> Unit,
@@ -316,7 +321,7 @@ private fun InboxHeader(
                         Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.main_search))
                     }
                     Box {
-                        IconButton(onClick = { menuExpanded = true }) {
+                        IconButton(onClick = { menuExpanded = true }, modifier = Modifier.testTag(MainInboxTestTags.MORE)) {
                             Icon(painterResource(R.drawable.ic_more_vert), contentDescription = stringResource(R.string.main_more_options))
                         }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
@@ -329,6 +334,14 @@ private fun InboxHeader(
                                 trailingIcon = {
                                     if (unreadOnly) Icon(painterResource(R.drawable.ic_check), contentDescription = null)
                                 },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.stats_title)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onOpenStats()
+                                },
+                                modifier = Modifier.testTag(MainInboxTestTags.STATS),
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.settings_title)) },

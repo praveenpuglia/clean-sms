@@ -199,6 +199,7 @@ class MainActivity : AppCompatActivity() {
                         onSearchModeChange = { enabled -> if (enabled) enterSearchMode() else exitSearchMode() },
                         onSearchQueryChange = ::updateSearchQuery,
                         onUnreadOnlyChange = ::setUnreadFilter,
+                        onOpenStats = { startActivity(Intent(this, StatsActivity::class.java)) },
                         onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                         onNewMessage = { startActivity(Intent(this, NewMessageActivity::class.java)) },
                         onThreadClick = ::handleThreadClick,

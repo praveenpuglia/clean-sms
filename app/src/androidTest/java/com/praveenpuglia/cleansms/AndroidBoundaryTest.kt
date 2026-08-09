@@ -194,12 +194,14 @@ class AndroidBoundaryTest {
         val wap = context.packageManager.getReceiverInfo(ComponentName(context, WapPushReceiver::class.java), flags)
         val copy = context.packageManager.getReceiverInfo(ComponentName(context, OtpCopyReceiver::class.java), flags)
         val respond = context.packageManager.getServiceInfo(ComponentName(context, RespondViaMessageService::class.java), flags)
+        val stats = context.packageManager.getActivityInfo(ComponentName(context, StatsActivity::class.java), flags)
 
         assertTrue(sms.exported)
         assertEquals("android.permission.BROADCAST_SMS", sms.permission)
         assertTrue(wap.exported)
         assertEquals("android.permission.BROADCAST_WAP_PUSH", wap.permission)
         assertFalse(copy.exported)
+        assertFalse(stats.exported)
         assertTrue(respond.exported)
         assertEquals("android.permission.SEND_RESPOND_VIA_MESSAGE", respond.permission)
 
