@@ -5,6 +5,7 @@ import android.content.ContentProviderOperation
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
 import android.provider.ContactsContract
 import android.provider.ContactsContract.CommonDataKinds.Phone
 import android.provider.ContactsContract.CommonDataKinds.StructuredName
@@ -20,12 +21,35 @@ import android.widget.Toast
  *   adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED
  * Optional extras:
  *   --ez clear true      // wipe previously-seeded test rows first (default: true)
+ *   --ez seed false      // clear without inserting a new seed set
+ *   --ei count 5000      // generate a large inbox across 500 threads (max: 5,000)
  */
 class DebugSeedReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         Log.i(TAG, "onReceive: action=${intent.action}")
         if (intent.action != ACTION_DEBUG_SEED) return
+
+        val pendingResult = goAsync()
+        Thread({
+            try {
+                seed(context.applicationContext, Intent(intent))
+            } catch (e: RuntimeException) {
+                Log.e(TAG, "Seed failed", e)
+            } finally {
+                pendingResult.finish()
+            }
+        }, "DebugSmsSeeder").start()
+    }
+
+    private fun seed(context: Context, intent: Intent) {
+        val performanceCount = intent.getIntExtra(EXTRA_COUNT, 0)
+        if (intent.hasExtra(EXTRA_COUNT) && performanceCount !in 1..MAX_SEED_COUNT) {
+            val summary = "count must be between 1 and $MAX_SEED_COUNT"
+            Log.w(TAG, summary)
+            showToast(context, summary)
+            return
+        }
 
         val shouldClear = intent.getBooleanExtra(EXTRA_CLEAR, true)
         val resolver = context.contentResolver
@@ -44,32 +68,30 @@ class DebugSeedReceiver : BroadcastReceiver() {
             }
         }
 
+        if (!intent.getBooleanExtra(EXTRA_SEED, true)) {
+            val summary = "Cleared $deleted seeded msgs"
+            Log.i(TAG, summary)
+            showToast(context, summary)
+            return
+        }
+
         val now = System.currentTimeMillis()
+        val messages = if (performanceCount == 0) {
+            SEED_MESSAGES
+        } else {
+            List(performanceCount) { performanceSeed(it) }
+        }
         var inserted = 0
-        for ((i, msg) in SEED_MESSAGES.withIndex()) {
-            val values = ContentValues().apply {
-                put(Telephony.Sms.ADDRESS, msg.address)
-                put(Telephony.Sms.BODY, msg.body)
-                put(Telephony.Sms.DATE, now - msg.ageMinutes * 60_000L)
-                put(Telephony.Sms.DATE_SENT, now - msg.ageMinutes * 60_000L)
-                put(Telephony.Sms.READ, if (msg.read) 1 else 0)
-                put(Telephony.Sms.SEEN, if (msg.read) 1 else 0)
-                put(Telephony.Sms.TYPE, msg.type)
-                put(Telephony.Sms.SERVICE_CENTER, SEED_TAG)
-            }
+        for (batch in messages.chunked(INSERT_BATCH_SIZE)) {
+            val values = batch.map { it.toContentValues(now) }.toTypedArray()
             try {
-                val uri = resolver.insert(Telephony.Sms.CONTENT_URI, values)
-                if (uri != null) {
-                    inserted++
-                } else {
-                    Log.w(TAG, "Insert $i returned null: ${msg.address}")
-                }
+                inserted += resolver.bulkInsert(Telephony.Sms.CONTENT_URI, values)
             } catch (e: Exception) {
-                Log.e(TAG, "Insert $i failed: ${msg.address}", e)
+                Log.e(TAG, "Batch insert failed", e)
             }
         }
 
-        val contacts = seedContacts(context)
+        val contacts = if (performanceCount == 0) seedContacts(context) else 0
 
         val summary = buildString {
             append("Seeded $inserted msgs")
@@ -77,7 +99,13 @@ class DebugSeedReceiver : BroadcastReceiver() {
             if (contacts > 0) append(", $contacts contacts")
         }
         Log.i(TAG, summary)
-        Toast.makeText(context, summary, Toast.LENGTH_LONG).show()
+        showToast(context, summary)
+    }
+
+    private fun showToast(context: Context, message: String) {
+        Handler(context.mainLooper).post {
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     /**
@@ -136,10 +164,45 @@ class DebugSeedReceiver : BroadcastReceiver() {
         val type: Int = Telephony.Sms.MESSAGE_TYPE_INBOX,
     )
 
+    private fun Seed.toContentValues(now: Long) = ContentValues().apply {
+        put(Telephony.Sms.ADDRESS, address)
+        put(Telephony.Sms.BODY, body)
+        put(Telephony.Sms.DATE, now - ageMinutes * 60_000L)
+        put(Telephony.Sms.DATE_SENT, now - ageMinutes * 60_000L)
+        put(Telephony.Sms.READ, if (read) 1 else 0)
+        put(Telephony.Sms.SEEN, if (read) 1 else 0)
+        put(Telephony.Sms.TYPE, type)
+        put(Telephony.Sms.SERVICE_CENTER, SEED_TAG)
+    }
+
+    private fun performanceSeed(index: Int): Seed {
+        val threadIndex = index / PERFORMANCE_MESSAGES_PER_THREAD
+        val template = SEED_MESSAGES[threadIndex % SEED_MESSAGES.size]
+        val suffix = template.address.substringAfterLast('-')
+            .takeIf { it.length == 1 }
+            ?: "S"
+        val address = if (template.address.startsWith('+')) {
+            "+91${9_000_000_000L + threadIndex}"
+        } else {
+            "VM-P${threadIndex.toString().padStart(5, '0')}-$suffix"
+        }
+        return template.copy(
+            address = address,
+            ageMinutes = index.toLong(),
+            read = template.read || index % 5 != 0,
+        )
+    }
+
     companion object {
         private const val TAG = "DebugSeedReceiver"
         const val ACTION_DEBUG_SEED = "com.praveenpuglia.cleansms.DEBUG_SEED"
         const val EXTRA_CLEAR = "clear"
+        const val EXTRA_SEED = "seed"
+        const val EXTRA_COUNT = "count"
+
+        private const val MAX_SEED_COUNT = 5_000
+        private const val PERFORMANCE_MESSAGES_PER_THREAD = 10
+        private const val INSERT_BATCH_SIZE = 1_000
 
         // Sentinel stored in `service_center` so we can find & wipe our seeded rows.
         // Real SMSCs are short numbers like "+919885005444"; this string is harmless if it leaks.

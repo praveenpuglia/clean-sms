@@ -4,14 +4,14 @@
 
 Clean SMS is a privacy-focused Android SMS messaging client written in Kotlin. It provides intelligent message categorization using TRAI headers (Indian SMS standard), OTP management, and spam detection with a modern Material Design 3 UI.
 
-**Current Version**: 1.1.4
-**Min SDK**: 33 (Android 13) | **Target SDK**: 36 (Android 15)
+**Current Version**: 2.0.1
+**Min SDK**: 33 (Android 13) | **Target SDK**: 36 (Android 16)
 
 ## Tech Stack
 
 - **Language**: Kotlin 2.2.10
 - **Build System**: Gradle 9.3.1 with Kotlin DSL (AGP 9.1.0, JDK 21 toolchain)
-- **UI**: Material Design 3 with dynamic colors (Material You)
+- **UI**: Jetpack Compose with Material Design 3 and dynamic colors (Material You); XML is retained only for notification `RemoteViews`
 - **Architecture**: Standard Android with Activities, Receivers, and Services
 - **Key Dependencies**: libphonenumber (phone parsing), AndroidX, Material Components
 
@@ -21,13 +21,13 @@ Clean SMS is a privacy-focused Android SMS messaging client written in Kotlin. I
 app/src/main/java/com/praveenpuglia/cleansms/
 ├── MainActivity.kt              # Main screen with tabs (Messages/OTPs)
 ├── ThreadDetailActivity.kt      # Conversation view
-├── ComposeActivity.kt           # Message composition
 ├── NewMessageActivity.kt        # New message creation
 ├── SettingsActivity.kt          # App settings
+├── ui/                           # Compose screens, shared UI, and theme
 ├── CategoryClassifier.kt        # Message categorization engine (TRAI headers)
-├── IncomingSmsReceiver.kt       # Incoming SMS handling & notifications
+├── SmsDeliverReceiver.kt        # Incoming SMS handling & notifications
 ├── Message.kt / ThreadItem.kt   # Data models
-└── *Adapter.kt                  # RecyclerView adapters
+└── DebugSettings.kt             # Debug-only Compose settings content
 ```
 
 ## Development Workflow
@@ -114,7 +114,7 @@ adb shell am start -n com.praveenpuglia.cleansms/.MainActivity
 
 ### Seeding test messages (debug builds only)
 
-[DebugSeedReceiver](app/src/debug/java/com/praveenpuglia/cleansms/DebugSeedReceiver.kt) populates the inbox with ~56 curated messages covering every TRAI category, all 4 OTP detection strategies, OTP false-positive guards (PNRs, order numbers, monetary-only), Airtel-SPAM-prefixed spam, and a mix of read/unread. Useful for UI testing on a fresh emulator.
+[DebugSeedReceiver](app/src/debug/java/com/praveenpuglia/cleansms/DebugSeedReceiver.kt) populates the inbox with curated messages covering every TRAI category, all 4 OTP detection strategies, OTP false-positive guards (PNRs, order numbers, monetary-only), Airtel-SPAM-prefixed spam, and a mix of read/unread. Useful for UI testing on a fresh emulator.
 
 One-time setup on a new device:
 ```bash
@@ -128,6 +128,11 @@ Seed or re-seed (clears its own prior rows, leaves real messages alone):
 adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED
 ```
 
+For performance testing, generate up to 5,000 messages across 500 threads. Keep the app open until the completion toast appears:
+```bash
+adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED --ei count 5000
+```
+
 Seeded rows are tagged via `service_center=CLEAN_SMS_DEBUG_SEED`. The receiver only exists in the `debug` source set, so release builds are unaffected.
 
 ## Project Principles
@@ -135,12 +140,13 @@ Seeded rows are tagged via `service_center=CLEAN_SMS_DEBUG_SEED`. The receiver o
 Enduring rules that govern all changes. PR descriptions should call out any deviations.
 
 ### Material Design 3 & Theming
-- Use Material Components views (`MaterialToolbar`, `MaterialCardView`, `TextInputLayout`/`TextInputEditText`, `Chip`, `MaterialButton`, `FloatingActionButton`). No plain `EditText` unless justified.
+- Use Material 3 Compose components. Keep composables stateless where practical: Activities own Android framework work and pass display state plus callbacks.
 - Typography follows the M3 type scale (Title Medium 16sp for primary text, Body Medium 14sp for metadata, Body Small 12sp for timestamps, Label Small 11sp for badges).
-- Icons: 24dp standard, 16dp only for inline metadata. **All icons/drawables must be theme-aware** — use `app:tint="?attr/colorOnSurface"` (or appropriate theme attribute), never `@android:color/white` or other hardcoded colors.
-- Reference theme attributes (`?attr/colorSurface`, `?attr/colorPrimary`) for semantic colors — no inline color literals.
+- Icons: 24dp standard, 16dp only for inline metadata. **All icons/drawables must be theme-aware** — tint with the appropriate `MaterialTheme.colorScheme` role, never hardcoded colors.
+- Use `MaterialTheme.colorScheme` semantic roles rather than inline color literals.
 - Dynamic color (Material You) on Android 12+; static M3 palette as fallback. Dark theme must reach parity.
 - Use M3 shape tokens; avoid arbitrary corner radii. Elevation only where semantically meaningful.
+- `notification_otp.xml` is the sole screen-layout exception because Android custom notifications require `RemoteViews`.
 
 ### UX & Interaction
 - **No implicit navigation side-effects**: sending a message does NOT auto-open the thread view. User stays in context.
@@ -150,11 +156,11 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 - Accessibility: 48dp minimum touch targets, content descriptions on all icon-only buttons (Back, Send, FAB, Delete), TalkBack support, chips/text fields handle large font scaling.
 
 ### Architecture & Performance
-- Separation of concerns: Activities/Fragments render and handle input; data access (ContentResolver queries) belongs in repository-style helpers as complexity grows.
+- Separation of concerns: Activities own framework operations and data loading; composables render state and emit callbacks. Move `ContentResolver` queries into repository-style helpers only as complexity warrants.
 - Defensive queries: always null/empty-check cursor columns; close cursors with `use { }` blocks.
 - OTP detection and thread enrichment run off the UI thread (coroutines / structured concurrency — no ad hoc thread spawning).
 - Lazy/incremental loading for contacts and large lists; debounce/batch on-device queries.
-- `RecyclerView` with stable IDs and `ListAdapter`/`DiffUtil` for dynamic sets.
+- Compose lists use `LazyColumn`/`LazyRow` with stable keys; paged screens use Compose pagers with stable page state.
 
 ### Code Style
 - Idiomatic Kotlin; data classes, extension functions sparingly, avoid long parameter lists.
@@ -234,10 +240,10 @@ See [RELEASE_GUIDE.md](RELEASE_GUIDE.md) for detailed instructions.
 3. Update UI in relevant adapters
 
 ### Modifying notification behavior
-- Edit `IncomingSmsReceiver.kt` for incoming SMS notifications
+- Edit `SmsDeliverReceiver.kt` for incoming SMS notifications
 - Edit `OtpCopyReceiver.kt` for OTP-related notifications
 
 ### Updating UI themes
-- Light theme: `res/values/themes.xml`
-- Dark theme: `res/values-night/themes.xml`
-- Colors: `res/values/colors.xml`
+- Compose theme: `ui/theme/CleanSmsTheme.kt`
+- Activity/window theme: `res/values/themes.xml` and `res/values-night/themes.xml`
+- Notification colors: `res/values/colors.xml`

@@ -1,8 +1,10 @@
 package com.praveenpuglia.cleansms
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.provider.Telephony
 import android.util.Log
 import android.content.ContentValues
@@ -16,6 +18,7 @@ import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.TaskStackBuilder
+import androidx.core.content.ContextCompat
 import kotlin.math.absoluteValue
 import com.praveenpuglia.cleansms.R
 
@@ -56,10 +59,10 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         val photoUri = enriched?.photoUri
         val lookupUri = enriched?.lookupUri
 
-    val threadId = findOrCreateThreadId(context, originatingAddress)
-    val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
-    // Unified high precision OTP detection (keyword + proximity) per CategoryClassifier
-    val otpCode = CategoryClassifier.extractHighPrecisionOtp(fullBody)
+        val threadId = findOrCreateThreadId(context, originatingAddress)
+        val category = CategoryStorage.getCategoryOrCompute(context, originatingAddress, threadId)
+        // Unified high precision OTP detection (keyword + proximity) per CategoryClassifier
+        val otpCode = CategoryClassifier.extractHighPrecisionOtp(fullBody)
 
         postNotification(
             context = context,
@@ -191,6 +194,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         }
         val bmp = loadBitmap(context, photoUri)
         if (bmp != null) builder.setLargeIcon(bmp)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         NotificationManagerCompat.from(context).notify(notificationId, builder.build())
     }
 

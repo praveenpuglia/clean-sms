@@ -4,6 +4,7 @@ import java.io.FileInputStream
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 // Load keystore properties
@@ -64,17 +65,27 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        compose = true
     }
 }
 
 dependencies {
+    val composeBom = platform(libs.androidx.compose.bom)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    implementation("androidx.recyclerview:recyclerview:1.3.1")
+    implementation(composeBom)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    debugCompileOnly(libs.androidx.compose.ui.tooling)
     // libphonenumber for robust phone number parsing/matching
     implementation("com.googlecode.libphonenumber:libphonenumber:8.13.22")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(composeBom)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
