@@ -304,7 +304,7 @@ private fun SettingsScreen(
 
 @Composable
 private fun SettingsHeader(onBack: () -> Unit) {
-    Surface(shadowElevation = 3.dp) {
+    Surface {
         Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

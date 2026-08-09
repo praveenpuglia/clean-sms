@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -58,7 +59,7 @@ fun OnboardingScreen(
     onContinue: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -71,16 +72,16 @@ fun OnboardingScreen(
                 Box(
                     modifier = Modifier
                         .size(80.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(CircleShape)
                         .semantics { contentDescription = logoDescription },
                 ) {
                     Image(
-                        painter = painterResource(R.drawable.ic_launcher_background),
+                        painter = painterResource(R.mipmap.ic_launcher_background),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                     )
                     Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                        painter = painterResource(R.mipmap.ic_launcher_foreground),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -150,10 +151,10 @@ fun OnboardingScreen(
                 Spacer(Modifier.height(32.dp))
             }
 
-            Surface(tonalElevation = 8.dp, shadowElevation = 8.dp) {
+            Surface(shadowElevation = 8.dp) {
                 Button(
                     onClick = onContinue,
-                    enabled = state.isDefaultSmsApp,
+                    enabled = state.isDefaultSmsApp && state.isBatteryOptimizationIgnored,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()

@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -50,7 +49,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.praveenpuglia.cleansms.ContactSuggestion
 import com.praveenpuglia.cleansms.R
+import com.praveenpuglia.cleansms.ui.ComposerTopShadow
 import com.praveenpuglia.cleansms.ui.ContactAvatar
+import com.praveenpuglia.cleansms.ui.SimSelectorButton
 
 object NewMessageTestTags {
     const val BODY = "new_message_body"
@@ -118,7 +119,7 @@ fun NewMessageScreen(
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
-            Surface(shadowElevation = 3.dp) {
+            Surface {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,8 +181,8 @@ fun NewMessageScreen(
             }
 
             CounterRow(counter)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shadowElevation = 4.dp) {
+            ComposerTopShadow()
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
                 RecipientBar(
                     recipients = recipients,
                     recipientQuery = recipientQuery,
@@ -316,22 +317,11 @@ private fun RecipientBar(
         }
 
         if (showSimSelector && selectedSimNumber != null) {
-            IconButton(onClick = onSimToggle, modifier = Modifier.size(40.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_sim_card),
-                        contentDescription = stringResource(R.string.new_message_sim, selectedSimNumber),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        selectedSimNumber.toString(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 5.dp),
-                    )
-                }
-            }
+            SimSelectorButton(
+                slot = selectedSimNumber,
+                onClick = onSimToggle,
+                description = stringResource(R.string.new_message_sim, selectedSimNumber),
+            )
         }
         FilledIconButton(
             onClick = onSend,

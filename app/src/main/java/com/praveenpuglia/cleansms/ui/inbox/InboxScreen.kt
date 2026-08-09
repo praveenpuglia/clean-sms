@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -75,6 +76,7 @@ import com.praveenpuglia.cleansms.R
 import com.praveenpuglia.cleansms.SearchResultItem
 import com.praveenpuglia.cleansms.ThreadItem
 import com.praveenpuglia.cleansms.ui.ContactAvatar
+import com.praveenpuglia.cleansms.ui.SimIndicator
 import java.util.Calendar
 import java.util.Locale
 
@@ -235,7 +237,7 @@ private fun SearchHeader(query: String, onQueryChange: (String) -> Unit, onClose
         focusRequester.requestFocus()
         keyboard?.show()
     }
-    Surface(shadowElevation = 3.dp) {
+    Surface {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -289,7 +291,7 @@ private fun InboxHeader(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    Surface(shadowElevation = 3.dp, modifier = Modifier.testTag(MainInboxTestTags.HEADER)) {
+    Surface(modifier = Modifier.testTag(MainInboxTestTags.HEADER)) {
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 20.dp),
@@ -392,8 +394,8 @@ private fun InboxTabs(
                             )
                         }
                         Box {
-                            Text(pageLabel(page))
-                            if (unread) Box(Modifier.align(Alignment.TopEnd).padding(start = 4.dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
+                            Text(pageLabel(page), modifier = Modifier.padding(end = 8.dp))
+                            if (unread) Box(Modifier.align(Alignment.TopEnd).offset(y = (-2).dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
                         }
                     }
                 },
@@ -541,6 +543,7 @@ private fun ThreadRow(
                         item.snippet,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
+                        lineHeight = 18.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -603,9 +606,18 @@ private fun OtpList(
                                 modifier = Modifier.weight(1f),
                             )
                             Text(formatInboxDate(item.date), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
-                            if (item.simSlot != null || item.subscriptionId != null) SimIndicator(item.simSlot)
+                            if (item.simSlot != null || item.subscriptionId != null) {
+                                SimIndicator(item.simSlot, Modifier.padding(start = 4.dp))
+                            }
                         }
-                        Text(item.body.trim(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            item.body.trim(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         if (item.otpCode.isNotBlank()) {
                             Surface(
                                 color = MaterialTheme.colorScheme.secondaryContainer,
@@ -641,29 +653,30 @@ private fun MessageList(
         itemsIndexed(items, key = { _, item -> item.messageId }) { _, item ->
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { onClick(item) }.padding(12.dp).testTag(MainInboxTestTags.message(item.messageId)),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
                 SearchAvatar(item)
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             item.senderDisplay ?: item.sender,
-                            fontSize = 15.sp,
+                            fontSize = 16.sp,
                             fontWeight = if (item.isUnread) FontWeight.SemiBold else FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
                         Text(formatInboxDate(item.date), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
-                        if (item.simSlot != null || item.subscriptionId != null) SimIndicator(item.simSlot)
+                        if (item.simSlot != null || item.subscriptionId != null) {
+                            SimIndicator(item.simSlot, Modifier.padding(start = 4.dp))
+                        }
                     }
                     Text(
                         highlightedText(item.body, query, MaterialTheme.colorScheme.primaryContainer),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
+                        lineHeight = 18.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
@@ -702,9 +715,13 @@ private fun InboxAvatar(
             Surface(
                 color = MaterialTheme.colorScheme.error,
                 shape = CircleShape,
-                modifier = Modifier.align(Alignment.BottomCenter).size(20.dp).semantics { contentDescription = spamDescription },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = 8.dp)
+                    .size(16.dp)
+                    .semantics { contentDescription = spamDescription },
             ) {
-                Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = MaterialTheme.colorScheme.onError, modifier = Modifier.padding(3.dp))
+                Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = MaterialTheme.colorScheme.onError, modifier = Modifier.padding(2.5.dp))
             }
         }
         if (selected) {
@@ -720,17 +737,9 @@ private fun SearchAvatar(item: SearchResultItem) {
     val label = item.senderDisplay ?: item.sender
     val context = LocalContext.current
     val (background, foreground) = remember(label) { AvatarColorResolver.resolve(context, label) }
-    Box(Modifier.padding(end = 12.dp).size(44.dp)) {
-        ContactAvatar(label, item.contactPhotoUri, 44.dp, Color(background), Color(foreground))
+    Box(Modifier.padding(end = 12.dp).size(48.dp)) {
+        ContactAvatar(label, item.contactPhotoUri, 48.dp, Color(background), Color(foreground))
         if (item.isUnread) Box(Modifier.align(Alignment.TopEnd).padding(2.dp).size(10.dp).background(MaterialTheme.colorScheme.error, CircleShape))
-    }
-}
-
-@Composable
-private fun SimIndicator(slot: Int?) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(start = 4.dp).size(width = 10.dp, height = 13.dp)) {
-        Icon(painterResource(R.drawable.ic_sim_card), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text((slot ?: "?").toString(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 7.sp, fontWeight = FontWeight.Bold)
     }
 }
 

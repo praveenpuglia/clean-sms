@@ -318,6 +318,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun completeOnboarding() {
+        if (!onboardingUiState.isDefaultSmsApp || !onboardingUiState.isBatteryOptimizationIgnored) return
+
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             .edit()
             .putBoolean(PREF_ONBOARDING_COMPLETED, true)

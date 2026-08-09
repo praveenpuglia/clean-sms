@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -42,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -66,7 +68,10 @@ import com.praveenpuglia.cleansms.MessageCategory
 import com.praveenpuglia.cleansms.MessageListItem
 import com.praveenpuglia.cleansms.R
 import com.praveenpuglia.cleansms.SpamDetector
+import com.praveenpuglia.cleansms.ui.ComposerTopShadow
 import com.praveenpuglia.cleansms.ui.ContactAvatar
+import com.praveenpuglia.cleansms.ui.SimIndicator
+import com.praveenpuglia.cleansms.ui.SimSelectorButton
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import java.util.Locale
@@ -183,7 +188,7 @@ private fun ThreadHeader(
     val label = contactName ?: contactAddress ?: stringResource(R.string.thread_unknown_contact)
     val context = LocalContext.current
     val (avatarBackground, avatarForeground) = remember(label) { AvatarColorResolver.resolve(context, label) }
-    Surface(shadowElevation = 3.dp) {
+    Surface {
         Column {
             Row(
                 modifier = Modifier
@@ -246,14 +251,17 @@ private fun MessageBubble(
     onHighlightFinished: () -> Unit,
 ) {
     val incoming = message.type == TelephonyMessageType.INCOMING
+    val spam = incoming && SpamDetector.isSpam(message.body)
     val baseColor = if (incoming) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primaryContainer
     val contentColor = if (incoming) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimaryContainer
     val highlight = remember(message.id) { Animatable(0f) }
     LaunchedEffect(highlighted) {
         if (highlighted) {
             delay(80)
-            highlight.animateTo(0.86f, tween(420))
-            highlight.animateTo(0f, tween(420))
+            repeat(2) {
+                highlight.animateTo(1f, tween(180))
+                highlight.animateTo(0f, tween(180))
+            }
             onHighlightFinished()
         }
     }
@@ -265,39 +273,57 @@ private fun MessageBubble(
             .testTag(ThreadDetailTestTags.message(message.id)),
         contentAlignment = if (incoming) Alignment.CenterStart else Alignment.CenterEnd,
     ) {
-        Surface(
-            color = lerp(baseColor, MaterialTheme.colorScheme.primaryContainer, highlight.value),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.padding(
-                start = if (incoming) 0.dp else 60.dp,
-                end = if (incoming) 60.dp else 0.dp,
-            ),
+        Box(
+            modifier = Modifier
+                .padding(
+                    start = if (incoming) 0.dp else 60.dp,
+                    end = if (incoming) 60.dp else 0.dp,
+                )
+                .padding(top = if (spam) 12.dp else 0.dp),
         ) {
-            Column(Modifier.padding(12.dp)) {
-                if (incoming && SpamDetector.isSpam(message.body)) SpamBadge()
-                MessageBody(message.body, contentColor)
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                color = lerp(baseColor, MaterialTheme.colorScheme.primary, highlight.value * 0.32f),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Column(
+                    Modifier.padding(
+                        start = 12.dp,
+                        top = if (spam) 16.dp else 12.dp,
+                        end = 12.dp,
+                        bottom = 12.dp,
+                    ),
                 ) {
-                    Text(formatMessageTime(message.date), color = contentColor, fontSize = 11.sp)
-                    message.simSlot?.let {
-                        Spacer(Modifier.width(4.dp))
-                        SimIndicator(it, contentColor)
-                    }
-                    if (!incoming && message.status != 64) {
-                        Icon(
-                            painterResource(R.drawable.ic_tick_single),
-                            contentDescription = stringResource(R.string.thread_sent_status),
-                            tint = contentColor,
-                            modifier = Modifier
-                                .padding(start = 4.dp)
-                                .size(11.dp),
-                        )
+                    MessageBody(message.body, contentColor)
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(formatMessageTime(message.date), color = contentColor, fontSize = 11.sp)
+                        message.simSlot?.let {
+                            Spacer(Modifier.width(4.dp))
+                            SimIndicator(it, color = contentColor)
+                        }
+                        if (!incoming && message.status != 64) {
+                            Icon(
+                                painterResource(R.drawable.ic_tick_single),
+                                contentDescription = stringResource(R.string.thread_sent_status),
+                                tint = contentColor,
+                                modifier = Modifier
+                                    .padding(start = 4.dp)
+                                    .size(11.dp),
+                            )
+                        }
                     }
                 }
+            }
+            if (spam) {
+                SpamBadge(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .graphicsLayer { translationY = -size.height / 2f },
+                )
             }
         }
     }
@@ -328,38 +354,30 @@ private fun MessageBody(body: String, color: Color) {
 }
 
 @Composable
-private fun SpamBadge() {
+private fun SpamBadge(modifier: Modifier = Modifier) {
     Surface(
-        color = Color(0xFFF44336),
-        shape = RoundedCornerShape(4.dp),
-        modifier = Modifier.padding(bottom = 6.dp),
+        color = MaterialTheme.colorScheme.error,
+        shape = CircleShape,
+        modifier = modifier,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 painterResource(R.drawable.ic_warning),
                 contentDescription = stringResource(R.string.thread_spam_warning),
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onError,
                 modifier = Modifier.size(12.dp),
             )
             Text(
                 stringResource(R.string.thread_spam),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onError,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 3.dp),
             )
         }
-    }
-}
-
-@Composable
-private fun SimIndicator(slot: Int, color: Color) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(width = 10.dp, height = 12.dp)) {
-        Icon(painterResource(R.drawable.ic_sim_card), contentDescription = null, tint = color)
-        Text(slot.toString(), color = color, fontSize = 7.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -374,7 +392,6 @@ private fun DayIndicator(label: String) {
         Surface(
             color = Color.Black.copy(alpha = 0.7f),
             shape = RoundedCornerShape(10.dp),
-            shadowElevation = 2.dp,
         ) {
             Text(
                 label,
@@ -406,55 +423,60 @@ private fun MessageComposer(
             keyboard?.show()
         }
     }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 60.dp)
-                .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    Column {
+        ComposerTopShadow()
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
         ) {
-            BasicTextField(
-                value = message,
-                onValueChange = onMessageChange,
-                maxLines = 4,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-                    .focusRequester(focusRequester)
-                    .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
-                decorationBox = { input ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (message.isEmpty()) {
-                            Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        input()
-                    }
-                },
-            )
-            Text(message.length.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-            if (showSimSelector && selectedSimNumber != null) {
-                IconButton(onClick = onSimToggle, modifier = Modifier.size(36.dp)) {
-                    SimIndicator(selectedSimNumber, MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            FilledIconButton(
-                onClick = onSend,
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .size(40.dp)
-                    .testTag(ThreadDetailTestTags.SEND),
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 60.dp)
+                    .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    painterResource(R.drawable.ic_send),
-                    contentDescription = stringResource(R.string.new_message_send),
-                    modifier = Modifier.size(20.dp),
+                BasicTextField(
+                    value = message,
+                    onValueChange = onMessageChange,
+                    maxLines = 4,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp)
+                        .focusRequester(focusRequester)
+                        .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
+                    decorationBox = { input ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (message.isEmpty()) {
+                                Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            input()
+                        }
+                    },
                 )
+                Text(message.length.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                if (showSimSelector && selectedSimNumber != null) {
+                    SimSelectorButton(
+                        slot = selectedSimNumber,
+                        onClick = onSimToggle,
+                        description = stringResource(R.string.new_message_sim, selectedSimNumber),
+                    )
+                }
+                FilledIconButton(
+                    onClick = onSend,
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(40.dp)
+                        .testTag(ThreadDetailTestTags.SEND),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_send),
+                        contentDescription = stringResource(R.string.new_message_send),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }

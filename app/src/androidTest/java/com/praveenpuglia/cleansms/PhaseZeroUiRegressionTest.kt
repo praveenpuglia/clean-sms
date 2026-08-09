@@ -61,15 +61,25 @@ class PhaseZeroUiRegressionTest {
     }
 
     @Test
-    fun incompleteOnboardingShowsSetupAndAccessibleActions() {
+    fun onboardingRequiresBothSetupStepsToContinue() {
         ensureSmsRole()
+        shell("dumpsys deviceidle whitelist -$packageName")
         prefs.edit().putBoolean("onboarding_completed", false).commit()
 
         ActivityScenario.launch(MainActivity::class.java).use {
             composeRule.onNodeWithText("Welcome to Clean SMS").assertIsDisplayed()
             composeRule.onNodeWithTag(OnboardingTestTags.SET_DEFAULT).assertIsNotEnabled()
-            composeRule.onNodeWithTag(OnboardingTestTags.CONTINUE).assertIsEnabled()
+            composeRule.onNodeWithTag(OnboardingTestTags.CONTINUE).assertIsNotEnabled()
             composeRule.onNodeWithContentDescription("Clean SMS logo").assertIsDisplayed()
+        }
+
+        shell("dumpsys deviceidle whitelist +$packageName")
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use {
+                composeRule.onNodeWithTag(OnboardingTestTags.CONTINUE).assertIsEnabled()
+            }
+        } finally {
+            shell("dumpsys deviceidle whitelist -$packageName")
         }
     }
 
