@@ -36,6 +36,7 @@ import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingTestTags
 import com.praveenpuglia.cleansms.ui.newmessage.NewMessageTestTags
 import com.praveenpuglia.cleansms.ui.thread.ThreadDetailTestTags
+import com.praveenpuglia.cleansms.ui.stats.StatsTestTags
 import org.junit.After
 import org.junit.Rule
 import org.junit.Assert.assertEquals
@@ -275,6 +276,22 @@ class PhaseZeroUiRegressionTest {
         val body = "OTP for txn of Rs.2,500 to AMAZON on card ending 4521 is 458291. Valid for 5 min. Do not share. -Axis Bank"
         val spans = LinkifyUtil.linkify(body)
         assertFalse(spans.getSpans(0, spans.length, URLSpan::class.java).any { it.url == "tel:4521" })
+    }
+
+    @Test
+    fun seededStatsLoadFromTheSmsProvider() {
+        prepareSeededInbox()
+
+        ActivityScenario.launch(StatsActivity::class.java).use {
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                composeRule.onAllNodesWithTag(StatsTestTags.TOTAL_MESSAGES)
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("Stats for nerds").assertIsDisplayed()
+            composeRule.onNodeWithTag(StatsTestTags.TOTAL_MESSAGES).assertIsDisplayed()
+            composeRule.onNodeWithTag(StatsTestTags.TOTAL_THREADS).assertIsDisplayed()
+            composeRule.onNodeWithText("Messages per day").assertIsDisplayed()
+        }
     }
 
     @Test

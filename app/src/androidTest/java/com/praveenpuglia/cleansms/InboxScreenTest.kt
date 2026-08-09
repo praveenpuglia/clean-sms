@@ -15,6 +15,7 @@ import com.praveenpuglia.cleansms.ui.inbox.InboxScreen
 import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -30,6 +31,7 @@ class InboxScreenTest {
         val all = SearchResultItem(30, 30, "VM-BANK-T", null, "Rs.500 credited", 1, null, null, MessageCategory.TRANSACTIONAL, isUnread = true)
         var selectedPage by mutableIntStateOf(0)
         var copied = ""
+        var openedStats = false
         composeRule.setContent {
             CleanSmsTheme {
                 InboxScreen(
@@ -53,6 +55,7 @@ class InboxScreenTest {
                     onSearchModeChange = {},
                     onSearchQueryChange = {},
                     onUnreadOnlyChange = {},
+                    onOpenStats = { openedStats = true },
                     onOpenSettings = {},
                     onNewMessage = {},
                     onThreadClick = {},
@@ -87,5 +90,9 @@ class InboxScreenTest {
         composeRule.onNodeWithTag(MainInboxTestTags.thread(10)).assertIsDisplayed()
         composeRule.onNodeWithText("2").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Contains spam").assertIsDisplayed()
+
+        composeRule.onNodeWithTag(MainInboxTestTags.MORE).performClick()
+        composeRule.onNodeWithTag(MainInboxTestTags.STATS).performClick()
+        composeRule.runOnIdle { assertTrue(openedStats) }
     }
 }
