@@ -93,6 +93,34 @@ class CategoryClassifierTest {
         assertNull(CategoryClassifier.extractHighPrecisionOtp("OTP: 1234".padEnd(1001, 'x')))
     }
 
+    @Test
+    fun categorizesTraiHeadersPhoneNumbersAndShortCodes() {
+        listOf(
+            "VM-OFFER-P" to MessageCategory.PROMOTIONAL,
+            "vm-hdfcbk-t" to MessageCategory.TRANSACTIONAL,
+            "JX-BOLT-S" to MessageCategory.SERVICE,
+            "VM-IRSMSA-G" to MessageCategory.GOVERNMENT,
+            "+91 98765-43210" to MessageCategory.PERSONAL,
+            "9876543210" to MessageCategory.PERSONAL,
+            "620014" to MessageCategory.SERVICE,
+            "VM-HDFCBK" to MessageCategory.UNKNOWN,
+            "VM-HDFCBK-X" to MessageCategory.UNKNOWN,
+            "MEESHO" to MessageCategory.UNKNOWN,
+        ).forEach { (address, expected) ->
+            assertEquals(address, expected, CategoryClassifier.categorizeAddress(address))
+        }
+    }
+
+    @Test
+    fun rejectsCodesWhoseContextIdentifiesAnotherPurpose() {
+        listOf(
+            "1234 is your promo code",
+            "5678 is the order code",
+        ).forEach { message ->
+            assertNull(message, CategoryClassifier.extractHighPrecisionOtp(message))
+        }
+    }
+
     private fun assertOtp(expected: String, message: String) {
         assertEquals(message, expected, CategoryClassifier.extractHighPrecisionOtp(message))
     }

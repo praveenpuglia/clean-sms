@@ -19,6 +19,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -142,14 +144,22 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsNotEnabled()
             composeRule.onNodeWithTag(NewMessageTestTags.RECIPIENT_INPUT).performTextReplacement("9988776655")
             composeRule.onNodeWithText("Send SMS to 9988776655").performClick()
+            composeRule.onNodeWithTag(NewMessageTestTags.RECIPIENT_INPUT).performTextReplacement("8877665544")
+            composeRule.onNodeWithText("Send SMS to 8877665544").performClick()
             composeRule.onNodeWithTag(NewMessageTestTags.BODY).performTextReplacement("Hello")
             composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsEnabled()
 
             composeRule.onNodeWithTag(NewMessageTestTags.RECIPIENT_INPUT)
                 .performClick()
                 .performKeyInput { pressKey(Key.Backspace) }
+            composeRule.onNodeWithText("9988776655").assertIsDisplayed()
+            composeRule.onNodeWithText("8877665544").assertDoesNotExist()
+            composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsEnabled()
+            composeRule.onNodeWithContentDescription("Remove 9988776655").performClick()
             composeRule.onNodeWithTag(NewMessageTestTags.SEND).assertIsNotEnabled()
             composeRule.onNodeWithText("9988776655").assertDoesNotExist()
+            composeRule.onNodeWithTag(NewMessageTestTags.RECIPIENT_INPUT).performTextReplacement("not a number")
+            composeRule.onNodeWithText("Send SMS to not a number").assertDoesNotExist()
         }
     }
 
@@ -162,12 +172,17 @@ class PhaseZeroUiRegressionTest {
         val googleMessageId = messageIdFor("VK-GOOGLE-T", "G-892341")
 
         ActivityScenario.launch(MainActivity::class.java).use {
-            SystemClock.sleep(2_000)
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag(MainInboxTestTags.otpCode(googleMessageId))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.onNodeWithText("All").assertIsDisplayed()
             composeRule.onNodeWithText("OTPs").assertIsDisplayed()
             composeRule.onNodeWithText("Personal").assertIsDisplayed()
             composeRule.onNodeWithTag(MainInboxTestTags.tab(1)).assertIsSelected()
             composeRule.onNodeWithTag(MainInboxTestTags.tabUnread(0), useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithTag(MainInboxTestTags.tabUnread(1), useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithTag(MainInboxTestTags.tabUnread(2), useUnmergedTree = true).assertExists()
             composeRule.onNodeWithTag(MainInboxTestTags.otpCode(googleMessageId)).performClick()
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             assertEquals("892341", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
@@ -175,6 +190,7 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithText("Personal").performClick()
             composeRule.onNodeWithTag(MainInboxTestTags.thread(momThreadId)).assertIsDisplayed()
                 .performTouchInput { longClick() }
+            composeRule.onNodeWithText("Mom").assertIsDisplayed()
             composeRule.onNodeWithText("1 selected").assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Delete selected conversations or messages").performClick()
             composeRule.onNodeWithTag(MainInboxTestTags.DELETE_DIALOG).assertIsDisplayed()
@@ -188,8 +204,7 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithTag(MainInboxTestTags.SEARCH).performClick()
             composeRule.onNodeWithTag(MainInboxTestTags.SEARCH_INPUT).performTextReplacement("RATNADEEP")
             composeRule.onNodeWithTag(MainInboxTestTags.CLEAR_SEARCH).assertIsDisplayed()
-            pressBack()
-            pressBack()
+            composeRule.onNodeWithContentDescription("Close search").performClick()
             composeRule.onNodeWithText("Messages").assertIsDisplayed()
         }
 
@@ -200,7 +215,9 @@ class PhaseZeroUiRegressionTest {
             putExtra("CATEGORY", MessageCategory.PERSONAL.name)
         }
         ActivityScenario.launch<ThreadDetailActivity>(intent).use {
-            SystemClock.sleep(1_000)
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag(ThreadDetailTestTags.COMPOSER).fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.onNodeWithTag(ThreadDetailTestTags.CONTACT_NAME).assertTextContains("Mom")
             composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER_INPUT).assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Call").assertIsDisplayed()
@@ -220,7 +237,11 @@ class PhaseZeroUiRegressionTest {
         }
 
         ActivityScenario.launch<ThreadDetailActivity>(intent).use {
-            SystemClock.sleep(1_000)
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithText(
+                    "Your order 7283910 worth Rs.1,499 will be delivered by 5pm today. Track at flipkart.com/track/7283910"
+                ).fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.onNodeWithTag(ThreadDetailTestTags.CONTACT_NAME).assertTextContains("BP-FLPKRT-S")
             composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER).assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Call").assertDoesNotExist()
@@ -244,6 +265,10 @@ class PhaseZeroUiRegressionTest {
             putExtra("TARGET_MESSAGE_ID", targetId)
         }
         ActivityScenario.launch<ThreadDetailActivity>(targetIntent).use {
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag(ThreadDetailTestTags.message(targetId))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.onNodeWithTag(ThreadDetailTestTags.message(targetId)).assertIsDisplayed()
         }
 
