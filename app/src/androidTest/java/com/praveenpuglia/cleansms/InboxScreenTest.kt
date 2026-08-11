@@ -67,6 +67,7 @@ class InboxScreenTest {
                     onCopyOtp = { copied = it },
                     onMessageClick = {},
                     onSelectAll = {},
+                    onMarkAsRead = {},
                     onDeleteRequest = {},
                     onDeleteConfirm = {},
                     onDeleteDismiss = {},

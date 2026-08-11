@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.provider.Telephony
 import android.text.style.URLSpan
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -25,11 +26,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.pressKey
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
@@ -171,6 +170,7 @@ class PhaseZeroUiRegressionTest {
         SettingsActivity.setDefaultTab(context, SettingsActivity.DefaultTab.OTP)
         val momThreadId = threadIdFor("+919876543210")
         val googleMessageId = messageIdFor("VK-GOOGLE-T", "G-892341")
+        val axisMessageId = messageIdFor("VK-AXISBK-T", "OTP for txn")
 
         ActivityScenario.launch(MainActivity::class.java).use {
             composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -187,18 +187,33 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithTag(MainInboxTestTags.otpCode(googleMessageId)).performClick()
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             assertEquals("892341", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+            assertFalse(messageIsRead(googleMessageId))
+            assertFalse(messageIsRead(axisMessageId))
+            composeRule.onNodeWithTag(MainInboxTestTags.otp(googleMessageId))
+                .performSemanticsAction(SemanticsActions.OnLongClick)
+            composeRule.onNodeWithContentDescription("Select all items").performClick()
+            composeRule.onNodeWithContentDescription("Mark selected conversations or messages as read").performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) { messageIsRead(googleMessageId) && messageIsRead(axisMessageId) }
 
             composeRule.onNodeWithText("Personal").performClick()
+            assertTrue(threadHasUnread(momThreadId))
             composeRule.onNodeWithTag(MainInboxTestTags.thread(momThreadId)).assertIsDisplayed()
-                .performTouchInput { longClick() }
+                .performSemanticsAction(SemanticsActions.OnLongClick)
             composeRule.onNodeWithText("Mom").assertIsDisplayed()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithText("1 selected").fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.onNodeWithText("1 selected").assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Delete selected conversations or messages").performClick()
             composeRule.onNodeWithTag(MainInboxTestTags.DELETE_DIALOG).assertIsDisplayed()
             composeRule.onNodeWithText("Cancel").performClick()
-            pressBack()
+            composeRule.onNodeWithContentDescription("Mark selected conversations or messages as read").performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) { !threadHasUnread(momThreadId) }
 
-            composeRule.onNodeWithContentDescription("More options").performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag(MainInboxTestTags.MORE).fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag(MainInboxTestTags.MORE).performClick()
             composeRule.onNodeWithText("Unread only").performClick()
             composeRule.onNodeWithTag(MainInboxTestTags.UNREAD_CHIP).assertIsDisplayed().performClick()
 
@@ -352,6 +367,22 @@ class PhaseZeroUiRegressionTest {
         )?.use { cursor -> if (cursor.moveToFirst()) return cursor.getLong(0) }
         error("No seeded message found for the requested fixture")
     }
+
+    private fun messageIsRead(id: Long): Boolean = context.contentResolver.query(
+        Telephony.Sms.CONTENT_URI,
+        arrayOf(Telephony.Sms.READ),
+        "${Telephony.Sms._ID} = ?",
+        arrayOf(id.toString()),
+        null,
+    )?.use { cursor -> cursor.moveToFirst() && cursor.getInt(0) != 0 } == true
+
+    private fun threadHasUnread(id: Long): Boolean = context.contentResolver.query(
+        Telephony.Sms.CONTENT_URI,
+        arrayOf(Telephony.Sms._ID),
+        "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
+        arrayOf(id.toString()),
+        null,
+    )?.use { cursor -> cursor.moveToFirst() } == true
 
     private fun ensureSmsRole() {
         shell("cmd role add-role-holder android.app.role.SMS $packageName 0")

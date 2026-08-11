@@ -79,6 +79,7 @@
     <string name="toast_contact_not_found">Contact not available</string>
     <string name="toast_contact_permission_required">Allow contact access to open saved contacts</string>
     <string name="delete_selected_content_description">Delete selected conversations or messages</string>
+    <string name="mark_selected_read_content_description">Mark selected conversations or messages as read</string>
     <string name="select_all_content_description">Select all items</string>
     <string name="selection_count">%1$d selected</string>
     <string name="dialog_delete_title">Delete items?</string>
@@ -88,6 +89,8 @@
     <string name="dialog_delete_negative">Cancel</string>
     <string name="toast_messages_deleted">Deleted</string>
     <string name="toast_messages_delete_failed">Nothing was deleted</string>
+    <string name="toast_messages_marked_read">Marked as read</string>
+    <string name="toast_messages_mark_read_failed">Couldn\'t mark as read</string>
     <string name="action_select_text">Select text</string>
     <string name="action_copy">Copy</string>
     <string name="toast_message_copied">Message copied</string>
