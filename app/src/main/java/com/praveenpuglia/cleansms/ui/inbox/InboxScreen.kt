@@ -139,6 +139,7 @@ fun InboxScreen(
     onCopyOtp: (String) -> Unit,
     onMessageClick: (SearchResultItem) -> Unit,
     onSelectAll: () -> Unit,
+    onMarkAsRead: () -> Unit,
     onDeleteRequest: () -> Unit,
     onDeleteConfirm: () -> Unit,
     onDeleteDismiss: () -> Unit,
@@ -184,6 +185,7 @@ fun InboxScreen(
                     onOpenStats = onOpenStats,
                     onOpenSettings = onOpenSettings,
                     onSelectAll = onSelectAll,
+                    onMarkAsRead = onMarkAsRead,
                     onDelete = onDeleteRequest,
                 )
             }
@@ -293,6 +295,7 @@ private fun InboxHeader(
     onOpenStats: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAll: () -> Unit,
+    onMarkAsRead: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -312,6 +315,12 @@ private fun InboxHeader(
                 if (selectionMode) {
                     IconButton(onClick = onSelectAll) {
                         Icon(painterResource(R.drawable.ic_select_all), contentDescription = stringResource(R.string.select_all_content_description))
+                    }
+                    IconButton(onClick = onMarkAsRead, enabled = selectionCount > 0) {
+                        Icon(
+                            painterResource(R.drawable.ic_mark_read),
+                            contentDescription = stringResource(R.string.mark_selected_read_content_description),
+                        )
                     }
                     IconButton(onClick = onDelete, enabled = selectionCount > 0) {
                         Icon(painterResource(R.drawable.ic_delete), contentDescription = stringResource(R.string.delete_selected_content_description))

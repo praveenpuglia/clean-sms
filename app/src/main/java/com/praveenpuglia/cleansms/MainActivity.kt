@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.ContentUris
@@ -27,6 +28,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import com.google.i18n.phonenumbers.NumberParseException
 import android.provider.ContactsContract
@@ -38,6 +40,9 @@ import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 import java.util.LinkedHashMap
 import java.util.LinkedHashSet
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -211,6 +216,7 @@ class MainActivity : AppCompatActivity() {
                         onCopyOtp = ::copyOtp,
                         onMessageClick = ::handleSearchResultClick,
                         onSelectAll = ::toggleSelectAll,
+                        onMarkAsRead = ::markSelectionAsRead,
                         onDeleteRequest = ::confirmDeleteSelection,
                         onDeleteConfirm = ::performDeletion,
                         onDeleteDismiss = { showDeleteDialog = false },
@@ -749,6 +755,53 @@ class MainActivity : AppCompatActivity() {
             return
         }
         showDeleteDialog = true
+    }
+
+    private fun markSelectionAsRead() {
+        val threadIds = selectedThreadIds.toSet()
+        val messageIds = selectedMessageIds.toSet()
+        if (threadIds.isEmpty() && messageIds.isEmpty()) {
+            exitSelectionMode()
+            return
+        }
+
+        lifecycleScope.launch {
+            val success = withContext(Dispatchers.IO) {
+                val values = ContentValues(1).apply { put(Telephony.Sms.READ, 1) }
+                try {
+                    threadIds.forEach { threadId ->
+                        contentResolver.update(
+                            Telephony.Sms.CONTENT_URI,
+                            values,
+                            "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
+                            arrayOf(threadId.toString()),
+                        )
+                    }
+                    messageIds.forEach { messageId ->
+                        contentResolver.update(
+                            ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, messageId),
+                            values,
+                            "${Telephony.Sms.READ} = 0",
+                            null,
+                        )
+                    }
+                    true
+                } catch (error: SecurityException) {
+                    Log.w("MainActivity", "Failed to mark selection read: ${error.javaClass.simpleName}")
+                    false
+                } catch (error: IllegalArgumentException) {
+                    Log.w("MainActivity", "Failed to mark selection read: ${error.javaClass.simpleName}")
+                    false
+                }
+            }
+            exitSelectionMode()
+            Toast.makeText(
+                this@MainActivity,
+                getString(if (success) R.string.toast_messages_marked_read else R.string.toast_messages_mark_read_failed),
+                Toast.LENGTH_SHORT,
+            ).show()
+            refreshThreadsAsync()
+        }
     }
 
     private fun performDeletion() {
