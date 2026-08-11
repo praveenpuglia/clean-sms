@@ -199,6 +199,9 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithTag(MainInboxTestTags.thread(momThreadId)).assertIsDisplayed()
                 .performTouchInput { longClick() }
             composeRule.onNodeWithText("Mom").assertIsDisplayed()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithText("1 selected").fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.onNodeWithText("1 selected").assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Delete selected conversations or messages").performClick()
             composeRule.onNodeWithTag(MainInboxTestTags.DELETE_DIALOG).assertIsDisplayed()
