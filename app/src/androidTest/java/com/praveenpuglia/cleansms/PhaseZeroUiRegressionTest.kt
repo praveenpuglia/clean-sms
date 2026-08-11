@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.provider.Telephony
 import android.text.style.URLSpan
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -25,9 +26,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.pressKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -189,7 +189,8 @@ class PhaseZeroUiRegressionTest {
             assertEquals("892341", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
             assertFalse(messageIsRead(googleMessageId))
             assertFalse(messageIsRead(axisMessageId))
-            composeRule.onNodeWithTag(MainInboxTestTags.otp(googleMessageId)).performTouchInput { longClick() }
+            composeRule.onNodeWithTag(MainInboxTestTags.otp(googleMessageId))
+                .performSemanticsAction(SemanticsActions.OnLongClick)
             composeRule.onNodeWithContentDescription("Select all items").performClick()
             composeRule.onNodeWithContentDescription("Mark selected conversations or messages as read").performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) { messageIsRead(googleMessageId) && messageIsRead(axisMessageId) }
@@ -197,7 +198,7 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithText("Personal").performClick()
             assertTrue(threadHasUnread(momThreadId))
             composeRule.onNodeWithTag(MainInboxTestTags.thread(momThreadId)).assertIsDisplayed()
-                .performTouchInput { longClick() }
+                .performSemanticsAction(SemanticsActions.OnLongClick)
             composeRule.onNodeWithText("Mom").assertIsDisplayed()
             composeRule.waitUntil(timeoutMillis = 5_000) {
                 composeRule.onAllNodesWithText("1 selected").fetchSemanticsNodes().isNotEmpty()
