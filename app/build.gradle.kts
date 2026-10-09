@@ -3,7 +3,6 @@ import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -17,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.praveenpuglia.cleansms"
     compileSdk {
-        version = release(36)
+        version = release(37)
     }
 
     defaultConfig {
@@ -56,12 +55,10 @@ android {
             }
         }
     }
+    // Built-in Kotlin takes its JVM target from targetCompatibility.
     compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-    }
-    kotlinOptions {
-        jvmTarget = "21"
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         buildConfig = true
@@ -81,11 +78,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugCompileOnly(libs.androidx.compose.ui.tooling)
     // libphonenumber for robust phone number parsing/matching
-    implementation("com.googlecode.libphonenumber:libphonenumber:8.13.22")
+    implementation(libs.libphonenumber)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(composeBom)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

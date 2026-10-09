@@ -5,12 +5,12 @@
 Clean SMS is a privacy-focused Android SMS messaging client written in Kotlin. It provides intelligent message categorization using TRAI headers (Indian SMS standard), OTP management, and spam detection with a modern Material Design 3 UI.
 
 **Current Version**: 2.0.1
-**Min SDK**: 33 (Android 13) | **Target SDK**: 36 (Android 16)
+**Min SDK**: 33 (Android 13) | **Target SDK**: 36 (Android 16) | **Compile SDK**: 37
 
 ## Tech Stack
 
-- **Language**: Kotlin 2.2.10
-- **Build System**: Gradle 9.3.1 with Kotlin DSL (AGP 9.1.0, JDK 21 toolchain)
+- **Language**: Kotlin 2.4.21 (AGP built-in Kotlin)
+- **Build System**: Gradle 9.8.1 with Kotlin DSL (AGP 9.4.1, JDK 21 toolchain)
 - **UI**: Jetpack Compose with Material Design 3 and dynamic colors (Material You); XML is retained only for notification `RemoteViews`
 - **Architecture**: Standard Android with Activities, Receivers, and Services
 - **Key Dependencies**: libphonenumber (phone parsing), AndroidX, Material Components
