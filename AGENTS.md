@@ -5,12 +5,12 @@
 Clean SMS is a privacy-focused Android SMS messaging client written in Kotlin. It provides intelligent message categorization using TRAI headers (Indian SMS standard), OTP management, and spam detection with a modern Material Design 3 UI.
 
 **Current Version**: 2.0.1
-**Min SDK**: 33 (Android 13) | **Target SDK**: 36 (Android 16)
+**Min SDK**: 33 (Android 13) | **Target SDK**: 36 (Android 16) | **Compile SDK**: 37
 
 ## Tech Stack
 
-- **Language**: Kotlin 2.2.10
-- **Build System**: Gradle 9.3.1 with Kotlin DSL (AGP 9.1.0, JDK 21 toolchain)
+- **Language**: Kotlin 2.4.21 (AGP built-in Kotlin)
+- **Build System**: Gradle 9.8.1 with Kotlin DSL (AGP 9.4.1, JDK 21 toolchain)
 - **UI**: Jetpack Compose with Material Design 3 and dynamic colors (Material You); XML is retained only for notification `RemoteViews`
 - **Architecture**: Standard Android with Activities, Receivers, and Services
 - **Key Dependencies**: libphonenumber (phone parsing), AndroidX, Material Components
@@ -149,7 +149,7 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 - Typography follows the M3 type scale (Title Medium 16sp for primary text, Body Medium 14sp for metadata, Body Small 12sp for timestamps, Label Small 11sp for badges).
 - Icons: 24dp standard, 16dp only for inline metadata. **All icons/drawables must be theme-aware** — tint with the appropriate `MaterialTheme.colorScheme` role, never hardcoded colors.
 - Use `MaterialTheme.colorScheme` semantic roles rather than inline color literals.
-- Dynamic color (Material You) on Android 12+; static M3 palette as fallback. Dark theme must reach parity.
+- Dynamic color (Material You) everywhere (minSdk 33 always supports it). Dark theme must reach parity.
 - Use M3 shape tokens; avoid arbitrary corner radii. Elevation only where semantically meaningful.
 - `notification_otp.xml` is the sole screen-layout exception because Android custom notifications require `RemoteViews`.
 

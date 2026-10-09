@@ -40,14 +40,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -96,7 +93,6 @@ fun ThreadDetailScreen(
     messages: List<Message>,
     messageText: String,
     showComposer: Boolean,
-    focusComposer: Boolean,
     selectedSimNumber: Int?,
     showSimSelector: Boolean,
     highlightedMessageId: Long?,
@@ -164,7 +160,6 @@ fun ThreadDetailScreen(
             if (showComposer) {
                 MessageComposer(
                     message = messageText,
-                    focusComposer = focusComposer,
                     selectedSimNumber = selectedSimNumber,
                     showSimSelector = showSimSelector,
                     onMessageChange = onMessageChange,
@@ -306,7 +301,24 @@ private fun MessageBubble(
                             Spacer(Modifier.width(4.dp))
                             SimIndicator(it, color = contentColor)
                         }
-                        if (!incoming && message.status != 64) {
+                        // Outbox/queued messages show no mark until the radio reports back.
+                        val failed = message.type == TelephonyMessageType.FAILED || message.status == STATUS_FAILED
+                        if (failed) {
+                            Icon(
+                                painterResource(R.drawable.ic_warning),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .padding(start = 4.dp)
+                                    .size(12.dp),
+                            )
+                            Text(
+                                stringResource(R.string.thread_failed_status),
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(start = 2.dp),
+                            )
+                        } else if (message.type == TelephonyMessageType.SENT) {
                             Icon(
                                 painterResource(R.drawable.ic_tick_single),
                                 contentDescription = stringResource(R.string.thread_sent_status),
@@ -409,21 +421,12 @@ private fun DayIndicator(label: String) {
 @Composable
 private fun MessageComposer(
     message: String,
-    focusComposer: Boolean,
     selectedSimNumber: Int?,
     showSimSelector: Boolean,
     onMessageChange: (String) -> Unit,
     onSimToggle: () -> Unit,
     onSend: () -> Unit,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
-    LaunchedEffect(focusComposer) {
-        if (focusComposer) {
-            focusRequester.requestFocus()
-            keyboard?.show()
-        }
-    }
     Column {
         ComposerTopShadow()
         Surface(
@@ -447,7 +450,6 @@ private fun MessageComposer(
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
-                        .focusRequester(focusRequester)
                         .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
                     decorationBox = { input ->
                         Box(contentAlignment = Alignment.CenterStart) {
@@ -486,7 +488,11 @@ private fun MessageComposer(
 
 private object TelephonyMessageType {
     const val INCOMING = 1
+    const val SENT = 2
+    const val FAILED = 5
 }
+
+private const val STATUS_FAILED = 64
 
 fun createMessageListItems(messages: List<Message>, nowMillis: Long = System.currentTimeMillis()): List<MessageListItem> {
     if (messages.isEmpty()) return emptyList()

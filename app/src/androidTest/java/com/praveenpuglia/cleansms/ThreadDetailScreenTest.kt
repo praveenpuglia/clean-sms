@@ -1,6 +1,12 @@
 package com.praveenpuglia.cleansms
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -33,7 +39,6 @@ class ThreadDetailScreenTest {
                     messages = messages,
                     messageText = "Reply",
                     showComposer = true,
-                    focusComposer = false,
                     selectedSimNumber = 2,
                     showSimSelector = true,
                     highlightedMessageId = 1,
@@ -75,7 +80,6 @@ class ThreadDetailScreenTest {
                     messages = listOf(message(3, body, type = 1)),
                     messageText = "",
                     showComposer = false,
-                    focusComposer = false,
                     selectedSimNumber = null,
                     showSimSelector = false,
                     highlightedMessageId = null,
@@ -95,6 +99,40 @@ class ThreadDetailScreenTest {
         composeRule.onNodeWithContentDescription("Spam warning").assertIsDisplayed()
         composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER).assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Call").assertDoesNotExist()
+    }
+
+    @Test
+    fun outgoingMessagesShowTheirSendState() {
+        composeRule.setContent {
+            CleanSmsTheme {
+                ThreadDetailScreen(
+                    contactName = "Mom",
+                    contactAddress = "+919876543210",
+                    contactPhotoUri = null,
+                    category = MessageCategory.PERSONAL,
+                    messages = listOf(message(1, "Queued", type = 4), message(2, "Delivered", type = 2), message(3, "Bounced", type = 5)),
+                    messageText = "",
+                    showComposer = true,
+                    selectedSimNumber = null,
+                    showSimSelector = false,
+                    highlightedMessageId = null,
+                    scrollRequest = 0,
+                    onBack = {},
+                    onAvatarClick = {},
+                    onCall = {},
+                    onMessageChange = {},
+                    onSimToggle = {},
+                    onSend = {},
+                    onHighlightFinished = {},
+                )
+            }
+        }
+
+        // Only the confirmed message gets a tick; the failed one says so; the queued one shows neither.
+        composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("Not sent", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onNode(hasText("Not sent") and hasAnyAncestor(hasTestTag(ThreadDetailTestTags.message(3))), useUnmergedTree = true)
+            .assertExists()
     }
 
     private fun message(id: Long, body: String, type: Int) = Message(

@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms
 
 import android.content.Context
+import androidx.core.content.edit
 import android.content.SharedPreferences
 
 object CategoryStorage {
@@ -21,7 +22,7 @@ object CategoryStorage {
         val savedVersion = prefs.getInt(KEY_VERSION, 0)
         if (savedVersion < CURRENT_VERSION) {
             // Clear all cached categories
-            prefs.edit().clear().putInt(KEY_VERSION, CURRENT_VERSION).apply()
+            prefs.edit { clear().putInt(KEY_VERSION, CURRENT_VERSION) }
         }
     }
 
@@ -29,9 +30,7 @@ object CategoryStorage {
      * Save category for a thread (by address since thread IDs can change)
      */
     fun saveCategory(context: Context, address: String, category: MessageCategory) {
-        getPrefs(context).edit()
-            .putString("$KEY_PREFIX$address", category.name)
-            .apply()
+        getPrefs(context).edit { putString("$KEY_PREFIX$address", category.name) }
     }
 
     /**

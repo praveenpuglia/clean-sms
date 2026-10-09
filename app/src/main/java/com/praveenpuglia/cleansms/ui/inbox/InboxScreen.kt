@@ -30,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +59,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -100,6 +102,7 @@ object MainInboxTestTags {
     fun tab(index: Int) = "main_tab_$index"
     fun tabUnread(index: Int) = "main_tab_unread_$index"
     fun thread(id: Long) = "main_thread_$id"
+    fun unreadBadge(threadId: Long) = "main_unread_badge_$threadId"
     fun otp(id: Long) = "main_otp_$id"
     fun otpCode(id: Long) = "main_otp_code_$id"
     fun message(id: Long) = "main_message_$id"
@@ -153,7 +156,7 @@ fun InboxScreen(
             text = {
                 Text(
                     if (count == 1) stringResource(R.string.dialog_delete_message_single)
-                    else stringResource(R.string.dialog_delete_message_multiple, count),
+                    else pluralStringResource(R.plurals.dialog_delete_message_multiple, count, count),
                 )
             },
             confirmButton = { TextButton(onClick = onDeleteConfirm) { Text(stringResource(R.string.dialog_delete_positive)) } },
@@ -306,7 +309,7 @@ private fun InboxHeader(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (selectionMode) stringResource(R.string.selection_count, selectionCount) else stringResource(R.string.header_messages),
+                    if (selectionMode) pluralStringResource(R.plurals.selection_count, selectionCount, selectionCount) else stringResource(R.string.header_messages),
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.42.sp,
@@ -569,38 +572,38 @@ private fun ThreadRow(
             )
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        item.contactName ?: item.nameOrAddress,
-                        fontSize = 16.sp,
-                        fontWeight = if (item.hasUnread) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(formatInboxDate(item.date), fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
-                }
-                Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        item.snippet,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (item.hasUnread) {
-                        Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(start = 8.dp)) {
-                            Text(
-                                item.unreadCount.toString(),
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            )
+                    // Name shrinks (ellipsis) before the badge does, so the count stays visible.
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            item.contactName ?: item.nameOrAddress,
+                            fontSize = 16.sp,
+                            fontWeight = if (item.hasUnread) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (item.hasUnread) {
+                            // M3 badge: a circle for one digit, growing into a pill for more.
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(start = 8.dp).testTag(MainInboxTestTags.unreadBadge(item.threadId)),
+                            ) {
+                                Text(item.unreadCount.toString(), fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
+                    Text(formatInboxDate(item.date), fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
                 }
+                Text(
+                    item.snippet,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
             }
         }
     }

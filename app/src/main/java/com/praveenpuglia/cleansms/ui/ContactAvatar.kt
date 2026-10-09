@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms.ui
 
 import android.graphics.BitmapFactory
+import androidx.core.net.toUri
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,7 +40,7 @@ fun ContactAvatar(
         value = photoUri?.let { photo ->
             withContext(Dispatchers.IO) {
                 runCatching {
-                    context.contentResolver.openInputStream(Uri.parse(photo)).use { stream ->
+                    context.contentResolver.openInputStream(photo.toUri()).use { stream ->
                         BitmapFactory.decodeStream(stream)?.asImageBitmap()
                     }
                 }.getOrNull()

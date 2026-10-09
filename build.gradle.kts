@@ -2,6 +2,5 @@
 // Java version is set in app/build.gradle.kts (Java 21)
 plugins {
     alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
 }

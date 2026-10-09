@@ -214,6 +214,16 @@ class AndroidBoundaryTest {
         )
     }
 
+    @Test
+    fun launcherIconResolvesToTheAdaptiveXml() {
+        // Guards res/mipmap-anydpi/ic_launcher.xml: if it stops being packaged, the launcher icon
+        // silently falls back to the legacy PNG (runtime icon checks can't tell: newer Android
+        // wraps and themes legacy icons too), so assert on the packaged resource itself.
+        val value = android.util.TypedValue()
+        context.resources.getValue(R.mipmap.ic_launcher, value, true)
+        assertTrue(value.string.toString(), value.string.toString().endsWith(".xml"))
+    }
+
     private fun shell(command: String) {
         val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
         ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
