@@ -220,7 +220,7 @@ scripts/e2e-smoke.sh
 ```
 
 ### Local CI signoff
-Run the checks locally and post them to the PR as `signoff/unit` and `signoff/emulator` (needs `gh extension install basecamp/gh-signoff`, a running emulator, a clean tree and a pushed HEAD):
+GitHub Actions never run automatically (PR Tests is manual-only, via workflow_dispatch). Merging to `main` requires the local signoffs. Run the checks locally and post them to the PR as `signoff/unit` and `signoff/emulator` (needs `gh extension install basecamp/gh-signoff`, a running emulator, a clean tree and a pushed HEAD):
 ```bash
 scripts/signoff.sh            # both
 scripts/signoff.sh unit       # unit tests + lint only
