@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms
 
 import android.content.ActivityNotFoundException
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -67,7 +68,7 @@ class SettingsActivity : AppCompatActivity() {
 
     internal fun openUrl(url: String) {
         try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         } catch (_: ActivityNotFoundException) {
             // A browser is not guaranteed on managed or test devices.
         }

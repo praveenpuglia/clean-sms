@@ -95,7 +95,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                     messages = messages,
                     messageText = messageText,
                     showComposer = shouldShowComposer(),
-                    focusComposer = intent.getBooleanExtra(EXTRA_FOCUS_COMPOSER, false),
                     selectedSimNumber = availableSims.getOrNull(selectedSimIndex)?.simSlotIndex?.plus(1),
                     showSimSelector = availableSims.size > 1,
                     highlightedMessageId = highlightedMessageId,
@@ -153,7 +152,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
 
-        contactLookupUri?.let { runCatching { Uri.parse(it) }.getOrNull() }?.let {
+        contactLookupUri?.let { it.toUri() }?.let {
             launchContactIntent(it)
             return
         }
@@ -162,7 +161,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         info?.name?.takeIf(String::isNotBlank)?.let { contactName = it }
         info?.photoUri?.takeIf(String::isNotBlank)?.let { contactPhotoUri = it }
 
-        val resolvedUri = info?.lookupUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        val resolvedUri = info?.lookupUri?.let { it.toUri() }
         if (resolvedUri != null) {
             contactLookupUri = resolvedUri.toString()
             launchContactIntent(resolvedUri)
@@ -193,7 +192,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun openDialer() {
         contactAddress?.let {
-            startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$it")))
+            startActivity(Intent(Intent.ACTION_DIAL, "tel:$it".toUri()))
         }
     }
 
@@ -327,6 +326,5 @@ class ThreadDetailActivity : AppCompatActivity() {
         private const val EXTRA_CONTACT_LOOKUP_URI = "CONTACT_LOOKUP_URI"
         private const val EXTRA_CATEGORY = "CATEGORY"
         private const val EXTRA_TARGET_MESSAGE_ID = "TARGET_MESSAGE_ID"
-        private const val EXTRA_FOCUS_COMPOSER = "focus_composer"
     }
 }

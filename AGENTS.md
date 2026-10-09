@@ -149,7 +149,7 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 - Typography follows the M3 type scale (Title Medium 16sp for primary text, Body Medium 14sp for metadata, Body Small 12sp for timestamps, Label Small 11sp for badges).
 - Icons: 24dp standard, 16dp only for inline metadata. **All icons/drawables must be theme-aware** — tint with the appropriate `MaterialTheme.colorScheme` role, never hardcoded colors.
 - Use `MaterialTheme.colorScheme` semantic roles rather than inline color literals.
-- Dynamic color (Material You) on Android 12+; static M3 palette as fallback. Dark theme must reach parity.
+- Dynamic color (Material You) everywhere (minSdk 33 always supports it). Dark theme must reach parity.
 - Use M3 shape tokens; avoid arbitrary corner radii. Elevation only where semantically meaningful.
 - `notification_otp.xml` is the sole screen-layout exception because Android custom notifications require `RemoteViews`.
 

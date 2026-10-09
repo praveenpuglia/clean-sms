@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.compose.foundation.layout.Spacer
@@ -118,20 +117,18 @@ object DebugSettings {
         val testBody = body
 
         // Ensure channel exists
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = context.getSystemService(NotificationManager::class.java)
-            if (nm.getNotificationChannel(channelId) == null) {
-                val otpChannel = NotificationChannel(
-                    channelId,
-                    "OTP Messages",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "High-priority notifications for OTP codes"
-                    enableVibration(true)
-                    setShowBadge(true)
-                }
-                nm.createNotificationChannel(otpChannel)
+        val nm = context.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(channelId) == null) {
+            val otpChannel = NotificationChannel(
+                channelId,
+                "OTP Messages",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "High-priority notifications for OTP codes"
+                enableVibration(true)
+                setShowBadge(true)
             }
+            nm.createNotificationChannel(otpChannel)
         }
 
         val notificationId = testSender.hashCode()

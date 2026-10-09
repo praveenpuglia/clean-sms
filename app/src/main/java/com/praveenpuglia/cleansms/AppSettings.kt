@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.appcompat.app.AppCompatDelegate
 
 /** User preferences stored in the shared "CleanSmsPrefs" file. Keys are stable across releases. */
@@ -26,7 +27,7 @@ object AppSettings {
 
     fun setThemeMode(context: Context, mode: Int) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putInt(KEY_THEME, mode).apply()
+            .edit { putInt(KEY_THEME, mode) }
     }
 
     fun getDefaultTab(context: Context): DefaultTab {
@@ -55,7 +56,7 @@ object AppSettings {
 
     fun setDefaultTab(context: Context, tab: DefaultTab) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putInt(KEY_DEFAULT_TAB, tab.ordinal).apply()
+            .edit { putInt(KEY_DEFAULT_TAB, tab.ordinal) }
     }
 
     fun getPromoNotificationsEnabled(context: Context): Boolean {
@@ -65,7 +66,7 @@ object AppSettings {
 
     fun setPromoNotificationsEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, enabled).apply()
+            .edit { putBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, enabled) }
     }
 
     fun getAllTabEnabled(context: Context): Boolean {
@@ -75,7 +76,7 @@ object AppSettings {
 
     fun setAllTabEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ALL_TAB_ENABLED, enabled).apply()
+            .edit { putBoolean(KEY_ALL_TAB_ENABLED, enabled) }
     }
 
     fun getFontFamily(context: Context): FontFamily {
@@ -86,7 +87,7 @@ object AppSettings {
 
     fun setFontFamily(context: Context, family: FontFamily) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putInt(KEY_FONT_FAMILY, family.ordinal).apply()
+            .edit { putInt(KEY_FONT_FAMILY, family.ordinal) }
     }
 
     private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
@@ -96,6 +97,6 @@ object AppSettings {
 
     fun setOnboardingCompleted(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ONBOARDING_COMPLETED, true).apply()
+            .edit { putBoolean(KEY_ONBOARDING_COMPLETED, true) }
     }
 }

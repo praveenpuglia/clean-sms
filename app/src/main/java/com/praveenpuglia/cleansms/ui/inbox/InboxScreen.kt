@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -153,7 +154,7 @@ fun InboxScreen(
             text = {
                 Text(
                     if (count == 1) stringResource(R.string.dialog_delete_message_single)
-                    else stringResource(R.string.dialog_delete_message_multiple, count),
+                    else pluralStringResource(R.plurals.dialog_delete_message_multiple, count, count),
                 )
             },
             confirmButton = { TextButton(onClick = onDeleteConfirm) { Text(stringResource(R.string.dialog_delete_positive)) } },
@@ -306,7 +307,7 @@ private fun InboxHeader(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (selectionMode) stringResource(R.string.selection_count, selectionCount) else stringResource(R.string.header_messages),
+                    if (selectionMode) pluralStringResource(R.plurals.selection_count, selectionCount, selectionCount) else stringResource(R.string.header_messages),
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.42.sp,

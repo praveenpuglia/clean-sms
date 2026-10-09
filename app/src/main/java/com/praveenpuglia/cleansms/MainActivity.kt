@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms
 
 import android.Manifest
+import androidx.core.net.toUri
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -211,7 +212,7 @@ class MainActivity : AppCompatActivity() {
     private fun requestBatteryOptimizationExemption() {
         try {
             startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:$packageName")
+                data = "package:$packageName".toUri()
             })
         } catch (e: RuntimeException) {
             Log.w("BatteryOptimization", "Request failed: ${e.message}")
@@ -361,7 +362,7 @@ class MainActivity : AppCompatActivity() {
         contactName: String?,
         contactPhotoUri: String?
     ) {
-        val existingUri = lookupUriString?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        val existingUri = lookupUriString?.let { it.toUri() }
         if (existingUri != null) {
             launchContactIntent(existingUri)
             return
