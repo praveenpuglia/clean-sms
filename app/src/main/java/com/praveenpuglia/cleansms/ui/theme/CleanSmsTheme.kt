@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import com.praveenpuglia.cleansms.R
-import com.praveenpuglia.cleansms.SettingsActivity
+import com.praveenpuglia.cleansms.AppSettings
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF6750A4),
@@ -80,10 +80,10 @@ fun CleanSmsTheme(content: @Composable () -> Unit) {
     } else {
         LightColors
     }
-    val fontFamily = when (SettingsActivity.getFontFamily(context)) {
-        SettingsActivity.FontFamily.SANS_SERIF -> FontFamily(Font(R.font.google_sans_flex))
-        SettingsActivity.FontFamily.MONOSPACE -> FontFamily(Font(R.font.google_sans_code))
-        SettingsActivity.FontFamily.SYSTEM -> FontFamily.SansSerif
+    val fontFamily = when (AppSettings.getFontFamily(context)) {
+        AppSettings.FontFamily.SANS_SERIF -> FontFamily(Font(R.font.google_sans_flex))
+        AppSettings.FontFamily.MONOSPACE -> FontFamily(Font(R.font.google_sans_code))
+        AppSettings.FontFamily.SYSTEM -> FontFamily.SansSerif
     }
 
     MaterialTheme(

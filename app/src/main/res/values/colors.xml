@@ -51,20 +51,8 @@
     <color name="md_theme_dark_outline">#938F99</color>
 
     <!-- Grayscale palette (kept for legacy references) -->
-    <color name="gray_900">#FF212121</color>
-    <color name="gray_800">#FF424242</color>
-    <color name="gray_700">#FF616161</color>
-    <color name="gray_600">#FF757575</color>
-    <color name="gray_500">#FF9E9E9E</color>
-    <color name="gray_400">#FFBDBDBD</color>
-    <color name="gray_300">#FFE0E0E0</color>
-    <color name="gray_200">#FFEEEEEE</color>
-    <color name="gray_100">#FFF5F5F5</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
 
     <!-- Notification specific colors -->
-    <color name="notification_otp_background">@color/md_theme_light_surface</color>
     <color name="notification_otp_text_color">@color/md_theme_light_onSurface</color>
     <color name="notification_otp_icon_tint">@color/md_theme_light_onSurface</color>
 </resources>

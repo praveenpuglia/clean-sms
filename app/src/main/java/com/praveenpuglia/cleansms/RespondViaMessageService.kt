@@ -3,10 +3,9 @@ package com.praveenpuglia.cleansms
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
-import android.telephony.SmsManager
 import android.util.Log
-import android.net.Uri
 
 /**
  * Service to handle quick reply (respond-via-message) actions from the Phone app.
@@ -24,23 +23,25 @@ class RespondViaMessageService : Service() {
     }
 
     private fun handleRespondViaMessage(intent: Intent) {
+        val number = intent.data?.schemeSpecificPart
+            ?: intent.getStringExtra("address")
+            ?: intent.getStringExtra("phone")
+            ?: return
+        val body = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+        if (body.isBlank()) return
+        val subscriptionId = intent.getIntExtra(SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX, SubscriptionManager.INVALID_SUBSCRIPTION_ID)
+            .takeIf(SubscriptionManager::isValidSubscriptionId)
+
         try {
-            val uri: Uri? = intent.data
-            val number = uri?.schemeSpecificPart
-                ?: intent.getStringExtra("address")
-                ?: intent.getStringExtra("phone")
-                ?: return
-
-            val body = intent.getStringExtra(Intent.EXTRA_TEXT)
-                ?: intent.getStringExtra("android.intent.extra.TEXT")
-                ?: ""
-            if (body.isBlank()) return
-
-            val smsManager = SmsManager.getDefault()
-            smsManager.sendTextMessage(number, null, body, null, null)
-            Log.d("RespondViaMessage", "Quick reply sent to $number")
-        } catch (e: Exception) {
-            Log.e("RespondViaMessage", "Failed quick reply", e)
+            SmsSender.send(this, number, body, subscriptionId)
+            Log.d(TAG, "Quick reply sent")
+        } catch (e: RuntimeException) {
+            // Component boundary: a failed quick reply must not crash the process.
+            Log.e(TAG, "Failed quick reply: ${e.javaClass.simpleName}")
         }
+    }
+
+    private companion object {
+        const val TAG = "RespondViaMessage"
     }
 }

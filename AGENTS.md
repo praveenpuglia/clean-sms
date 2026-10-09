@@ -19,7 +19,12 @@ Clean SMS is a privacy-focused Android SMS messaging client written in Kotlin. I
 
 ```
 app/src/main/java/com/praveenpuglia/cleansms/
-├── MainActivity.kt              # Main screen with tabs (Messages/OTPs)
+├── MainActivity.kt              # Inbox host: onboarding, permissions, navigation
+├── InboxViewModel.kt            # Inbox state + SMS provider work (survives rotation)
+├── AppSettings.kt               # User preferences (SharedPreferences)
+├── SmsSender.kt                 # Single send path (multipart + Sent box record)
+├── ContactDirectory.kt          # Contact matching/index for SMS addresses
+├── SimSlots.kt                  # SIM list and subscription → slot mapping
 ├── ThreadDetailActivity.kt      # Conversation view
 ├── NewMessageActivity.kt        # New message creation
 ├── SettingsActivity.kt          # App settings
@@ -156,7 +161,8 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 - Accessibility: 48dp minimum touch targets, content descriptions on all icon-only buttons (Back, Send, FAB, Delete), TalkBack support, chips/text fields handle large font scaling.
 
 ### Architecture & Performance
-- Separation of concerns: Activities own framework operations and data loading; composables render state and emit callbacks. Move `ContentResolver` queries into repository-style helpers only as complexity warrants.
+- Separation of concerns: Activities own navigation, permissions and onboarding; `InboxViewModel` owns inbox state and provider work; composables render state and emit callbacks. Shared provider logic lives in small helpers (`SmsSender`, `ContactDirectory`, `SimSlots`), not per-screen copies.
+- Screens refresh from `ContentObserver`s while visible; never reach into another Activity's instance.
 - Defensive queries: always null/empty-check cursor columns; close cursors with `use { }` blocks.
 - OTP detection and thread enrichment run off the UI thread (coroutines / structured concurrency — no ad hoc thread spawning).
 - Lazy/incremental loading for contacts and large lists; debounce/batch on-device queries.
@@ -206,6 +212,9 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 
 # Test with coverage
 ./gradlew testDebugUnitTest
+
+# End-to-end smoke on an emulator (real modem SMS → receiver → provider → notification)
+scripts/e2e-smoke.sh
 ```
 
 ## Release Process

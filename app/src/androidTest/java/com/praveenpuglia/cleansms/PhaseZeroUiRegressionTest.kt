@@ -58,8 +58,8 @@ class PhaseZeroUiRegressionTest {
     fun restoreStableDeviceState() {
         ensureSmsRole()
         prefs.edit().putBoolean("onboarding_completed", true).commit()
-        SettingsActivity.setThemeMode(context, SettingsActivity.THEME_DARK)
-        SettingsActivity.setFontFamily(context, SettingsActivity.FontFamily.SANS_SERIF)
+        AppSettings.setThemeMode(context, AppSettings.THEME_DARK)
+        AppSettings.setFontFamily(context, AppSettings.FontFamily.SANS_SERIF)
     }
 
     @Test
@@ -87,9 +87,9 @@ class PhaseZeroUiRegressionTest {
 
     @Test
     fun settingsPersistAndDisablingAllRepairsTheDefaultTab() {
-        SettingsActivity.setAllTabEnabled(context, true)
-        SettingsActivity.setDefaultTab(context, SettingsActivity.DefaultTab.ALL)
-        SettingsActivity.setPromoNotificationsEnabled(context, true)
+        AppSettings.setAllTabEnabled(context, true)
+        AppSettings.setDefaultTab(context, AppSettings.DefaultTab.ALL)
+        AppSettings.setPromoNotificationsEnabled(context, true)
 
         ActivityScenario.launch(SettingsActivity::class.java).use {
             composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).assertIsOn()
@@ -102,9 +102,9 @@ class PhaseZeroUiRegressionTest {
             composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
         }
 
-        assertFalse(SettingsActivity.getAllTabEnabled(context))
-        assertFalse(SettingsActivity.getPromoNotificationsEnabled(context))
-        assertEquals(SettingsActivity.DefaultTab.OTP, SettingsActivity.getDefaultTab(context))
+        assertFalse(AppSettings.getAllTabEnabled(context))
+        assertFalse(AppSettings.getPromoNotificationsEnabled(context))
+        assertEquals(AppSettings.DefaultTab.OTP, AppSettings.getDefaultTab(context))
     }
 
     @Test
@@ -166,8 +166,8 @@ class PhaseZeroUiRegressionTest {
     @Test
     fun seededInboxSupportsTabsSearchAndPersonalThread() {
         prepareSeededInbox()
-        SettingsActivity.setAllTabEnabled(context, true)
-        SettingsActivity.setDefaultTab(context, SettingsActivity.DefaultTab.OTP)
+        AppSettings.setAllTabEnabled(context, true)
+        AppSettings.setDefaultTab(context, AppSettings.DefaultTab.OTP)
         val momThreadId = threadIdFor("+919876543210")
         val googleMessageId = messageIdFor("VK-GOOGLE-T", "G-892341")
         val axisMessageId = messageIdFor("VK-AXISBK-T", "OTP for txn")

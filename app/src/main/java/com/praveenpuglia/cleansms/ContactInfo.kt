@@ -5,3 +5,5 @@ data class ContactInfo(
     val photoUri: String?,
     val lookupUri: String?
 )
+
+fun ContactInfo.hasAny() = name != null || photoUri != null || lookupUri != null

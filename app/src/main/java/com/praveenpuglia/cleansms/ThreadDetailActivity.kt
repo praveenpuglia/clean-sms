@@ -2,6 +2,7 @@ package com.praveenpuglia.cleansms
 
 import android.Manifest
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.ContentObserver
@@ -11,9 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Telephony
-import android.telephony.SmsManager
 import android.telephony.SubscriptionInfo
-import android.telephony.SubscriptionManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -25,6 +24,11 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 import com.praveenpuglia.cleansms.ui.thread.ThreadDetailScreen
 
@@ -41,11 +45,12 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var highlightedMessageId by mutableStateOf<Long?>(null)
     private var scrollRequest by mutableIntStateOf(0)
     private var highlightInProgress = false
+    private var sending = false
+    private var loadJob: Job? = null
 
     private var availableSims by mutableStateOf<List<SubscriptionInfo>>(emptyList())
     private var selectedSimIndex by mutableIntStateOf(0)
-    private val simSlotCache = mutableMapOf<Int, Int?>()
-    private val subscriptionFallbackOrder = mutableListOf<Int>()
+    private val simSlots by lazy { SimSlots.resolver(this) }
 
     private val observerHandler = Handler(Looper.getMainLooper())
     private var pendingObserverReload: Runnable? = null
@@ -60,7 +65,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         FontThemeHelper.apply(this)
-        AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
+        AppCompatDelegate.setDefaultNightMode(AppSettings.getThemeMode(this))
         super.onCreate(savedInstanceState)
 
         threadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)
@@ -153,9 +158,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
 
-        val info = MainActivity.lookupFromCache(address)
-            ?: MainActivity.lookupFromIndex(address)
-            ?: ContactEnrichment.enrich(this, address)
+        val info = ContactDirectory.enrich(this, address)
         info?.name?.takeIf(String::isNotBlank)?.let { contactName = it }
         info?.photoUri?.takeIf(String::isNotBlank)?.let { contactPhotoUri = it }
 
@@ -201,16 +204,8 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun setupSimSelector() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return
-        try {
-            availableSims = getSystemService(SubscriptionManager::class.java)?.activeSubscriptionInfoList.orEmpty()
-            if (availableSims.size > 1) {
-                val defaultId = SubscriptionManager.getDefaultSmsSubscriptionId()
-                selectedSimIndex = availableSims.indexOfFirst { it.subscriptionId == defaultId }.coerceAtLeast(0)
-            }
-        } catch (_: SecurityException) {
-            availableSims = emptyList()
-        }
+        availableSims = SimSlots.activeSims(this)
+        selectedSimIndex = SimSlots.defaultIndex(availableSims)
     }
 
     private fun sendMessage(address: String, body: String) {
@@ -219,65 +214,40 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
 
-        Thread {
+        if (sending) return // a double tap must not send twice
+        sending = true
+        val selectedSim = availableSims.getOrNull(selectedSimIndex)
+        lifecycleScope.launch {
             try {
-                val selectedSim = availableSims.getOrNull(selectedSimIndex)
-                val smsManager = selectedSim?.let {
-                    @Suppress("DEPRECATION")
-                    SmsManager.getSmsManagerForSubscriptionId(it.subscriptionId)
-                } ?: run {
-                    @Suppress("DEPRECATION")
-                    SmsManager.getDefault()
-                }
-                val parts = smsManager.divideMessage(body)
-                if (parts.size > 1) {
-                    smsManager.sendMultipartTextMessage(address, null, parts, null, null)
-                } else {
-                    smsManager.sendTextMessage(address, null, body, null, null)
-                }
-
-                val values = ContentValues().apply {
-                    put(Telephony.Sms.ADDRESS, address)
-                    put(Telephony.Sms.BODY, body)
-                    put(Telephony.Sms.DATE, System.currentTimeMillis())
-                    put(Telephony.Sms.READ, 1)
-                    put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
-                    put(Telephony.Sms.THREAD_ID, threadId)
-                    selectedSim?.let { put("sub_id", it.subscriptionId) }
-                }
-                contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
-
-                val simInfo = selectedSim?.takeIf { availableSims.size > 1 }
-                    ?.let { " via SIM ${it.simSlotIndex + 1}" }
-                    .orEmpty()
-                runOnUiThread {
-                    messageText = ""
-                    Toast.makeText(this, getString(R.string.toast_message_sent, simInfo), Toast.LENGTH_SHORT).show()
-                    loadMessages()
-                }
+                withContext(Dispatchers.IO) { SmsSender.send(this@ThreadDetailActivity, address, body, selectedSim?.subscriptionId, threadId) }
+                messageText = ""
+                Toast.makeText(this@ThreadDetailActivity, selectedSim?.takeIf { availableSims.size > 1 }
+                    ?.let { getString(R.string.toast_message_sent_via_sim, it.simSlotIndex + 1) }
+                    ?: getString(R.string.toast_message_sent), Toast.LENGTH_SHORT).show()
+                loadMessages()
             } catch (error: RuntimeException) {
-                runOnUiThread {
-                    Toast.makeText(this, getString(R.string.toast_message_send_failed, error.message.orEmpty()), Toast.LENGTH_SHORT).show()
-                }
+                Toast.makeText(this@ThreadDetailActivity, getString(R.string.toast_message_send_failed, error.message.orEmpty()), Toast.LENGTH_SHORT).show()
+            } finally {
+                sending = false
             }
-        }.start()
+        }
     }
 
     private fun loadMessages() {
-        Thread {
-            val loaded = queryMessagesForThread(threadId)
-            markThreadAsRead(threadId)
-            runOnUiThread {
-                messages = loaded
-                val target = targetMessageId
-                if (target != null) {
-                    highlightedMessageId = loaded.firstOrNull { it.id == target }?.id ?: loaded.lastOrNull()?.id
-                    highlightInProgress = highlightedMessageId != null
-                    targetMessageId = null
-                }
-                scrollRequest++
+        loadJob?.cancel() // newest load wins
+        loadJob = lifecycleScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                queryMessagesForThread(threadId).also { markThreadAsRead(threadId) }
             }
-        }.start()
+            messages = loaded
+            val target = targetMessageId
+            if (target != null) {
+                highlightedMessageId = loaded.firstOrNull { it.id == target }?.id ?: loaded.lastOrNull()?.id
+                highlightInProgress = highlightedMessageId != null
+                targetMessageId = null
+            }
+            scrollRequest++
+        }
     }
 
     private fun queryMessagesForThread(id: Long): List<Message> {
@@ -308,36 +278,12 @@ class ThreadDetailActivity : AppCompatActivity() {
                     date = if (date >= 0) cursor.getLong(date) else 0L,
                     type = if (type >= 0) cursor.getInt(type) else 1,
                     subscriptionId = subscriptionId,
-                    simSlot = subscriptionId?.let(::resolveSimSlot),
+                    simSlot = subscriptionId?.let(simSlots::slotFor),
                     status = if (status >= 0) cursor.getInt(status) else -1,
                 )
             }
         }
         return messages
-    }
-
-    private fun resolveSimSlot(subscriptionId: Int): Int? {
-        if (simSlotCache.containsKey(subscriptionId)) return simSlotCache[subscriptionId]
-        var slot = if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                getSystemService(SubscriptionManager::class.java)?.activeSubscriptionInfoList
-                    ?.firstOrNull { it.subscriptionId == subscriptionId }
-                    ?.simSlotIndex
-                    ?.plus(1)
-            } catch (_: SecurityException) {
-                null
-            }
-        } else {
-            null
-        }
-        if (slot == null) {
-            if (subscriptionId !in subscriptionFallbackOrder && subscriptionFallbackOrder.size < 2) {
-                subscriptionFallbackOrder += subscriptionId
-            }
-            slot = subscriptionFallbackOrder.indexOf(subscriptionId).takeIf { it >= 0 }?.plus(1)
-        }
-        simSlotCache[subscriptionId] = slot
-        return slot
     }
 
     private fun markThreadAsRead(id: Long) {
@@ -348,22 +294,39 @@ class ThreadDetailActivity : AppCompatActivity() {
                 "thread_id = ? AND read = 0",
                 arrayOf(id.toString()),
             )
-            MainActivity.refreshThreadsIfActive()
         } catch (error: RuntimeException) {
             android.util.Log.w("ThreadDetailActivity", "Failed to mark thread read: ${error.javaClass.simpleName}")
         }
     }
 
-    private companion object {
-        const val OBSERVER_DEBOUNCE_MS = 300L
-        const val STATE_MESSAGE = "message"
-        const val EXTRA_THREAD_ID = "THREAD_ID"
-        const val EXTRA_CONTACT_NAME = "CONTACT_NAME"
-        const val EXTRA_CONTACT_ADDRESS = "CONTACT_ADDRESS"
-        const val EXTRA_CONTACT_PHOTO_URI = "CONTACT_PHOTO_URI"
-        const val EXTRA_CONTACT_LOOKUP_URI = "CONTACT_LOOKUP_URI"
-        const val EXTRA_CATEGORY = "CATEGORY"
-        const val EXTRA_TARGET_MESSAGE_ID = "TARGET_MESSAGE_ID"
-        const val EXTRA_FOCUS_COMPOSER = "focus_composer"
+    companion object {
+        fun intent(
+            context: Context,
+            threadId: Long,
+            address: String,
+            contactName: String?,
+            photoUri: String?,
+            lookupUri: String?,
+            category: MessageCategory,
+            targetMessageId: Long? = null,
+        ): Intent = Intent(context, ThreadDetailActivity::class.java)
+            .putExtra(EXTRA_THREAD_ID, threadId)
+            .putExtra(EXTRA_CONTACT_ADDRESS, address)
+            .putExtra(EXTRA_CONTACT_NAME, contactName)
+            .putExtra(EXTRA_CONTACT_PHOTO_URI, photoUri)
+            .putExtra(EXTRA_CONTACT_LOOKUP_URI, lookupUri)
+            .putExtra(EXTRA_CATEGORY, category.name)
+            .apply { targetMessageId?.let { putExtra(EXTRA_TARGET_MESSAGE_ID, it) } }
+
+        private const val OBSERVER_DEBOUNCE_MS = 300L
+        private const val STATE_MESSAGE = "message"
+        private const val EXTRA_THREAD_ID = "THREAD_ID"
+        private const val EXTRA_CONTACT_NAME = "CONTACT_NAME"
+        private const val EXTRA_CONTACT_ADDRESS = "CONTACT_ADDRESS"
+        private const val EXTRA_CONTACT_PHOTO_URI = "CONTACT_PHOTO_URI"
+        private const val EXTRA_CONTACT_LOOKUP_URI = "CONTACT_LOOKUP_URI"
+        private const val EXTRA_CATEGORY = "CATEGORY"
+        private const val EXTRA_TARGET_MESSAGE_ID = "TARGET_MESSAGE_ID"
+        private const val EXTRA_FOCUS_COMPOSER = "focus_composer"
     }
 }

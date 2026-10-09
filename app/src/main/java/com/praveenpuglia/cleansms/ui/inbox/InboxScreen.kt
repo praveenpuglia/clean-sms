@@ -245,7 +245,7 @@ private fun SearchHeader(query: String, onQueryChange: (String) -> Unit, onClose
     }
     Surface {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
@@ -504,6 +504,24 @@ private fun InboxPager(
     }
 }
 
+/**
+ * Lazy lists keep their scroll anchor on the old first row when rows are inserted above it, which
+ * hides newly arrived messages. If the user was viewing the old first row, follow the new head;
+ * if they had scrolled down, leave them where they are.
+ */
+@Composable
+private fun FollowNewItemsAtTop(state: LazyListState, firstKey: Any?) {
+    var previousFirstKey by remember { mutableStateOf(firstKey) }
+    LaunchedEffect(firstKey) {
+        val previous = previousFirstKey
+        previousFirstKey = firstKey
+        if (previous == null || previous == firstKey) return@LaunchedEffect
+        // Rows peeking into the top content padding also count as "visible"; match the first visible index.
+        val firstVisible = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == state.firstVisibleItemIndex }
+        if (firstVisible?.key == previous) state.scrollToItem(0)
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ThreadList(
@@ -515,6 +533,7 @@ private fun ThreadList(
     onLongClick: (ThreadItem) -> Unit,
     state: LazyListState,
 ) {
+    FollowNewItemsAtTop(state, items.firstOrNull()?.threadId)
     LazyColumn(state = state, contentPadding = PaddingValues(top = 4.dp, bottom = 88.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         itemsIndexed(items, key = { _, item -> item.threadId }) { index, item ->
             ThreadRow(item, selectionMode, item.threadId in selectedIds, onClick, onAvatarClick, onLongClick)
@@ -599,6 +618,7 @@ private fun OtpList(
     onCopyOtp: (String) -> Unit,
     state: LazyListState,
 ) {
+    FollowNewItemsAtTop(state, items.firstOrNull()?.messageId)
     LazyColumn(state = state, contentPadding = PaddingValues(top = 4.dp, bottom = 88.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         itemsIndexed(items, key = { _, item -> item.messageId }) { index, item ->
             val selected = item.messageId in selectedIds
@@ -671,6 +691,7 @@ private fun MessageList(
     modifier: Modifier,
     state: LazyListState = rememberLazyListState(),
 ) {
+    FollowNewItemsAtTop(state, items.firstOrNull()?.messageId)
     LazyColumn(state = state, contentPadding = PaddingValues(top = 4.dp, bottom = 88.dp), modifier = modifier.padding(horizontal = 16.dp)) {
         itemsIndexed(items, key = { _, item -> item.messageId }) { _, item ->
             Row(

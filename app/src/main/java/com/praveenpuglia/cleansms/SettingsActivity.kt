@@ -59,102 +59,6 @@ import androidx.compose.ui.unit.sp
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 
 class SettingsActivity : AppCompatActivity() {
-    enum class DefaultTab {
-        OTP,
-        PERSONAL,
-        TRANSACTIONAL,
-        SERVICE,
-        PROMOTIONAL,
-        GOVERNMENT,
-        ALL,
-    }
-
-    enum class FontFamily {
-        SANS_SERIF, MONOSPACE, SYSTEM
-    }
-
-    companion object {
-        private const val PREFS_NAME = "CleanSmsPrefs"
-        private const val KEY_THEME = "theme_mode"
-        private const val KEY_DEFAULT_TAB = "default_tab"
-        private const val KEY_PROMO_NOTIFICATIONS_ENABLED = "promo_notifications_enabled"
-        private const val KEY_ALL_TAB_ENABLED = "all_tab_enabled"
-        private const val KEY_FONT_FAMILY = "font_family"
-        const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
-        const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
-        const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-
-        fun getThemeMode(context: Context): Int {
-            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getInt(KEY_THEME, THEME_SYSTEM)
-        }
-
-        fun setThemeMode(context: Context, mode: Int) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putInt(KEY_THEME, mode).apply()
-        }
-
-        fun getDefaultTab(context: Context): DefaultTab {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            if (prefs.contains(KEY_DEFAULT_TAB)) {
-                try {
-                    val ordinal = prefs.getInt(KEY_DEFAULT_TAB, -1)
-                    if (ordinal >= 0) return DefaultTab.entries.getOrNull(ordinal) ?: DefaultTab.OTP
-                } catch (_: ClassCastException) {
-                    val migratedTab = when (prefs.getString(KEY_DEFAULT_TAB, null)) {
-                        "OTP", "OTPs" -> DefaultTab.OTP
-                        "Personal" -> DefaultTab.PERSONAL
-                        "Transactions" -> DefaultTab.TRANSACTIONAL
-                        "Service", "Services" -> DefaultTab.SERVICE
-                        "Promotions" -> DefaultTab.PROMOTIONAL
-                        "Government", "Governmental" -> DefaultTab.GOVERNMENT
-                        "All" -> DefaultTab.ALL
-                        else -> DefaultTab.OTP
-                    }
-                    setDefaultTab(context, migratedTab)
-                    return migratedTab
-                }
-            }
-            return DefaultTab.OTP
-        }
-
-        fun setDefaultTab(context: Context, tab: DefaultTab) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putInt(KEY_DEFAULT_TAB, tab.ordinal).apply()
-        }
-
-        fun getPromoNotificationsEnabled(context: Context): Boolean {
-            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, true)
-        }
-
-        fun setPromoNotificationsEnabled(context: Context, enabled: Boolean) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, enabled).apply()
-        }
-
-        fun getAllTabEnabled(context: Context): Boolean {
-            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getBoolean(KEY_ALL_TAB_ENABLED, false)
-        }
-
-        fun setAllTabEnabled(context: Context, enabled: Boolean) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY_ALL_TAB_ENABLED, enabled).apply()
-        }
-
-        fun getFontFamily(context: Context): FontFamily {
-            val ordinal = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getInt(KEY_FONT_FAMILY, FontFamily.SANS_SERIF.ordinal)
-            return FontFamily.entries.getOrNull(ordinal) ?: FontFamily.SANS_SERIF
-        }
-
-        fun setFontFamily(context: Context, family: FontFamily) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putInt(KEY_FONT_FAMILY, family.ordinal).apply()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         FontThemeHelper.apply(this)
         super.onCreate(savedInstanceState)
@@ -172,12 +76,12 @@ class SettingsActivity : AppCompatActivity() {
 
 private fun SettingsActivity.showSettingsContent() {
     setContent {
-        var themeMode by remember { mutableIntStateOf(SettingsActivity.getThemeMode(this)) }
-        var fontFamily by remember { mutableStateOf(SettingsActivity.getFontFamily(this)) }
-        var defaultTab by remember { mutableStateOf(SettingsActivity.getDefaultTab(this)) }
-        var allTabEnabled by remember { mutableStateOf(SettingsActivity.getAllTabEnabled(this)) }
+        var themeMode by remember { mutableIntStateOf(AppSettings.getThemeMode(this)) }
+        var fontFamily by remember { mutableStateOf(AppSettings.getFontFamily(this)) }
+        var defaultTab by remember { mutableStateOf(AppSettings.getDefaultTab(this)) }
+        var allTabEnabled by remember { mutableStateOf(AppSettings.getAllTabEnabled(this)) }
         var promoNotificationsEnabled by remember {
-            mutableStateOf(SettingsActivity.getPromoNotificationsEnabled(this))
+            mutableStateOf(AppSettings.getPromoNotificationsEnabled(this))
         }
 
         CleanSmsTheme {
@@ -191,31 +95,31 @@ private fun SettingsActivity.showSettingsContent() {
                 onBack = ::finish,
                 onThemeSelected = { selected ->
                     themeMode = selected
-                    SettingsActivity.setThemeMode(this, selected)
+                    AppSettings.setThemeMode(this, selected)
                     AppCompatDelegate.setDefaultNightMode(selected)
                 },
                 onFontSelected = { selected ->
                     if (selected != fontFamily) {
                         fontFamily = selected
-                        SettingsActivity.setFontFamily(this, selected)
+                        AppSettings.setFontFamily(this, selected)
                         recreate()
                     }
                 },
                 onDefaultTabSelected = { selected ->
                     defaultTab = selected
-                    SettingsActivity.setDefaultTab(this, selected)
+                    AppSettings.setDefaultTab(this, selected)
                 },
                 onAllTabChanged = { enabled ->
                     allTabEnabled = enabled
-                    SettingsActivity.setAllTabEnabled(this, enabled)
-                    if (!enabled && defaultTab == SettingsActivity.DefaultTab.ALL) {
-                        defaultTab = SettingsActivity.DefaultTab.OTP
-                        SettingsActivity.setDefaultTab(this, SettingsActivity.DefaultTab.OTP)
+                    AppSettings.setAllTabEnabled(this, enabled)
+                    if (!enabled && defaultTab == AppSettings.DefaultTab.ALL) {
+                        defaultTab = AppSettings.DefaultTab.OTP
+                        AppSettings.setDefaultTab(this, AppSettings.DefaultTab.OTP)
                     }
                 },
                 onPromoNotificationsChanged = { enabled ->
                     promoNotificationsEnabled = enabled
-                    SettingsActivity.setPromoNotificationsEnabled(this, enabled)
+                    AppSettings.setPromoNotificationsEnabled(this, enabled)
                 },
                 onTermsClick = { openUrl("https://clean-sms.praveenpuglia.com/tnc") },
                 onPrivacyClick = { openUrl("https://clean-sms.praveenpuglia.com/privacy-policy") },
@@ -234,15 +138,15 @@ object SettingsTestTags {
 @Composable
 private fun SettingsScreen(
     themeMode: Int,
-    fontFamily: SettingsActivity.FontFamily,
-    defaultTab: SettingsActivity.DefaultTab,
+    fontFamily: AppSettings.FontFamily,
+    defaultTab: AppSettings.DefaultTab,
     allTabEnabled: Boolean,
     promoNotificationsEnabled: Boolean,
     versionName: String,
     onBack: () -> Unit,
     onThemeSelected: (Int) -> Unit,
-    onFontSelected: (SettingsActivity.FontFamily) -> Unit,
-    onDefaultTabSelected: (SettingsActivity.DefaultTab) -> Unit,
+    onFontSelected: (AppSettings.FontFamily) -> Unit,
+    onDefaultTabSelected: (AppSettings.DefaultTab) -> Unit,
     onAllTabChanged: (Boolean) -> Unit,
     onPromoNotificationsChanged: (Boolean) -> Unit,
     onTermsClick: () -> Unit,
@@ -310,7 +214,7 @@ private fun SettingsHeader(onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(start = 4.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
             ) {
                 IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                     Icon(
@@ -360,9 +264,9 @@ private data class ThemeOption(
 )
 
 private val themeOptions = listOf(
-    ThemeOption(SettingsActivity.THEME_LIGHT, R.string.settings_theme_light, R.drawable.ic_sun),
-    ThemeOption(SettingsActivity.THEME_DARK, R.string.settings_theme_dark, R.drawable.ic_moon),
-    ThemeOption(SettingsActivity.THEME_SYSTEM, R.string.settings_theme_system, R.drawable.ic_computer),
+    ThemeOption(AppSettings.THEME_LIGHT, R.string.settings_theme_light, R.drawable.ic_sun),
+    ThemeOption(AppSettings.THEME_DARK, R.string.settings_theme_dark, R.drawable.ic_moon),
+    ThemeOption(AppSettings.THEME_SYSTEM, R.string.settings_theme_system, R.drawable.ic_computer),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -391,16 +295,16 @@ private fun ThemeSelector(selectedMode: Int, onSelected: (Int) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FontSelector(
-    selectedFont: SettingsActivity.FontFamily,
-    onSelected: (SettingsActivity.FontFamily) -> Unit,
+    selectedFont: AppSettings.FontFamily,
+    onSelected: (AppSettings.FontFamily) -> Unit,
 ) {
-    val fonts = SettingsActivity.FontFamily.entries
+    val fonts = AppSettings.FontFamily.entries
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         fonts.forEachIndexed { index, font ->
             val sampleFont = when (font) {
-                SettingsActivity.FontFamily.SANS_SERIF -> ComposeFontFamily(Font(R.font.google_sans_flex))
-                SettingsActivity.FontFamily.MONOSPACE -> ComposeFontFamily(Font(R.font.google_sans_code))
-                SettingsActivity.FontFamily.SYSTEM -> ComposeFontFamily.SansSerif
+                AppSettings.FontFamily.SANS_SERIF -> ComposeFontFamily(Font(R.font.google_sans_flex))
+                AppSettings.FontFamily.MONOSPACE -> ComposeFontFamily(Font(R.font.google_sans_code))
+                AppSettings.FontFamily.SYSTEM -> ComposeFontFamily.SansSerif
             }
             SegmentedButton(
                 selected = selectedFont == font,
@@ -414,9 +318,7 @@ private fun FontSelector(
                         fontSize = 14.sp,
                     )
                 },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -426,9 +328,9 @@ private fun FontSelector(
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun DefaultTabRow(
-    selectedTab: SettingsActivity.DefaultTab,
+    selectedTab: AppSettings.DefaultTab,
     allTabEnabled: Boolean,
-    onSelected: (SettingsActivity.DefaultTab) -> Unit,
+    onSelected: (AppSettings.DefaultTab) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Row(
@@ -464,9 +366,9 @@ private fun DefaultTabRow(
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.width(168.dp),
             ) {
-                (listOf(SettingsActivity.DefaultTab.ALL) +
-                    SettingsActivity.DefaultTab.entries.filterNot { it == SettingsActivity.DefaultTab.ALL })
-                    .filter { it != SettingsActivity.DefaultTab.ALL || allTabEnabled }
+                (listOf(AppSettings.DefaultTab.ALL) +
+                    AppSettings.DefaultTab.entries.filterNot { it == AppSettings.DefaultTab.ALL })
+                    .filter { it != AppSettings.DefaultTab.ALL || allTabEnabled }
                     .forEach { tab ->
                         DropdownMenuItem(
                             text = { Text(stringResource(tab.labelResource())) },
@@ -539,12 +441,12 @@ private fun SettingsLink(text: String, onClick: () -> Unit) {
 }
 
 @StringRes
-private fun SettingsActivity.DefaultTab.labelResource(): Int = when (this) {
-    SettingsActivity.DefaultTab.ALL -> R.string.tab_all
-    SettingsActivity.DefaultTab.OTP -> R.string.tab_otp
-    SettingsActivity.DefaultTab.PERSONAL -> R.string.category_personal
-    SettingsActivity.DefaultTab.TRANSACTIONAL -> R.string.category_transactions
-    SettingsActivity.DefaultTab.SERVICE -> R.string.category_service
-    SettingsActivity.DefaultTab.PROMOTIONAL -> R.string.category_promotions
-    SettingsActivity.DefaultTab.GOVERNMENT -> R.string.category_government
+private fun AppSettings.DefaultTab.labelResource(): Int = when (this) {
+    AppSettings.DefaultTab.ALL -> R.string.tab_all
+    AppSettings.DefaultTab.OTP -> R.string.tab_otp
+    AppSettings.DefaultTab.PERSONAL -> R.string.category_personal
+    AppSettings.DefaultTab.TRANSACTIONAL -> R.string.category_transactions
+    AppSettings.DefaultTab.SERVICE -> R.string.category_service
+    AppSettings.DefaultTab.PROMOTIONAL -> R.string.category_promotions
+    AppSettings.DefaultTab.GOVERNMENT -> R.string.category_government
 }
