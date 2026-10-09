@@ -387,6 +387,9 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        // Leave selection now, not when the write finishes: a late exit would wipe a new selection
+        // the user started in the meantime. The ids are already captured above.
+        exitSelectionMode()
         viewModelScope.launch {
             val success = withContext(Dispatchers.IO) {
                 val values = ContentValues(1).apply { put(Telephony.Sms.READ, 1) }
@@ -416,7 +419,6 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
                     false
                 }
             }
-            exitSelectionMode()
             Toast.makeText(
                 app,
                 app.getString(if (success) R.string.toast_messages_marked_read else R.string.toast_messages_mark_read_failed),
@@ -440,6 +442,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
             threadId == null || !threadIds.contains(threadId)
         }
 
+        exitSelectionMode() // see markSelectionAsRead
         viewModelScope.launch {
             val deletedCount = withContext(Dispatchers.IO) {
                 val uris = threadIds.map { ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, it) } +
@@ -454,7 +457,6 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             }
-            exitSelectionMode()
             val message = if (deletedCount > 0) R.string.toast_messages_deleted else R.string.toast_messages_delete_failed
             Toast.makeText(app, app.getString(message), Toast.LENGTH_SHORT).show()
             reload()

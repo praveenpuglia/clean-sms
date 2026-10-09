@@ -8,6 +8,7 @@ import android.provider.Telephony
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -162,18 +163,36 @@ class InboxLiveUpdateTest {
         }
     }
 
+    @Test
+    fun selectionStartedRightAfterMarkAsReadIsNotWipedWhenTheWriteFinishes() {
+        listOf(LIVE_SENDER, DELETE_SENDER).forEach { insertInbox(it, "Unread for selection", read = 0) }
+        val first = threadIdFor(LIVE_SENDER)
+        val second = threadIdFor(DELETE_SENDER)
+        ActivityScenario.launch(MainActivity::class.java).use {
+            composeRule.onNodeWithText("Personal").performClick()
+            waitForTag(MainInboxTestTags.thread(second))
+            composeRule.onNodeWithTag(MainInboxTestTags.thread(first)).performSemanticsAction(SemanticsActions.OnLongClick)
+            composeRule.onNodeWithContentDescription("Mark selected conversations or messages as read").performClick()
+            composeRule.onNodeWithTag(MainInboxTestTags.thread(second)).performSemanticsAction(SemanticsActions.OnLongClick)
+
+            SystemClock.sleep(1_500) // let the mark-as-read write and reload complete
+            composeRule.waitForIdle()
+            assertEquals(1, composeRule.onAllNodesWithText("1 selected").fetchSemanticsNodes().size)
+        }
+    }
+
     private fun threadIntent(threadId: Long) = ThreadDetailActivity.intent(
         context, threadId, THREAD_SENDER, null, null, null, MessageCategory.PERSONAL,
     )
 
-    private fun insertInbox(address: String, body: String) {
+    private fun insertInbox(address: String, body: String, read: Int = 1) {
         context.contentResolver.insert(
             Telephony.Sms.Inbox.CONTENT_URI,
             ContentValues().apply {
                 put(Telephony.Sms.ADDRESS, address)
                 put(Telephony.Sms.BODY, body)
                 put(Telephony.Sms.DATE, System.currentTimeMillis())
-                put(Telephony.Sms.READ, 1)
+                put(Telephony.Sms.READ, read)
             },
         )
     }
