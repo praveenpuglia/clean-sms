@@ -16,6 +16,7 @@ object AppSettings {
     private const val KEY_PROMO_NOTIFICATIONS_ENABLED = "promo_notifications_enabled"
     private const val KEY_ALL_TAB_ENABLED = "all_tab_enabled"
     private const val KEY_FONT_FAMILY = "font_family"
+    private const val KEY_SHOW_SENDER_LOGOS = "show_sender_logos"
     const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
     const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
     const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
@@ -67,6 +68,13 @@ object AppSettings {
     fun setPromoNotificationsEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit { putBoolean(KEY_PROMO_NOTIFICATIONS_ENABLED, enabled) }
+    }
+
+    fun getShowSenderLogos(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHOW_SENDER_LOGOS, true)
+
+    fun setShowSenderLogos(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putBoolean(KEY_SHOW_SENDER_LOGOS, enabled) }
     }
 
     fun getAllTabEnabled(context: Context): Boolean {

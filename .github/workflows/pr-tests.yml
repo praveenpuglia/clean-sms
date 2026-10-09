@@ -1,9 +1,9 @@
 name: PR Tests
 
+# Manual only. PRs are verified locally with scripts/signoff.sh (signoff/unit, signoff/emulator),
+# which the main branch ruleset requires before merging.
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -441,6 +441,46 @@ class DebugSeedReceiver : BroadcastReceiver() {
             Seed("VM-HDFCBK-T",
                 "Rs.50,000 has been credited to your account XX1234 by NEFT on 17-May-26. Bal: Rs.79,840. -HDFC Bank",
                 ageMinutes = 3600, read = true),
+
+            // ===== Real-world variety (synthetic text; headers are public DLT registry IDs) =====
+            // One message per brand that has a bundled logo, so every logo can be eyeballed in the inbox.
+            Seed("AX-AUBANK-T", "Rs.2,150.00 spent on your AU Bank Debit Card XX3307 at CITY MART on 08-10-26. Avl bal Rs.18,402.11. Not you? Call 1800 1200 1200 -AU Bank", ageMinutes = 33),
+            Seed("VM-BAJAJF-S", "Dear Customer, EMI of Rs.3,499 for your Bajaj Finance loan A/c XX5520 is due on 12-10-26. Keep sufficient balance to avoid charges.", ageMinutes = 400, read = true),
+            Seed("JD-BOBTXN-S", "Rs.780.00 transferred from A/c ...6612 to VPA asha.m@acmebank (UPI Ref No 628104773921). Not you? Call 18005700 -BOB", ageMinutes = 620, read = true),
+            Seed("VM-BOIIND-S", "BOI: Your A/c XX0041 is credited with INR 15,000.00 on 07-10-26 by NEFT from ACME PAYROLL. Avl Bal INR 41,227.30", ageMinutes = 2900, read = true),
+            Seed("AD-CANBNK-T", "An amount of INR 499.00 has been DEBITED to your account XXX2219 on 06/10/2026 towards Acme Streaming autopay. Total Avail.bal INR 9,120.44 - Canara Bank", ageMinutes = 4400, read = true),
+            Seed("VK-FEDBNK-S", "Your Federal Bank Credit Card ending 8814 statement is generated. Total due Rs.12,480.00, minimum due Rs.624.00. Pay by 15-10-2026 to avoid charges.", ageMinutes = 1100),
+            Seed("VM-IDFCFB-S", "Your IDFC FIRST Bank A/C XX9087 has been credited with INR 1,200.00 on 08-OCT-2026 by UPI from neha.s@acme. Avl Bal INR 6,511.25", ageMinutes = 75),
+            Seed("JM-INDUSB-T", "Dear Customer, your IndusInd Bank Credit Card XX4410 has been used for INR 3,240.00 at ACME FUEL on 08-10-2026. Avl limit INR 1,42,760.00", ageMinutes = 140, read = true),
+            Seed("VM-PNBSMS-S", "Your a/c XX7731 is debited for Rs.4,500.00 on 07-10-2026 and credited to a/c XX0099 (IMPS Ref no 628011420931). -PNB", ageMinutes = 2100, read = true),
+            Seed("AD-UNIONB-S", "A/c *8890 Debited for Rs:1,999.00 on 05-10-2026 by Mob Bk ref no 527841920113 Avl Bal Rs:22,180.07. Never share OTP/PIN. -Union Bank of India", ageMinutes = 5600, read = true),
+            Seed("VK-YESBNK-T", "582913 is the OTP for INR 2,499.00 txn at CITY MART on YES BANK card ending 4521. Valid for 10 mins. Do not share it with anyone.", ageMinutes = 8),
+            Seed("VM-PAYTMB-S", "Rs.150 sent to ACME CAFE from Paytm Payments Bank A/c XX2210. UPI Ref: 628104990012. Not you? Report at paytm.com/care", ageMinutes = 260, read = true),
+            Seed("AX-PHONPE-S", "New login to your PhonePe account on a Pixel device at 08-Oct 09:41 PM. If this wasn't you, block your account from the app immediately.", ageMinutes = 48),
+            Seed("VM-LICIND-S", "Dear Policyholder, premium of Rs.12,034.00 for policy XXXX5521 is due on 20-10-2026. Pay online at licindia.in to keep your policy in force. -LIC", ageMinutes = 3000, read = true),
+            Seed("JD-JIOINF-S", "Your Jio plan expires in 2 days.\nPlan: Rs.349 | 2GB/day | Unlimited calls\nRecharge now to continue enjoying uninterrupted services: jio.example/r", ageMinutes = 650),
+            Seed("VM-VICARE-S", "Dear Customer, 90% of your daily data quota is used. Your data speed will reduce to 64 kbps after 100%. Add a data pack on the Vi app. -Vi", ageMinutes = 1500, read = true),
+            Seed("VM-Airtel-S", "Your Airtel Thanks bill of Rs.599 for Sep-26 is generated. Due date: 18-Oct-26. Pay via the Airtel Thanks app.", ageMinutes = 2200, read = true),
+            Seed("JK-blnkit-S", "Your Blinkit order of 6 items is on its way! Track live: blinkit.example/t/AB12cd", ageMinutes = 20),
+            Seed("VM-ZEPTON-S", "8213 is the delivery code for your Zepto order 554120. Share it only with the delivery partner at your doorstep.", ageMinutes = 16),
+            Seed("JM-SWIGGY-S", "Your Swiggy order from ACME BIRYANI is out for delivery and will reach in 12 mins. Never share OTP with anyone calling about this order.", ageMinutes = 27, read = true),
+            Seed("VK-BIGBKT-S", "Your bigbasket order BB-889123 has been delivered. Rate your experience: bigbasket.example/r", ageMinutes = 3900, read = true),
+            Seed("BP-NYKAAA-P", "\u2728 Glow up time! Flat 30% off on skincare + free gift on orders above Rs.999. Shop now: nykaa.example/glow T&C", ageMinutes = 7000, read = true),
+            Seed("VM-OLACAB-S", "Ride booked: White Sedan KA01AB1234, Driver: Ravi (98xxxxxx10), Pickup: 09 Oct 2026 10:30 AM. Share OTP: 4821 with the driver to start the ride.", ageMinutes = 10),
+            Seed("VM-IRCTCi-S", "PNR 4729381056: Train 12951 Coach B2 Berth 34 confirmed for 14-Oct-2026. Charting at 20:15. Never share OTP with anyone claiming to be from Railways.", ageMinutes = 1300, read = true),
+
+            // Shapes that must NOT get a brand logo
+            Seed("AD-Indigo-P", "Diwali colours are here! Get 15% off on premium wall paints this week. Visit your nearest dealer. -Indigo Paints", ageMinutes = 9000, read = true),
+            Seed("AX-QWZXKP-S", "Your appointment with Dr. A. Rao is confirmed for 10-Oct-2026 at 11:00 AM. Reply C to cancel. -Acme Clinic", ageMinutes = 820),
+            Seed("VM-650018-P", "Mega weekend sale! Up to 60% off on electronics. Limited stock. Shop now: acmeshop.example/sale", ageMinutes = 6200, read = true),
+            Seed("57575", "Your request has been received. Reference 662810. We never ask for OTP.", ageMinutes = 4700, read = true),
+
+            // Government (-G): long, multi-line, Devanagari
+            Seed("JZ-NDMAEW-G", "Weather alert: Heavy to very heavy rainfall is likely in your district during the next 48 hours. Avoid low-lying areas and stay indoors during thunderstorms.\n\u092d\u093e\u0930\u0940 \u092c\u093e\u0930\u093f\u0936 \u0915\u0940 \u0938\u0902\u092d\u093e\u0935\u0928\u093e \u0939\u0948, \u0938\u0941\u0930\u0915\u094d\u0937\u093f\u0924 \u0930\u0939\u0947\u0902\u0964", ageMinutes = 90),
+
+            // Investment / demat, long multipart
+            Seed("VM-NSESMS-S", "Trade confirmation: You bought 10 shares of ACME LTD at Rs.1,842.50 on NSE on 08-Oct-2026. Trade value Rs.18,425.00. Your broker will send the contract note within 24 hours. If you did not place this order, report to your broker and the exchange immediately.", ageMinutes = 1200, read = true),
+            Seed("VM-CDSLTX-S", "736104 is the OTP to link your demat account with the depository. Do not share your OTP with anyone. -CDSL", ageMinutes = 45),
         )
     }
 }

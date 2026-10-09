@@ -558,11 +558,14 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
                 val (threads, otp) = withContext(Dispatchers.IO) {
                     val enrichedThreads = loadSmsThreads().map { t ->
                         val hit = ContactDirectory.resolve(app, t.nameOrAddress)?.takeIf(ContactInfo::hasAny)
-                        hit?.let { t.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: t
+                        // No contact: a bundled brand logo (verified DLT owner) fills the avatar.
+                        hit?.let { t.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) }
+                            ?: t.copy(contactPhotoUri = SenderBrands.logoUri(app, t.nameOrAddress))
                     }
                     val enrichedOtp = loadOtpMessages().map { item ->
                         val hit = ContactDirectory.resolve(app, item.address)?.takeIf(ContactInfo::hasAny)
-                        hit?.let { item.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: item
+                        hit?.let { item.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) }
+                            ?: item.copy(contactPhotoUri = SenderBrands.logoUri(app, item.address))
                     }
                     enrichedThreads to enrichedOtp
                 }

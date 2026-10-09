@@ -357,14 +357,18 @@ class PhaseZeroUiRegressionTest {
         error("No seeded thread found for the requested fixture")
     }
 
+    // The seed broadcast inserts asynchronously, so wait for the row like threadIdFor does.
     private fun messageIdFor(address: String, bodyPrefix: String): Long {
-        context.contentResolver.query(
-            Telephony.Sms.CONTENT_URI,
-            arrayOf(Telephony.Sms._ID),
-            "${Telephony.Sms.ADDRESS} = ? AND ${Telephony.Sms.BODY} LIKE ?",
-            arrayOf(address, "$bodyPrefix%"),
-            null,
-        )?.use { cursor -> if (cursor.moveToFirst()) return cursor.getLong(0) }
+        repeat(20) {
+            context.contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                arrayOf(Telephony.Sms._ID),
+                "${Telephony.Sms.ADDRESS} = ? AND ${Telephony.Sms.BODY} LIKE ?",
+                arrayOf(address, "$bodyPrefix%"),
+                null,
+            )?.use { cursor -> if (cursor.moveToFirst()) return cursor.getLong(0) }
+            SystemClock.sleep(250)
+        }
         error("No seeded message found for the requested fixture")
     }
 

@@ -25,6 +25,7 @@ app/src/main/java/com/praveenpuglia/cleansms/
 ├── SmsSender.kt                 # Single send path (multipart + Sent box record)
 ├── ContactDirectory.kt          # Contact matching/index for SMS addresses
 ├── SimSlots.kt                  # SIM list and subscription → slot mapping
+├── SenderBrands.kt              # Bundled brand logos for DLT sender headers
 ├── ThreadDetailActivity.kt      # Conversation view
 ├── NewMessageActivity.kt        # New message creation
 ├── SettingsActivity.kt          # App settings
@@ -154,6 +155,7 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 - `notification_otp.xml` is the sole screen-layout exception because Android custom notifications require `RemoteViews`.
 
 ### UX & Interaction
+- **No brand logos in notifications**: logos appear only inside the app. A wrong or look-alike logo on an OTP notification could make someone trust and share the code; plain text makes them read the sender.
 - **No implicit navigation side-effects**: sending a message does NOT auto-open the thread view. User stays in context.
 - OTP detection must be high precision — avoid aggressive heuristics that yield false positives. Filter monetary amounts.
 - Every send action gives immediate feedback (toast/snackbar) and reflects message state visually where possible.
@@ -217,11 +219,16 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 scripts/e2e-smoke.sh
 ```
 
+### Local CI signoff
+GitHub Actions never run automatically (PR Tests is manual-only, via workflow_dispatch). Merging to `main` requires the local signoffs. Run the checks locally and post them to the PR as `signoff/unit` and `signoff/emulator` (needs `gh extension install basecamp/gh-signoff`, a running emulator, a clean tree and a pushed HEAD):
+```bash
+scripts/signoff.sh            # both
+scripts/signoff.sh unit       # unit tests + lint only
+```
+
 ## Release Process
 
-1. Create a git tag: `git tag v1.2.0`
-2. Push tag: `git push origin v1.2.0`
-3. GitHub Actions automatically builds and creates a release
+Releases are manual: **Actions → Release → Run workflow**, pick a version bump (`auto` reads Conventional Commits). The workflow bumps the version in `app/build.gradle.kts`, builds the signed APK + AAB, commits and tags `vX.Y.Z` on `main`, and publishes a GitHub Release. Nothing runs on push or tag.
 
 See [RELEASE_GUIDE.md](RELEASE_GUIDE.md) for detailed instructions.
 
@@ -247,6 +254,12 @@ See [RELEASE_GUIDE.md](RELEASE_GUIDE.md) for detailed instructions.
 1. Add enum value in `MessageCategory.kt`
 2. Update classification logic in `CategoryClassifier.kt`
 3. Update UI in relevant adapters
+
+### Adding a sender logo
+1. Find the brand's exact registered company name(s) in `data/dlt/jio-headers.csv` (case-sensitive; never match on header text, look-alikes exist).
+2. Add the brand to `data/brands.json` with `owners` and either `play` (its own Play Store app, developer verified) or `domain`.
+3. `scripts/dlt/fetch_logos.py <brand_id>`, then check the logo by eye: no app sub-brands, no NEW/OLD badges, no State Emblem. If the app icon is a sub-brand (common for banks), use the bank's mark from the [Indian Banks SVG Logos Figma file](https://www.figma.com/design/CCPeJdnX8tpsNpjsmvAfp1) ("Bank Logos (Small)") or a companieslogo.com icon/symbol SVG, scaled to ~70% on white so a circular avatar doesn't clip it, and record the source in `data/logo-sources.json`.
+4. `scripts/dlt/build_brand_map.py` to regenerate `app/src/main/assets/sender_brands.tsv`.
 
 ### Modifying notification behavior
 - Edit `SmsDeliverReceiver.kt` for incoming SMS notifications

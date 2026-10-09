@@ -84,6 +84,7 @@ private fun SettingsActivity.showSettingsContent() {
         var promoNotificationsEnabled by remember {
             mutableStateOf(AppSettings.getPromoNotificationsEnabled(this))
         }
+        var showSenderLogos by remember { mutableStateOf(AppSettings.getShowSenderLogos(this)) }
 
         CleanSmsTheme {
             SettingsScreen(
@@ -92,6 +93,7 @@ private fun SettingsActivity.showSettingsContent() {
                 defaultTab = defaultTab,
                 allTabEnabled = allTabEnabled,
                 promoNotificationsEnabled = promoNotificationsEnabled,
+                showSenderLogos = showSenderLogos,
                 versionName = BuildConfig.VERSION_NAME,
                 onBack = ::finish,
                 onThemeSelected = { selected ->
@@ -122,6 +124,10 @@ private fun SettingsActivity.showSettingsContent() {
                     promoNotificationsEnabled = enabled
                     AppSettings.setPromoNotificationsEnabled(this, enabled)
                 },
+                onShowSenderLogosChanged = { enabled ->
+                    showSenderLogos = enabled
+                    AppSettings.setShowSenderLogos(this, enabled)
+                },
                 onTermsClick = { openUrl("https://clean-sms.praveenpuglia.com/tnc") },
                 onPrivacyClick = { openUrl("https://clean-sms.praveenpuglia.com/privacy-policy") },
             )
@@ -133,6 +139,7 @@ object SettingsTestTags {
     const val DEFAULT_TAB = "settings_default_tab"
     const val ALL_TAB = "settings_all_tab"
     const val PROMO_NOTIFICATIONS = "settings_promo_notifications"
+    const val SENDER_LOGOS = "settings_sender_logos"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -143,6 +150,7 @@ private fun SettingsScreen(
     defaultTab: AppSettings.DefaultTab,
     allTabEnabled: Boolean,
     promoNotificationsEnabled: Boolean,
+    showSenderLogos: Boolean,
     versionName: String,
     onBack: () -> Unit,
     onThemeSelected: (Int) -> Unit,
@@ -150,6 +158,7 @@ private fun SettingsScreen(
     onDefaultTabSelected: (AppSettings.DefaultTab) -> Unit,
     onAllTabChanged: (Boolean) -> Unit,
     onPromoNotificationsChanged: (Boolean) -> Unit,
+    onShowSenderLogosChanged: (Boolean) -> Unit,
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
 ) {
@@ -167,6 +176,13 @@ private fun SettingsScreen(
                 ThemeSelector(themeMode, onThemeSelected)
                 SettingsLabel(stringResource(R.string.settings_font_label), topPadding = 16.dp)
                 FontSelector(fontFamily, onFontSelected)
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_sender_logos_title),
+                    subtitle = stringResource(R.string.settings_sender_logos_subtitle),
+                    checked = showSenderLogos,
+                    testTag = SettingsTestTags.SENDER_LOGOS,
+                    onCheckedChange = onShowSenderLogosChanged,
+                )
 
                 SettingsSectionTitle(stringResource(R.string.settings_organization), topPadding = 8.dp)
                 DefaultTabRow(defaultTab, allTabEnabled, onDefaultTabSelected)
@@ -201,6 +217,12 @@ private fun SettingsScreen(
                 SettingsLink(stringResource(R.string.settings_terms), onTermsClick)
                 SettingsDivider()
                 SettingsLink(stringResource(R.string.settings_privacy), onPrivacyClick)
+                Text(
+                    stringResource(R.string.settings_trademark_notice),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
                 DebugSettings.Content()
             }
         }

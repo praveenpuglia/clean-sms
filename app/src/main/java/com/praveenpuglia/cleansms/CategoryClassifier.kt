@@ -74,6 +74,22 @@ object CategoryClassifier {
         "reservation", "flight", "pnr", "ticket"
     )
 
+    // "never share OTP" / "we never ask for OTP": a warning footer, not a sign this message carries one
+    private val otpWarningPrefixRegex = Regex(
+        """(?i)(?:\b(?:never|not|don'?t|won'?t)\s+(?:ever\s+)?(?:share|ask(?:\s+(?:you\s+)?for)?|disclose|reveal|call\s+for)\s+(?:your\s+|the\s+|any\s+|an\s+)?(?:\w+\s*[,/]\s*)*)$"""
+    )
+
+    // A number labelled as something other than an OTP ("Ref no 482913", "order 554120", "Train 12951")
+    private val otherPurposeLabelRegex = Regex(
+        """(?i)\b(?:ref(?:erence)?|txn|transaction|order|a/?c|acct|account|card|policy|awb|pnr|train|trn|flight|booking|ticket|invoice|complaint|request|case|sr|id|utr|rrn)\.?\s*(?:no\.?|number|id|#)?\s*[:#.\-]?\s*$"""
+    )
+
+    // Mask characters right before digits: "*8890", "...6612", "XX 4521"
+    private val maskedDigitsPrefixRegex = Regex("""(?:\*+|\.{2,}|\b[xX]{2,})\s?$""")
+
+    // A 4-digit year at the end of a date (08/10/2026, 08-10-2026, 08.10.2026, 08-Oct-2026, 8 Oct 2026)
+    private val datePrefixRegex = Regex("""(?i)\b\d{1,2}\s*[/.\-]\s*(?:\d{1,2}|[a-z]{3,9})\s*[/.\-]\s*$|\b\d{1,2}\s+[a-z]{3,9},?\s+$""")
+
     // Pattern for "is XXXX" which commonly follows OTP mentions
     private val otpIsPatternRegex = Regex("""(?i)\bis\s*:?\s*(\d{4,8})\b""")
 
@@ -103,9 +119,11 @@ object CategoryClassifier {
      * Strategy 1: Look for explicit OTP keywords with code in proximity
      */
     private fun extractWithExplicitKeywords(body: String): String? {
-        if (!otpKeywordRegex.containsMatchIn(body)) return null
-
-        val otpKeywordMatch = otpKeywordRegex.find(body) ?: return null
+        // Ignore warning-footer mentions ("never share OTP"); they don't mean this message carries one.
+        val keywordMatches = otpKeywordRegex.findAll(body)
+            .filterNot { kw -> otpWarningPrefixRegex.containsMatchIn(body.substring(maxOf(0, kw.range.first - 40), kw.range.first)) }
+            .toList()
+        val otpKeywordMatch = keywordMatches.firstOrNull() ?: return null
 
         // First, try "is XXXX" pattern after keyword
         val afterKeyword = body.substring(minOf(otpKeywordMatch.range.last + 1, body.length))
@@ -119,7 +137,7 @@ object CategoryClassifier {
         }
 
         // Proximity-based: find codes near keywords
-        val keywords = otpKeywordRegex.findAll(body).map { it.range }.toList()
+        val keywords = keywordMatches.map { it.range }
         val codes = otpCodeRegex.findAll(body).toList()
 
         // Filter and find valid codes
@@ -213,6 +231,15 @@ object CategoryClassifier {
         val prefix = body.substring(lookbackStart, codeStart)
         if (monetaryPrefixRegex.containsMatchIn(prefix)) return false
 
+        // A year inside a date is never an OTP ("delivered on 08/10/2026 ... never share OTP")
+        if (code.length == 4 && datePrefixRegex.containsMatchIn(prefix)) return false
+
+        // A number labelled as a reference, order, account, train, etc. is not an OTP
+        if (otherPurposeLabelRegex.containsMatchIn(prefix)) return false
+
+        // Masked account/card digits ("A/c *8890", "...6612", "XX 4521") are not an OTP
+        if (maskedDigitsPrefixRegex.containsMatchIn(prefix)) return false
+
         // Check if it looks like a phone number (10+ consecutive digits in context)
         val lookAround = body.substring(
             maxOf(0, codeStart - 5),
@@ -220,6 +247,13 @@ object CategoryClassifier {
         )
         val digitCount = lookAround.count { it.isDigit() }
         if (digitCount > 10) return false
+
+        // ...including numbers written in groups ("toll free 1800 266 9970", "98765-43210")
+        var runStart = codeStart
+        while (runStart > 0 && (body[runStart - 1].isDigit() || body[runStart - 1] == ' ' || body[runStart - 1] == '-')) runStart--
+        var runEnd = codeStart + code.length
+        while (runEnd < body.length && (body[runEnd].isDigit() || body[runEnd] == ' ' || body[runEnd] == '-')) runEnd++
+        if (body.substring(runStart, runEnd).count { it.isDigit() } >= 10) return false
 
         return true
     }

@@ -94,6 +94,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 address = address,
                 title = enriched?.name ?: address,
                 body = body,
+                // Contact photos only. Brand logos stay out of notifications on purpose: a wrong or
+                // look-alike logo could make someone trust (and share) an OTP; text makes them read.
                 photoUri = enriched?.photoUri,
                 lookupUri = enriched?.lookupUri,
                 category = CategoryStorage.getCategoryOrCompute(context, address, threadId),
