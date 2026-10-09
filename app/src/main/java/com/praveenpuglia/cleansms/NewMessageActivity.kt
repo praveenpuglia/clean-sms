@@ -1,17 +1,10 @@
 package com.praveenpuglia.cleansms
 
-import android.Manifest
-import android.content.ContentValues
-import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
-import android.provider.Telephony
 import android.telephony.PhoneNumberUtils
-import android.telephony.SmsManager
 import android.telephony.SubscriptionInfo
-import android.telephony.SubscriptionManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -21,7 +14,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.ContextCompat
 import com.praveenpuglia.cleansms.ui.newmessage.NewMessageScreen
 import com.praveenpuglia.cleansms.ui.newmessage.smsCounter
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
@@ -155,18 +147,8 @@ class NewMessageActivity : AppCompatActivity() {
     }
 
     private fun setupSimSelector() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return
-
-        try {
-            val manager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-            availableSims = manager?.activeSubscriptionInfoList.orEmpty()
-            if (availableSims.size > 1) {
-                val defaultId = SubscriptionManager.getDefaultSmsSubscriptionId()
-                selectedSimIndex = availableSims.indexOfFirst { it.subscriptionId == defaultId }.coerceAtLeast(0)
-            }
-        } catch (_: SecurityException) {
-            availableSims = emptyList()
-        }
+        availableSims = SimSlots.activeSims(this)
+        selectedSimIndex = SimSlots.defaultIndex(availableSims)
     }
 
     private fun loadContacts() {
@@ -241,36 +223,9 @@ class NewMessageActivity : AppCompatActivity() {
         if (body.isBlank()) return
 
         try {
-            val smsManager = availableSims.getOrNull(selectedSimIndex)?.let {
-                @Suppress("DEPRECATION")
-                SmsManager.getSmsManagerForSubscriptionId(it.subscriptionId)
-            } ?: run {
-                @Suppress("DEPRECATION")
-                SmsManager.getDefault()
-            }
-
+            val subscriptionId = availableSims.getOrNull(selectedSimIndex)?.subscriptionId
             selectedRecipients.forEach { recipient ->
-                val parts = smsManager.divideMessage(body)
-                if (parts.size > 1) {
-                    smsManager.sendMultipartTextMessage(recipient.phoneNumber, null, parts, null, null)
-                } else {
-                    smsManager.sendTextMessage(recipient.phoneNumber, null, body, null, null)
-                }
-
-                try {
-                    val values = ContentValues().apply {
-                        put("address", recipient.phoneNumber)
-                        put("body", body)
-                        put("date", System.currentTimeMillis())
-                        put("read", 1)
-                        put("type", 2)
-                        put("thread_id", Telephony.Threads.getOrCreateThreadId(this@NewMessageActivity, setOf(recipient.phoneNumber)))
-                        availableSims.getOrNull(selectedSimIndex)?.let { put("sub_id", it.subscriptionId) }
-                    }
-                    contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
-                } catch (_: SecurityException) {
-                    // Sending can still succeed when provider insertion is denied.
-                }
+                SmsSender.send(this, recipient.phoneNumber, body, subscriptionId)
             }
 
             val sim = availableSims.getOrNull(selectedSimIndex)

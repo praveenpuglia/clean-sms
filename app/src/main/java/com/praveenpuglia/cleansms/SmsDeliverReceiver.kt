@@ -89,7 +89,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Failed inserting SMS: ${e.javaClass.simpleName}")
             }
 
-            val enriched = ContactEnrichment.enrich(context, address)
+            val enriched = ContactDirectory.enrich(context, address)
             val threadId = findOrCreateThreadId(context, address)
             postNotification(
                 context = context,
@@ -201,14 +201,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             category: MessageCategory,
             lookupUri: String?,
         ): PendingIntent {
-            val detailIntent = Intent(context, ThreadDetailActivity::class.java).apply {
-                putExtra("THREAD_ID", threadId)
-                putExtra("CONTACT_NAME", displayName)
-                putExtra("CONTACT_ADDRESS", address)
-                putExtra("CONTACT_PHOTO_URI", photoUri)
-                putExtra("CATEGORY", category.name)
-                putExtra("CONTACT_LOOKUP_URI", lookupUri)
-            }
+            val detailIntent = ThreadDetailActivity.intent(context, threadId, address, displayName, photoUri, lookupUri, category)
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val requestCode = (threadId xor address.hashCode().toLong()).toInt()
             return TaskStackBuilder.create(context)

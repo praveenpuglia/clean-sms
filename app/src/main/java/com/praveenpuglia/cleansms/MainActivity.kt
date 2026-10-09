@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.ContentUris
 import android.provider.Telephony
-import android.telephony.SubscriptionManager
 import android.app.role.RoleManager
 import android.database.Cursor
 import android.net.Uri
@@ -29,7 +28,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
-import com.google.i18n.phonenumbers.PhoneNumberUtil
 import android.provider.ContactsContract
 import com.praveenpuglia.cleansms.ui.inbox.InboxPage
 import com.praveenpuglia.cleansms.ui.inbox.InboxScreen
@@ -37,8 +35,6 @@ import com.praveenpuglia.cleansms.ui.onboarding.OnboardingScreen
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingUiState
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 import java.util.LinkedHashMap
-import java.util.LinkedHashSet
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,25 +46,6 @@ class MainActivity : AppCompatActivity() {
 
         fun refreshThreadsIfActive() {
             activeInstance?.refreshThreadsAsync()
-        }
-        fun lookupFromCache(raw: String): ContactInfo? {
-            val inst = activeInstance ?: return null
-            val keys = inst.candidateKeysForAddress(raw)
-            for (k in keys) {
-                val c = inst.contactLookupCache[k]
-                if (c != null) return c
-            }
-            return null
-        }
-        fun lookupFromIndex(raw: String): ContactInfo? {
-            val inst = activeInstance ?: return null
-            val idx = inst.bulkContactsIndex ?: return null
-            val keys = inst.candidateKeysForAddress(raw)
-            for (k in keys) {
-                val c = idx[k]
-                if (c != null) return c
-            }
-            return null
         }
     }
     private val requestSmsRoleLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { _ ->
@@ -86,13 +63,8 @@ class MainActivity : AppCompatActivity() {
         Manifest.permission.READ_PHONE_STATE // needed to reliably map subscriptionId to SIM slot
     )
 
-    // Cache keyed by E.164 or digits-only for phone numbers; fallback to raw key for alphanumeric senders
-    private val contactLookupCache = mutableMapOf<String, ContactInfo>()
-    // Bulk in-memory index built once per process run to speed repeated lookups
-    private var bulkContactsIndex: Map<String, ContactInfo>? = null
-    private val phoneUtil = PhoneNumberUtil.getInstance()
-    private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
     private val otpFetchLimit = 200
+    private val simSlots by lazy { SimSlots.resolver(this) }
     
     // SharedPreferences for persistent onboarding state
     private val PREFS_NAME = "CleanSmsPrefs"
@@ -331,44 +303,14 @@ class MainActivity : AppCompatActivity() {
             val threads = loadSmsThreads()
             val otpRaw = loadOtpMessages()
 
-            if (hasContactsPermission() && bulkContactsIndex == null) {
-                try {
-                    bulkContactsIndex = buildContactsIndex()
-                    Log.d("ContactLookup", "Built bulk contacts index with ${bulkContactsIndex?.size ?: 0} entries")
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "failed to build contacts index: ${e.message}")
-                }
+            val enrichedThreads = threads.map { t ->
+                val hit = ContactDirectory.resolve(this, t.nameOrAddress)?.takeIf(ContactInfo::hasAny)
+                hit?.let { t.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: t
             }
-
-            val index = bulkContactsIndex
-
-            val enrichedThreads = if (hasContactsPermission()) {
-                threads.map { t ->
-                    val hit = resolveContactFromCache(t.nameOrAddress, index)
-                    if (hit != null) {
-                        val name = hit.name
-                        val photo = hit.photoUri
-                        val lookup = hit.lookupUri
-                        if (name != null || photo != null || lookup != null) {
-                            t.copy(contactName = name, contactPhotoUri = photo, contactLookupUri = lookup)
-                        } else t
-                    } else t
-                }
-            } else threads
-
-            val enrichedOtp = if (hasContactsPermission()) {
-                otpRaw.map { item ->
-                    val hit = resolveContactFromCache(item.address, index)
-                    if (hit != null) {
-                        val name = hit.name
-                        val photo = hit.photoUri
-                        val lookup = hit.lookupUri
-                        if (name != null || photo != null || lookup != null) {
-                            item.copy(contactName = name, contactPhotoUri = photo, contactLookupUri = lookup)
-                        } else item
-                    } else item
-                }
-            } else otpRaw
+            val enrichedOtp = otpRaw.map { item ->
+                val hit = ContactDirectory.resolve(this, item.address)?.takeIf(ContactInfo::hasAny)
+                hit?.let { item.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: item
+            }
 
             runOnUiThread {
                 allThreads = enrichedThreads
@@ -377,75 +319,6 @@ class MainActivity : AppCompatActivity() {
                 applyInitialPageIfNeeded()
             }
         }.start()
-    }
-
-    private fun resolveContactFromCache(
-        rawAddress: String,
-        index: Map<String, ContactInfo>?
-    ): ContactInfo? {
-        if (!isMobileNumberCandidate(rawAddress)) return null
-        val candidateKeys = candidateKeysForAddress(rawAddress)
-        for (key in candidateKeys) {
-            val cached = contactLookupCache[key]
-            if (cached != null) return cached
-            val idxHit = index?.get(key)
-            if (idxHit != null) {
-                contactLookupCache[key] = idxHit
-                return idxHit
-            }
-        }
-        return null
-    }
-
-    // Build a simple in-memory index mapping normalized keys to (name, photoUri)
-    private fun buildContactsIndex(): Map<String, ContactInfo> {
-        val map = mutableMapOf<String, ContactInfo>()
-        try {
-            val projection = arrayOf(
-                ContactsContract.CommonDataKinds.Phone.NUMBER,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.PHOTO_URI,
-                ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY,
-                ContactsContract.CommonDataKinds.Phone.CONTACT_ID
-            )
-            val cursor = contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, projection, null, null, null)
-            cursor?.use { c ->
-                val idxNumber = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                val idxName = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-                val idxPhoto = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
-                val idxLookup = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY)
-                val idxContactId = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
-                while (c.moveToNext()) {
-                    val phone = if (idxNumber >= 0) c.getString(idxNumber) else null
-                    val name = if (idxName >= 0) c.getString(idxName) else null
-                    val photo = if (idxPhoto >= 0) c.getString(idxPhoto) else null
-                    val lookupKey = if (idxLookup >= 0) c.getString(idxLookup) else null
-                    val contactId = if (idxContactId >= 0) c.getLong(idxContactId) else null
-                    val lookupUri = if (!lookupKey.isNullOrEmpty() && contactId != null) {
-                        ContactsContract.Contacts.getLookupUri(contactId, lookupKey)?.toString()
-                    } else null
-                    if (!phone.isNullOrEmpty()) {
-                        val key = try {
-                            val parsed = phoneUtil.parse(phone, defaultRegion)
-                            phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
-                        } catch (_: Exception) {
-                            val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(phone).ifEmpty { phone.replace(Regex("\\s+"), "") }
-                            val digits = digitsOnly(normalized)
-                            if (digits.isNotEmpty()) digits else phone
-                        }
-                        map[key] = ContactInfo(name, photo, lookupUri)
-                        // also index by raw digits suffixes to help quick suffix matches
-                        val digitsOnly = digitsOnly(phone)
-                        if (digitsOnly.length >= 7) map[digitsOnly.takeLast(7)] = ContactInfo(name, photo, lookupUri)
-                        if (digitsOnly.length >= 9) map[digitsOnly.takeLast(9)] = ContactInfo(name, photo, lookupUri)
-                        if (digitsOnly.length >= 10) map[digitsOnly.takeLast(10)] = ContactInfo(name, photo, lookupUri)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("MainActivity", "bulk index failed: ${e.message}")
-        }
-        return map
     }
 
     private fun showThreadsUi() {
@@ -526,18 +399,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openThreadDetail(threadItem: ThreadItem, targetMessageId: Long? = null) {
-        val intent = Intent(this, ThreadDetailActivity::class.java).apply {
-            putExtra("THREAD_ID", threadItem.threadId)
-            putExtra("CONTACT_NAME", threadItem.contactName)
-            putExtra("CONTACT_ADDRESS", threadItem.nameOrAddress)
-            putExtra("CONTACT_PHOTO_URI", threadItem.contactPhotoUri)
-            putExtra("CONTACT_LOOKUP_URI", threadItem.contactLookupUri)
-            putExtra("CATEGORY", threadItem.category.name)
-            if (targetMessageId != null) {
-                putExtra("TARGET_MESSAGE_ID", targetMessageId)
-            }
-        }
-        startActivity(intent)
+        startActivity(
+            ThreadDetailActivity.intent(
+                context = this,
+                threadId = threadItem.threadId,
+                address = threadItem.nameOrAddress,
+                contactName = threadItem.contactName,
+                photoUri = threadItem.contactPhotoUri,
+                lookupUri = threadItem.contactLookupUri,
+                category = threadItem.category,
+                targetMessageId = targetMessageId,
+            ),
+        )
     }
 
     private fun openThreadDetailFromOtp(item: OtpMessageItem) {
@@ -873,17 +746,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
         Thread {
-            val resolvedUri = findContactLookupUri(rawAddress)
+            val resolvedUri = ContactDirectory.findLookupUri(this, rawAddress, contactName, contactPhotoUri)
             if (resolvedUri != null) {
-                val info = ContactInfo(contactName, contactPhotoUri, resolvedUri.toString())
-                val keys = candidateKeysForAddress(rawAddress)
-                if (keys.isEmpty()) {
-                    contactLookupCache[rawAddress] = info
-                } else {
-                    for (key in keys) {
-                        contactLookupCache[key] = info
-                    }
-                }
                 runOnUiThread { launchContactIntent(resolvedUri) }
             } else {
                 runOnUiThread {
@@ -903,103 +767,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun findContactLookupUri(rawAddress: String): Uri? {
-        val resolver = contentResolver
-        val keys = LinkedHashSet<String>()
-        keys += rawAddress
-        keys += candidateKeysForAddress(rawAddress)
-        for (key in keys) {
-            try {
-                val lookupUri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(key))
-                val projection = arrayOf(
-                    ContactsContract.PhoneLookup.LOOKUP_KEY,
-                    ContactsContract.PhoneLookup._ID
-                )
-                resolver.query(lookupUri, projection, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val idxLookup = cursor.getColumnIndex(ContactsContract.PhoneLookup.LOOKUP_KEY)
-                        val idxId = cursor.getColumnIndex(ContactsContract.PhoneLookup._ID)
-                        val lookupKey = if (idxLookup >= 0) cursor.getString(idxLookup) else null
-                        val contactId = if (idxId >= 0) cursor.getLong(idxId) else null
-                        if (!lookupKey.isNullOrEmpty() && contactId != null) {
-                            val contactUri = ContactsContract.Contacts.getLookupUri(contactId, lookupKey)
-                            if (contactUri != null) return contactUri
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("MainActivity", "findContactLookupUri failed: ${e.javaClass.simpleName}")
-            }
-        }
-        return null
-    }
-
-    /**
-     * Produce a prioritized list of candidate keys to try against the bulk contacts index.
-     * Order from most specific to more relaxed to maximize early hits and minimize lookups.
-     */
-    private fun candidateKeysForAddress(rawAddress: String): List<String> {
-        val keys = LinkedHashSet<String>()
-        try {
-            val parsed = phoneUtil.parse(rawAddress, defaultRegion)
-            val e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
-            if (e164.isNotBlank()) keys += e164
-
-        } catch (_: Exception) {}
-        val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(rawAddress).ifEmpty { rawAddress.replace(Regex("\\s+"), "") }
-        if (normalized.isNotBlank()) keys += normalized
-        val digits = digitsOnly(normalized)
-        if (digits.isNotBlank()) keys += digits
-        if (digits.length >= 10) {
-            val last10 = digits.takeLast(10)
-            keys += last10
-            keys += "+" + last10
-            keys += "0" + last10
-        }
-        if (digits.length >= 9) keys += digits.takeLast(9)
-        if (digits.length >= 8) keys += digits.takeLast(8)
-        if (digits.length >= 7) keys += digits.takeLast(7)
-        return keys.toList()
-    }
-
-    /**
-     * Heuristic to determine if an address should be treated as a mobile phone number
-     * for contact matching. Returns true for digit-like addresses that are long
-     * enough to be mobile numbers or parse to a MOBILE number via libphonenumber.
-     * Returns false for alphanumeric senders, shortcodes, and obvious service ids.
-     */
-    private fun isMobileNumberCandidate(rawAddress: String): Boolean {
-        if (rawAddress.isBlank()) return false
-        // Alphanumeric senders (contain letters) are not phone numbers
-        if (rawAddress.any { it.isLetter() }) return false
-
-        // Normalize and count digits quickly
-        val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(rawAddress)
-            .ifEmpty { rawAddress.replace(Regex("\\s+"), "") }
-        val digits = digitsOnly(normalized)
-
-        // Very short codes (e.g., < 7 digits) are usually service/shortcodes
-        if (digits.length < 7) return false
-
-        // Try to parse and confirm number type when possible (MOBILE or MOBILE_FAMILY)
-        try {
-            val parsed = phoneUtil.parse(rawAddress, defaultRegion)
-            val type = phoneUtil.getNumberType(parsed)
-            return when (type) {
-                PhoneNumberUtil.PhoneNumberType.MOBILE,
-                PhoneNumberUtil.PhoneNumberType.FIXED_LINE_OR_MOBILE,
-                PhoneNumberUtil.PhoneNumberType.PERSONAL_NUMBER -> true
-                else -> {
-                    // Fallback: treat reasonably long digit sequences as mobile candidates
-                    digits.length >= 10
-                }
-            }
-        } catch (_: Exception) {
-            // parsing failed: treat long digit sequences (>=10) as candidate, otherwise skip
-            return digits.length >= 10
-        }
-    }
-
     private fun showInstructionsUi() {
         permissionRequired = true
     }
@@ -1008,9 +775,7 @@ class MainActivity : AppCompatActivity() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun hasContactsPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
-    }
+    private fun hasContactsPermission() = ContactDirectory.hasPermission(this)
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
@@ -1108,7 +873,7 @@ class MainActivity : AppCompatActivity() {
                     if (messageId != -1L && threadId != -1L) {
                         val subIdRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
                         val subscriptionId = if (subIdRaw >= 0) subIdRaw else null
-                        val simSlot = subscriptionId?.let { resolveSimSlot(it) }
+                        val simSlot = subscriptionId?.let(simSlots::slotFor)
                         results.add(
                             OtpMessageItem(
                                 messageId = messageId,
@@ -1129,31 +894,6 @@ class MainActivity : AppCompatActivity() {
 
         return results
     }
-
-    private val simSlotCache = mutableMapOf<Int, Int?>()
-    private val subscriptionFallbackOrder = mutableListOf<Int>()
-    private fun resolveSimSlot(subscriptionId: Int): Int? {
-        if (simSlotCache.containsKey(subscriptionId)) return simSlotCache[subscriptionId]
-        val hasPhoneState = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
-        var slot: Int? = null
-        if (hasPhoneState) {
-            val mgr = getSystemService(SubscriptionManager::class.java)
-            val info = try { mgr?.activeSubscriptionInfoList?.firstOrNull { it.subscriptionId == subscriptionId } } catch (_: SecurityException) { null }
-            slot = info?.simSlotIndex?.plus(1)
-        }
-        if (slot == null) {
-            // Fallback: deterministic assignment order 1..2 based on first appearance
-            if (!subscriptionFallbackOrder.contains(subscriptionId) && subscriptionFallbackOrder.size < 2) {
-                subscriptionFallbackOrder += subscriptionId
-            }
-            slot = subscriptionFallbackOrder.indexOf(subscriptionId).takeIf { it >= 0 }?.plus(1)
-        }
-        simSlotCache[subscriptionId] = slot
-        return slot
-    }
-
-    // Helper: digits only
-    private fun digitsOnly(s: String): String = s.filter { it.isDigit() }
 
     private fun extractOtpFromBody(body: String?): String? {
         if (body.isNullOrBlank()) return null
@@ -1251,7 +991,7 @@ class MainActivity : AppCompatActivity() {
                     val read = if (idxRead >= 0) cursor.getInt(idxRead) else 1
                     val subIdRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
                     val subscriptionId = if (subIdRaw >= 0) subIdRaw else null
-                    val simSlot = subscriptionId?.let { resolveSimSlot(it) }
+                    val simSlot = subscriptionId?.let(simSlots::slotFor)
 
                     if (body.isBlank()) continue
 
