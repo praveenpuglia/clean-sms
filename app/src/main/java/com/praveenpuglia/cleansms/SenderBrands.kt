@@ -7,8 +7,9 @@ import java.io.IOException
 /**
  * Bundled brand logos for DLT sender headers. The map (assets/sender_brands.tsv) is generated from
  * data/brands.json: a header maps to a brand only when TRAI's registry lists that brand as its
- * owner, so look-alike headers never get a brand's logo. Lookups are exact and case-sensitive
- * (INDIGO is the airline, Indigo is a paint company). Everything stays on the device.
+ * owner, so look-alike headers never get a brand's logo. Lookups are case-sensitive (INDIGO is the
+ * airline, Indigo is a paint company), with a case-insensitive fallback only where unambiguous.
+ * Everything stays on the device.
  */
 object SenderBrands {
     private const val TAG = "SenderBrands"
@@ -25,9 +26,15 @@ object SenderBrands {
         return "android.resource://${context.packageName}/drawable/brand_$brand"
     }
 
+    /**
+     * Exact header first. Networks sometimes deliver a different case than registered ("Airtel" for
+     * AIRTEL), so fall back to a case-insensitive "~UPPER" key, which the generator only emits when
+     * every case variant of the header belongs to the same company.
+     */
     fun brandFor(context: Context, address: String): String? {
         val header = headerOf(address) ?: return null
-        return load(context)[header]
+        val map = load(context)
+        return map[header] ?: map["~${header.uppercase()}"]
     }
 
     /** Middle part of a TRAI address, case preserved: "VM-IndiGo-S" -> "IndiGo". */

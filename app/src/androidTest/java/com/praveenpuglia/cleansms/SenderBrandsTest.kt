@@ -54,6 +54,28 @@ class SenderBrandsTest {
     }
 
     @Test
+    fun realWorldHeaderShapesResolve() {
+        // Shapes seen in real inboxes: mixed-case registrations, no suffix, every suffix letter.
+        assertEquals("blinkit", SenderBrands.brandFor(context, "JK-blnkit-S"))
+        assertEquals("irctc", SenderBrands.brandFor(context, "VM-IRCTCi-S"))
+        assertEquals("hdfc_bank", SenderBrands.brandFor(context, "VM-HDFCBK"))
+        listOf("S", "T", "P", "G").forEach { assertEquals("hdfc_bank", SenderBrands.brandFor(context, "AX-HDFCBK-$it")) }
+        assertNull(SenderBrands.brandFor(context, "AX-HDFCBK-SS"))
+        assertNull(SenderBrands.brandFor(context, "56767"))
+        assertNull(SenderBrands.brandFor(context, "Airtel"))
+    }
+
+    @Test
+    fun differentCaseFallsBackOnlyWhenUnambiguous() {
+        // Registered as AIRTEL, delivered as "Airtel": one owner across case variants -> fallback.
+        assertEquals("airtel", SenderBrands.brandFor(context, "VM-Airtel-S"))
+        assertEquals("blinkit", SenderBrands.brandFor(context, "JK-BLNKIT-S"))
+        // INDIGO/IndiGo (airline) and Indigo (paints) differ by owner: an unseen variant gets nothing.
+        assertNull(SenderBrands.brandFor(context, "AD-InDiGo-S"))
+        assertNull(SenderBrands.brandFor(context, "AD-indigo-S"))
+    }
+
+    @Test
     fun everyMappedBrandHasABundledLogoThatDecodes() {
         val brands = context.assets.open("sender_brands.tsv").bufferedReader().readLines()
             .filter { it.isNotBlank() && !it.startsWith("#") }
