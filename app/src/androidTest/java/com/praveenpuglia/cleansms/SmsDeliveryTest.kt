@@ -65,6 +65,16 @@ class SmsDeliveryTest {
         assertEquals(SmsDeliverReceiver.CHANNEL_OTP, postedFor(PROMO_SENDER)?.notification?.channelId)
     }
 
+    @Test
+    fun notificationsNeverCarryBrandLogos() {
+        AppSettings.setShowSenderLogos(context, true)
+        SmsDeliverReceiver.deliver(context, BRAND_SENDER, "Your OTP is 517403 for checkout. Do not share it.")
+
+        val posted = postedFor(BRAND_SENDER)
+        assertNotNull(posted)
+        assertNull("brand logo must not appear in notifications", posted!!.notification.getLargeIcon())
+    }
+
     private fun storedReadFlag(address: String, body: String): Int? =
         context.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
@@ -93,6 +103,7 @@ class SmsDeliveryTest {
         const val OTP_SENDER = "+15550100001"
         const val PERSONAL_SENDER = "+15550100002"
         const val PROMO_SENDER = "VM-TSTSAL-P"
-        val ADDRESSES = listOf(OTP_SENDER, PERSONAL_SENDER, PROMO_SENDER)
+        const val BRAND_SENDER = "VK-YESBNK-T"
+        val ADDRESSES = listOf(OTP_SENDER, PERSONAL_SENDER, PROMO_SENDER, BRAND_SENDER)
     }
 }

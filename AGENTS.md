@@ -155,6 +155,7 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 - `notification_otp.xml` is the sole screen-layout exception because Android custom notifications require `RemoteViews`.
 
 ### UX & Interaction
+- **No brand logos in notifications**: logos appear only inside the app. A wrong or look-alike logo on an OTP notification could make someone trust and share the code; plain text makes them read the sender.
 - **No implicit navigation side-effects**: sending a message does NOT auto-open the thread view. User stays in context.
 - OTP detection must be high precision — avoid aggressive heuristics that yield false positives. Filter monetary amounts.
 - Every send action gives immediate feedback (toast/snackbar) and reflects message state visually where possible.
