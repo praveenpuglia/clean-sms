@@ -30,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -101,6 +102,7 @@ object MainInboxTestTags {
     fun tab(index: Int) = "main_tab_$index"
     fun tabUnread(index: Int) = "main_tab_unread_$index"
     fun thread(id: Long) = "main_thread_$id"
+    fun unreadBadge(threadId: Long) = "main_unread_badge_$threadId"
     fun otp(id: Long) = "main_otp_$id"
     fun otpCode(id: Long) = "main_otp_code_$id"
     fun message(id: Long) = "main_message_$id"
@@ -591,14 +593,13 @@ private fun ThreadRow(
                         modifier = Modifier.weight(1f),
                     )
                     if (item.hasUnread) {
-                        Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(start = 8.dp)) {
-                            Text(
-                                item.unreadCount.toString(),
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            )
+                        // M3 badge: a circle for one digit, growing into a pill for more.
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(start = 8.dp).testTag(MainInboxTestTags.unreadBadge(item.threadId)),
+                        ) {
+                            Text(item.unreadCount.toString(), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
