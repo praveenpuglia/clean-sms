@@ -228,9 +228,7 @@ scripts/signoff.sh unit       # unit tests + lint only
 
 ## Release Process
 
-1. Create a git tag: `git tag v1.2.0`
-2. Push tag: `git push origin v1.2.0`
-3. GitHub Actions automatically builds and creates a release
+Releases are manual: **Actions → Release → Run workflow**, pick a version bump (`auto` reads Conventional Commits). The workflow bumps the version in `app/build.gradle.kts`, builds the signed APK + AAB, commits and tags `vX.Y.Z` on `main`, and publishes a GitHub Release. Nothing runs on push or tag.
 
 See [RELEASE_GUIDE.md](RELEASE_GUIDE.md) for detailed instructions.
 

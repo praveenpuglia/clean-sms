@@ -23,11 +23,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # main requires local signoffs (see scripts/signoff.sh). GitHub Actions can't bypass that
+      # ruleset on a personal repo, so the version-bump push uses the admin's token instead.
+      - name: Require RELEASE_TOKEN
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::Missing RELEASE_TOKEN secret (fine-grained PAT, Contents: read and write). See RELEASE_GUIDE.md."
+            exit 1
+          fi
+
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0  # need full history + tags to derive the version
+          token: ${{ secrets.RELEASE_TOKEN }}  # the final push to main goes through the signoff ruleset
 
       - name: Compute next version
         id: version
