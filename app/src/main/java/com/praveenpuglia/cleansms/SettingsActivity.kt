@@ -318,9 +318,7 @@ private fun FontSelector(
                         fontSize = 14.sp,
                     )
                 },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
+                modifier = Modifier.weight(1f),
             )
         }
     }
