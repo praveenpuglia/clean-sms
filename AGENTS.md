@@ -206,6 +206,9 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 
 # Test with coverage
 ./gradlew testDebugUnitTest
+
+# End-to-end smoke on an emulator (real modem SMS → receiver → provider → notification)
+scripts/e2e-smoke.sh
 ```
 
 ## Release Process

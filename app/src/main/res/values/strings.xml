@@ -91,9 +91,6 @@
     <string name="toast_messages_delete_failed">Nothing was deleted</string>
     <string name="toast_messages_marked_read">Marked as read</string>
     <string name="toast_messages_mark_read_failed">Couldn\'t mark as read</string>
-    <string name="action_select_text">Select text</string>
-    <string name="action_copy">Copy</string>
-    <string name="toast_message_copied">Message copied</string>
     <string name="onboarding_logo_description">Clean SMS logo</string>
     <string name="onboarding_title">Welcome to Clean SMS</string>
     <string name="onboarding_description">Let\'s set up Clean SMS to manage your messages seamlessly.</string>

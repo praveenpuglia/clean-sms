@@ -30,7 +30,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.google.i18n.phonenumbers.PhoneNumberUtil
-import com.google.i18n.phonenumbers.NumberParseException
 import android.provider.ContactsContract
 import com.praveenpuglia.cleansms.ui.inbox.InboxPage
 import com.praveenpuglia.cleansms.ui.inbox.InboxScreen
@@ -51,20 +50,6 @@ class MainActivity : AppCompatActivity() {
 
         fun refreshThreadsIfActive() {
             activeInstance?.refreshThreadsAsync()
-        }
-        // Static helpers for receiver enrichment
-        fun isMobileNumberCandidateStatic(raw: String): Boolean {
-            val inst = activeInstance
-            if (inst != null) return inst.isMobileNumberCandidate(raw)
-            // Fallback heuristic when activity not active (cold start). Mirror main logic in simplified form.
-            if (raw.isBlank()) return false
-            if (raw.any { it.isLetter() }) return false
-            val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(raw)
-                .ifEmpty { raw.replace(Regex("\\s+"), "") }
-            val digits = normalized.filter { it.isDigit() }
-            if (digits.length < 7) return false
-            // Treat >=10 digits as likely mobile to allow enrichment attempts, else rely on PhoneLookup directly.
-            return digits.length >= 7
         }
         fun lookupFromCache(raw: String): ContactInfo? {
             val inst = activeInstance ?: return null
@@ -107,11 +92,6 @@ class MainActivity : AppCompatActivity() {
     private var bulkContactsIndex: Map<String, ContactInfo>? = null
     private val phoneUtil = PhoneNumberUtil.getInstance()
     private val defaultRegion: String by lazy { Locale.getDefault().country.ifEmpty { "US" } }
-    // Unified OTP detection replaced by CategoryClassifier.extractHighPrecisionOtp; legacy patterns kept only for future phased removal
-    @Deprecated("Use CategoryClassifier.extractHighPrecisionOtp")
-    private val otpRegex = Regex("\\b\\d{4,8}\\b")
-    @Deprecated("Use CategoryClassifier.extractHighPrecisionOtp")
-    private val otpKeywordPattern = Regex("\\botp\\b|one[\\s-]*time\\s+password", RegexOption.IGNORE_CASE)
     private val otpFetchLimit = 200
     
     // SharedPreferences for persistent onboarding state
@@ -662,7 +642,6 @@ class MainActivity : AppCompatActivity() {
         selectedThreadIds = if (item.threadId in selectedThreadIds) selectedThreadIds - item.threadId else selectedThreadIds + item.threadId
         if (selectionMode && selectionCount() == 0) {
             exitSelectionMode()
-        } else {
         }
     }
 
@@ -674,7 +653,6 @@ class MainActivity : AppCompatActivity() {
         selectedMessageIds = if (item.messageId in selectedMessageIds) selectedMessageIds - item.messageId else selectedMessageIds + item.messageId
         if (selectionMode && selectionCount() == 0) {
             exitSelectionMode()
-        } else {
         }
     }
 
@@ -950,25 +928,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: Exception) {
-                Log.w("MainActivity", "findContactLookupUri failed for $key: ${e.message}")
+                Log.w("MainActivity", "findContactLookupUri failed: ${e.javaClass.simpleName}")
             }
         }
         return null
-    }
-
-    private fun cacheKeyForAddress(rawAddress: String): String {
-        // reuse class-level phoneUtil/defaultRegion to avoid repeated instantiation
-        // Prefer E.164 when possible
-        try {
-            val parsed = phoneUtil.parse(rawAddress, defaultRegion)
-            val e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
-            if (!e164.isNullOrEmpty()) return e164
-        } catch (_: Exception) {
-            // ignore
-        }
-        val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(rawAddress).ifEmpty { rawAddress.replace(Regex("\\s+"), "") }
-        val digits = normalized.filter { it.isDigit() }
-        return if (digits.isNotEmpty()) digits else rawAddress
     }
 
     /**
@@ -1197,249 +1160,6 @@ class MainActivity : AppCompatActivity() {
         return CategoryClassifier.extractHighPrecisionOtp(body)
     }
 
-    /**
-     * Robust contact lookup. Returns Pair(displayName?, photoUri?). Strategies used:
-     * 1) PhoneLookup.CONTENT_FILTER_URI with multiple candidate strings (raw, normalized, E.164, +normalized, last10/9/7)
-     * 2) Quick SQL suffix queries (LIKE) for last 10/9/7 digits
-     * 3) Scan Phone table and use libphonenumber.PhoneNumberUtil.isNumberMatch on parsed numbers
-     * 4) Fallback: compare last 10/9/7 digits
-     */
-    private fun lookupContactForAddress(rawAddress: String): Pair<String?, String?> {
-        if (rawAddress.isBlank()) return Pair(null, null)
-
-        try {
-            val phoneUtil = PhoneNumberUtil.getInstance()
-            val defaultRegion = Locale.getDefault().country.ifEmpty { "US" }
-            val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(rawAddress).ifEmpty { rawAddress.replace(Regex("\\s+"), "") }
-            val digits = digitsOnly(normalized)
-
-            val tryValues = LinkedHashMap<String, Unit>()
-            tryValues[rawAddress] = Unit
-            if (normalized.isNotBlank()) tryValues[normalized] = Unit
-            // include E.164 candidate when possible
-            try {
-                val parsed = phoneUtil.parse(rawAddress, defaultRegion)
-                val e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
-                if (!e164.isNullOrEmpty()) tryValues[e164] = Unit
-            } catch (_: Exception) {
-            }
-            if (!normalized.startsWith("+")) tryValues["+" + normalized] = Unit
-            if (digits.length >= 10) {
-                val last10 = digits.takeLast(10)
-                tryValues[last10] = Unit
-                tryValues["+" + last10] = Unit
-                tryValues["0" + last10] = Unit
-            }
-            if (digits.length >= 9) tryValues[digits.takeLast(9)] = Unit
-            if (digits.length >= 7) tryValues[digits.takeLast(7)] = Unit
-
-            Log.d("ContactLookup", "lookupContactForAddress: raw=$rawAddress normalized=$normalized tryValues=${tryValues.keys}")
-
-            // 1) PhoneLookup quick test
-            for (valToTry in tryValues.keys) {
-                try {
-                    val lookupUri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(valToTry))
-                    val proj = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup.PHOTO_URI, ContactsContract.PhoneLookup._ID)
-                    val cur = contentResolver.query(lookupUri, proj, null, null, null)
-                    cur?.use { c ->
-                        if (c.moveToFirst()) {
-                            val idxName = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
-                            val idxPhoto = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
-                            val idxId = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
-                            val name = if (idxName >= 0) c.getString(idxName) else null
-                            var photo = if (idxPhoto >= 0) c.getString(idxPhoto) else null
-                            val contactId = if (idxId >= 0) c.getLong(idxId) else null
-                            if (photo.isNullOrEmpty() && contactId != null) {
-                                try {
-                                    val contactUri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, contactId.toString())
-                                    val p = arrayOf(ContactsContract.Contacts.PHOTO_URI)
-                                    val cur2 = contentResolver.query(contactUri, p, null, null, null)
-                                    cur2?.use { c2 ->
-                                        if (c2.moveToFirst()) {
-                                            val idxP = c2.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
-                                            photo = if (idxP >= 0) c2.getString(idxP) else photo
-                                        }
-                                    }
-                                } catch (_: Exception) {
-                                }
-                            }
-                            Log.d("ContactLookup", "PhoneLookup hit for '$valToTry' -> name=$name photo=${photo != null}")
-                            return Pair(name, photo)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "phone lookup failed for $valToTry: ${e.message}")
-                }
-            }
-
-            // 2) Quick suffix-query attempts using SQL LIKE on phone number for last 10/9/7 digits
-            val suffixLens = listOf(10, 9, 7)
-            for (len in suffixLens) {
-                if (digits.length >= len) {
-                    val suffix = digits.takeLast(len)
-                    try {
-                        val sel = "${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?"
-                        val args = arrayOf("%" + suffix)
-                        val proj = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.PHOTO_URI, ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
-                        val cur = contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, proj, sel, args, null)
-                        cur?.use { c ->
-                            if (c.moveToFirst()) {
-                                val idxName = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-                                val idxPhoto = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
-                                val idxContactId = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
-                                val name = if (idxName >= 0) c.getString(idxName) else null
-                                var photo = if (idxPhoto >= 0) c.getString(idxPhoto) else null
-                                val contactId = if (idxContactId >= 0) c.getLong(idxContactId) else null
-                                if (photo.isNullOrEmpty() && contactId != null) {
-                                    try {
-                                        val contactUri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, contactId.toString())
-                                        val p = arrayOf(ContactsContract.Contacts.PHOTO_URI)
-                                        val cur2 = contentResolver.query(contactUri, p, null, null, null)
-                                        cur2?.use { c2 ->
-                                            if (c2.moveToFirst()) {
-                                                val idxP = c2.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
-                                                photo = if (idxP >= 0) c2.getString(idxP) else photo
-                                            }
-                                        }
-                                    } catch (_: Exception) {
-                                    }
-                                }
-                                Log.d("ContactLookup", "Suffix-query hit for last $len digits '$suffix' -> name=$name photo=${photo != null}")
-                                return Pair(name, photo)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w("MainActivity", "suffix query failed for $suffix: ${e.message}")
-                    }
-                }
-            }
-
-            // 3) Parse incoming number if possible
-            var parsedIncoming: com.google.i18n.phonenumbers.Phonenumber.PhoneNumber? = null
-            try {
-                parsedIncoming = phoneUtil.parse(rawAddress, defaultRegion)
-            } catch (e: NumberParseException) {
-                // ignore
-            }
-
-            // 4) Scan phone table and compare
-            val projection = arrayOf(
-                ContactsContract.CommonDataKinds.Phone.NUMBER,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.PHOTO_URI,
-                ContactsContract.CommonDataKinds.Phone.CONTACT_ID
-            )
-            val uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI
-            val cursor = contentResolver.query(uri, projection, null, null, null)
-            val searchDigits = digitsOnly(normalized)
-            cursor?.use { c ->
-                val idxNumber = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                val idxName = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-                val idxPhoto = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
-                val idxContactId = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
-                while (c.moveToNext()) {
-                    val phone = if (idxNumber >= 0) c.getString(idxNumber) else null
-                    if (!phone.isNullOrEmpty()) {
-                        try {
-                            if (parsedIncoming != null) {
-                                try {
-                                    val parsedStored = phoneUtil.parse(phone, defaultRegion)
-                                    val match = phoneUtil.isNumberMatch(parsedIncoming, parsedStored)
-                                    if (match == PhoneNumberUtil.MatchType.EXACT_MATCH || match == PhoneNumberUtil.MatchType.NSN_MATCH || match == PhoneNumberUtil.MatchType.SHORT_NSN_MATCH) {
-                                        val name = if (idxName >= 0) c.getString(idxName) else null
-                                        var photo = if (idxPhoto >= 0) c.getString(idxPhoto) else null
-                                        val contactId = if (idxContactId >= 0) c.getLong(idxContactId) else null
-                                        if (photo.isNullOrEmpty() && contactId != null) {
-                                            try {
-                                                val contactUri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, contactId.toString())
-                                                val p = arrayOf(ContactsContract.Contacts.PHOTO_URI)
-                                                val cur2 = contentResolver.query(contactUri, p, null, null, null)
-                                                cur2?.use { c2 ->
-                                                    if (c2.moveToFirst()) {
-                                                        val idxP = c2.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
-                                                        photo = if (idxP >= 0) c2.getString(idxP) else photo
-                                                    }
-                                                }
-                                            } catch (_: Exception) {
-                                            }
-                                        }
-                                        Log.d("ContactLookup", "Parsed match for incoming '$rawAddress' -> name=$name photo=${photo != null}")
-                                        return Pair(name, photo)
-                                    }
-                                } catch (_: Exception) {
-                                    // fallback
-                                }
-                            }
-
-                            // string-based matching using libphonenumber
-                            val match1 = phoneUtil.isNumberMatch(rawAddress, phone)
-                            val match2 = phoneUtil.isNumberMatch(normalized, phone)
-                            val match3 = if (!normalized.startsWith("+")) phoneUtil.isNumberMatch("+" + normalized, phone) else PhoneNumberUtil.MatchType.NOT_A_NUMBER
-                            if (match1 == PhoneNumberUtil.MatchType.EXACT_MATCH || match1 == PhoneNumberUtil.MatchType.NSN_MATCH || match1 == PhoneNumberUtil.MatchType.SHORT_NSN_MATCH
-                                || match2 == PhoneNumberUtil.MatchType.EXACT_MATCH || match2 == PhoneNumberUtil.MatchType.NSN_MATCH || match2 == PhoneNumberUtil.MatchType.SHORT_NSN_MATCH
-                                || match3 == PhoneNumberUtil.MatchType.EXACT_MATCH || match3 == PhoneNumberUtil.MatchType.NSN_MATCH || match3 == PhoneNumberUtil.MatchType.SHORT_NSN_MATCH) {
-                                val name = if (idxName >= 0) c.getString(idxName) else null
-                                var photo = if (idxPhoto >= 0) c.getString(idxPhoto) else null
-                                val contactId = if (idxContactId >= 0) c.getLong(idxContactId) else null
-                                if (photo.isNullOrEmpty() && contactId != null) {
-                                    try {
-                                        val contactUri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, contactId.toString())
-                                        val p = arrayOf(ContactsContract.Contacts.PHOTO_URI)
-                                        val cur2 = contentResolver.query(contactUri, p, null, null, null)
-                                        cur2?.use { c2 ->
-                                            if (c2.moveToFirst()) {
-                                                val idxP = c2.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
-                                                photo = if (idxP >= 0) c2.getString(idxP) else photo
-                                            }
-                                        }
-                                    } catch (_: Exception) {
-                                    }
-                                }
-                                Log.d("ContactLookup", "String match for '$rawAddress' -> name=$name photo=${photo != null}")
-                                return Pair(name, photo)
-                            }
-
-                            // suffix match
-                            val phoneDigits = digitsOnly(phone)
-                            val suffixLens = listOf(10, 9, 7)
-                            for (len in suffixLens) {
-                                if (phoneDigits.length >= len && searchDigits.length >= len) {
-                                    if (phoneDigits.takeLast(len) == searchDigits.takeLast(len)) {
-                                        val name = if (idxName >= 0) c.getString(idxName) else null
-                                        var photo = if (idxPhoto >= 0) c.getString(idxPhoto) else null
-                                        val contactId = if (idxContactId >= 0) c.getLong(idxContactId) else null
-                                        if (photo.isNullOrEmpty() && contactId != null) {
-                                            try {
-                                                val contactUri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, contactId.toString())
-                                                val p = arrayOf(ContactsContract.Contacts.PHOTO_URI)
-                                                val cur2 = contentResolver.query(contactUri, p, null, null, null)
-                                                cur2?.use { c2 ->
-                                                    if (c2.moveToFirst()) {
-                                                        val idxP = c2.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
-                                                        photo = if (idxP >= 0) c2.getString(idxP) else photo
-                                                    }
-                                                }
-                                            } catch (_: Exception) {
-                                            }
-                                        }
-                                        Log.d("ContactLookup", "Suffix match for '$rawAddress' -> name=$name photo=${photo != null} len=$len")
-                                        return Pair(name, photo)
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            // ignore and continue
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("MainActivity", "contact lookup failed: ${e.message}")
-        }
-        Log.d("ContactLookup", "No contact found for '$rawAddress'")
-        return Pair(null, null)
-    }
-    
     // ========== Overflow Menu ==========
     
     private fun setUnreadFilter(enabled: Boolean) {
