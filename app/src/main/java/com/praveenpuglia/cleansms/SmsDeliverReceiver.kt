@@ -118,7 +118,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             // the provider — this only suppresses the system notification. OTP detections
             // still fire regardless of category so users never miss a code.
             if (!isOtp && category == MessageCategory.PROMOTIONAL &&
-                !SettingsActivity.getPromoNotificationsEnabled(context)
+                !AppSettings.getPromoNotificationsEnabled(context)
             ) {
                 return
             }

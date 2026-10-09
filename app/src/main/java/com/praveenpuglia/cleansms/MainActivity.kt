@@ -4,14 +4,11 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.content.Intent
-import android.content.ContentUris
 import android.provider.Telephony
 import android.app.role.RoleManager
 import android.database.ContentObserver
-import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
@@ -19,31 +16,28 @@ import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import android.provider.ContactsContract
-import com.praveenpuglia.cleansms.ui.inbox.InboxPage
 import com.praveenpuglia.cleansms.ui.inbox.InboxScreen
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingScreen
 import com.praveenpuglia.cleansms.ui.onboarding.OnboardingUiState
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
-import java.util.LinkedHashMap
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private val observerHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val reloadFromObserver = Runnable { reloadInboxData() }
+    private val inbox: InboxViewModel by viewModels()
+    private val reloadFromObserver = Runnable { inbox.reload() }
     // Reload while visible when SMS change (incoming, other apps, our own writes); debounced.
     private val smsObserver = object : ContentObserver(observerHandler) {
         override fun onChange(selfChange: Boolean) {
@@ -51,10 +45,6 @@ class MainActivity : AppCompatActivity() {
             observerHandler.postDelayed(reloadFromObserver, OBSERVER_DEBOUNCE_MS)
         }
     }
-    private var inboxLoad: Job? = null
-    private var inboxReloadPending = false
-    private var allTabLoad: Job? = null
-    private var searchLoad: Job? = null
     private val requestSmsRoleLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { _ ->
         // Re-evaluate default status after user interaction
         setupDefaultSmsUi()
@@ -70,67 +60,21 @@ class MainActivity : AppCompatActivity() {
         Manifest.permission.READ_PHONE_STATE // needed to reliably map subscriptionId to SIM slot
     )
 
-    private val otpFetchLimit = 200
-    private val simSlots by lazy { SimSlots.resolver(this) }
-    
-    // SharedPreferences for persistent onboarding state
-    private val PREFS_NAME = "CleanSmsPrefs"
-    private val PREF_ONBOARDING_COMPLETED = "onboarding_completed"
     private var onboardingUiState by mutableStateOf(OnboardingUiState())
-    
-    // Category filtering state - will be initialized in onCreate
-    private lateinit var selectedCategory: MessageCategory
-    private var allThreads by mutableStateOf<List<ThreadItem>>(emptyList())
-    private var otpMessages by mutableStateOf<List<OtpMessageItem>>(emptyList())
-    private var allTabItems by mutableStateOf<List<SearchResultItem>>(emptyList())
-    private var initialPageApplied = false
-    private val categories = listOf(
-        MessageCategory.PERSONAL,
-        MessageCategory.TRANSACTIONAL,
-        MessageCategory.SERVICE,
-        MessageCategory.PROMOTIONAL,
-        MessageCategory.GOVERNMENT
-    )
-    private var pagerPages: List<InboxPage> = buildPagerPages(allTabEnabled = false)
     private var lastAppliedAllTabEnabled: Boolean = false
-    private var lastAppliedFontFamily: SettingsActivity.FontFamily = SettingsActivity.FontFamily.SANS_SERIF
-    private var selectedPageIndex by mutableIntStateOf(0)
-    private var scrollToTopRequest by mutableIntStateOf(0)
+    private var lastAppliedFontFamily: AppSettings.FontFamily = AppSettings.FontFamily.SANS_SERIF
     private var permissionRequired by mutableStateOf(false)
     private var showOnboarding by mutableStateOf(true)
-    private var showDeleteDialog by mutableStateOf(false)
     private var promoMuted by mutableStateOf(false)
-
-    private fun buildPagerPages(allTabEnabled: Boolean): List<InboxPage> {
-        val base = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) }
-        return if (allTabEnabled) listOf(InboxPage.All) + base else base
-    }
-    private var selectionMode by mutableStateOf(false)
-    private var selectedThreadIds by mutableStateOf<Set<Long>>(emptySet())
-    private var selectedMessageIds by mutableStateOf<Set<Long>>(emptySet())
-    
-    // Search state
-    private var isSearchMode by mutableStateOf(false)
-    private var searchQuery by mutableStateOf("")
-    private var allMessagesForSearch: List<SearchResultItem> = emptyList()
-    private var searchResults by mutableStateOf<List<SearchResultItem>>(emptyList())
-    private val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var searchRunnable: Runnable? = null
-    private val searchDebounceMs = 300L
-
-    // Unread filter state
-    private var unreadOnlyFilter by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         FontThemeHelper.apply(this)
-        AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
+        AppCompatDelegate.setDefaultNightMode(AppSettings.getThemeMode(this))
         super.onCreate(savedInstanceState)
 
-        selectedCategory = getInitialCategory()
-        lastAppliedAllTabEnabled = SettingsActivity.getAllTabEnabled(this)
-        lastAppliedFontFamily = SettingsActivity.getFontFamily(this)
-        pagerPages = buildPagerPages(lastAppliedAllTabEnabled)
-        selectedPageIndex = getInitialPageIndexForTab(SettingsActivity.getDefaultTab(this))
+        lastAppliedAllTabEnabled = AppSettings.getAllTabEnabled(this)
+        lastAppliedFontFamily = AppSettings.getFontFamily(this)
+        inbox.configure(lastAppliedAllTabEnabled, AppSettings.getDefaultTab(this))
 
         setContent {
             CleanSmsTheme {
@@ -143,42 +87,42 @@ class MainActivity : AppCompatActivity() {
                     )
                 } else {
                     InboxScreen(
-                        pages = pagerPages,
-                        selectedPageIndex = selectedPageIndex,
-                        scrollToTopRequest = scrollToTopRequest,
-                        allThreads = allThreads,
-                        otpMessages = otpMessages,
-                        allItems = allTabItems,
-                        searchResults = searchResults,
-                        searchMode = isSearchMode,
-                        searchQuery = searchQuery,
-                        unreadOnly = unreadOnlyFilter,
-                        selectionMode = selectionMode,
-                        selectedThreadIds = selectedThreadIds,
-                        selectedMessageIds = selectedMessageIds,
+                        pages = inbox.pages,
+                        selectedPageIndex = inbox.selectedPageIndex,
+                        scrollToTopRequest = inbox.scrollToTopRequest,
+                        allThreads = inbox.allThreads,
+                        otpMessages = inbox.otpMessages,
+                        allItems = inbox.allTabItems,
+                        searchResults = inbox.searchResults,
+                        searchMode = inbox.searchMode,
+                        searchQuery = inbox.searchQuery,
+                        unreadOnly = inbox.unreadOnly,
+                        selectionMode = inbox.selectionMode,
+                        selectedThreadIds = inbox.selectedThreadIds,
+                        selectedMessageIds = inbox.selectedMessageIds,
                         promoMuted = promoMuted,
                         permissionRequired = permissionRequired,
-                        showDeleteDialog = showDeleteDialog,
-                        onPageSelected = ::selectPage,
-                        onSearchModeChange = { enabled -> if (enabled) enterSearchMode() else exitSearchMode() },
-                        onSearchQueryChange = ::updateSearchQuery,
-                        onUnreadOnlyChange = ::setUnreadFilter,
+                        showDeleteDialog = inbox.showDeleteDialog,
+                        onPageSelected = inbox::selectPage,
+                        onSearchModeChange = { enabled -> if (enabled) inbox.enterSearchMode() else inbox.exitSearchMode() },
+                        onSearchQueryChange = inbox::updateSearchQuery,
+                        onUnreadOnlyChange = inbox::setUnreadFilter,
                         onOpenStats = { startActivity(Intent(this, StatsActivity::class.java)) },
                         onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                         onNewMessage = { startActivity(Intent(this, NewMessageActivity::class.java)) },
                         onThreadClick = ::handleThreadClick,
                         onThreadAvatarClick = ::handleThreadAvatarClick,
-                        onThreadLongClick = ::startThreadSelection,
+                        onThreadLongClick = inbox::startThreadSelection,
                         onOtpClick = ::handleOtpClick,
                         onOtpAvatarClick = ::handleOtpAvatarClick,
-                        onOtpLongClick = ::startOtpSelection,
+                        onOtpLongClick = inbox::startOtpSelection,
                         onCopyOtp = ::copyOtp,
                         onMessageClick = ::handleSearchResultClick,
-                        onSelectAll = ::toggleSelectAll,
-                        onMarkAsRead = ::markSelectionAsRead,
-                        onDeleteRequest = ::confirmDeleteSelection,
-                        onDeleteConfirm = ::performDeletion,
-                        onDeleteDismiss = { showDeleteDialog = false },
+                        onSelectAll = inbox::toggleSelectAll,
+                        onMarkAsRead = inbox::markSelectionAsRead,
+                        onDeleteRequest = inbox::confirmDeleteSelection,
+                        onDeleteConfirm = inbox::performDeletion,
+                        onDeleteDismiss = { inbox.showDeleteDialog = false },
                     )
                 }
             }
@@ -187,8 +131,8 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
-                    isSearchMode -> exitSearchMode()
-                    selectionMode -> exitSelectionMode()
+                    inbox.searchMode -> inbox.exitSearchMode()
+                    inbox.selectionMode -> inbox.exitSelectionMode()
                     else -> {
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()
@@ -206,26 +150,21 @@ class MainActivity : AppCompatActivity() {
         // Re-check after potential default change
         setupDefaultSmsUi()
         // If the All-tab preference changed in Settings, simplest path is to rebuild the activity.
-        if (SettingsActivity.getAllTabEnabled(this) != lastAppliedAllTabEnabled ||
-            SettingsActivity.getFontFamily(this) != lastAppliedFontFamily) {
+        if (AppSettings.getAllTabEnabled(this) != lastAppliedAllTabEnabled ||
+            AppSettings.getFontFamily(this) != lastAppliedFontFamily) {
             recreate()
             return
         }
         if (hasReadPermission()) {
-            refreshThreadsAsync()
+            inbox.reload()
         }
-        promoMuted = !SettingsActivity.getPromoNotificationsEnabled(this)
+        promoMuted = !AppSettings.getPromoNotificationsEnabled(this)
     }
 
     override fun onPause() {
         observerHandler.removeCallbacks(reloadFromObserver)
         contentResolver.unregisterContentObserver(smsObserver)
         super.onPause()
-    }
-
-    override fun onDestroy() {
-        searchRunnable?.let(searchHandler::removeCallbacks)
-        super.onDestroy()
     }
 
     private fun setupDefaultSmsUi() {
@@ -237,9 +176,7 @@ class MainActivity : AppCompatActivity() {
         val isBatteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
         onboardingUiState = OnboardingUiState(isDefault, isBatteryOptimizationIgnored)
         
-        // Check if onboarding has been completed (persisted)
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val hasCompletedOnboarding = prefs.getBoolean(PREF_ONBOARDING_COMPLETED, false)
+        val hasCompletedOnboarding = AppSettings.isOnboardingCompleted(this)
         
         Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored hasCompletedOnboarding=$hasCompletedOnboarding")
         
@@ -287,10 +224,7 @@ class MainActivity : AppCompatActivity() {
     private fun completeOnboarding() {
         if (!onboardingUiState.isDefaultSmsApp || !onboardingUiState.isBatteryOptimizationIgnored) return
 
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            .edit()
-            .putBoolean(PREF_ONBOARDING_COMPLETED, true)
-            .apply()
+        AppSettings.setOnboardingCompleted(this)
         showOnboarding = false
 
         if (hasReadPermission()) {
@@ -301,118 +235,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshThreadsAsync() {
-        reloadInboxData()
-    }
-
-    /**
-     * Loads are coalesced: never two at once, and a request arriving mid-load triggers exactly
-     * one more pass afterwards, so the newest provider state always wins.
-     */
-    private fun reloadInboxData() {
-        if (inboxLoad?.isActive == true) {
-            inboxReloadPending = true
-            return
-        }
-        inboxLoad = lifecycleScope.launch {
-            do {
-                inboxReloadPending = false
-                val (threads, otp) = withContext(Dispatchers.IO) {
-                    val enrichedThreads = loadSmsThreads().map { t ->
-                        val hit = ContactDirectory.resolve(this@MainActivity, t.nameOrAddress)?.takeIf(ContactInfo::hasAny)
-                        hit?.let { t.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: t
-                    }
-                    val enrichedOtp = loadOtpMessages().map { item ->
-                        val hit = ContactDirectory.resolve(this@MainActivity, item.address)?.takeIf(ContactInfo::hasAny)
-                        hit?.let { item.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: item
-                    }
-                    enrichedThreads to enrichedOtp
-                }
-                val restorePageIndex = if (initialPageApplied) selectedPageIndex else null
-                allThreads = threads
-                otpMessages = otp
-                updatePagerContent(restorePageIndex)
-                applyInitialPageIfNeeded()
-            } while (inboxReloadPending)
-        }
-    }
-
     private fun showThreadsUi() {
         permissionRequired = false
-        reloadInboxData()
+        inbox.reload()
     }
 
-    private fun updatePagerContent(restorePageIndex: Int?) {
-        pruneSelection()
-        if (pagerPages.any { it is InboxPage.All }) loadAllItemsForAllTab()
-        updateSelectionUi()
-        val restoreIndex = restorePageIndex
-        if (restoreIndex != null && restoreIndex in pagerPages.indices) {
-            selectedPageIndex = restoreIndex
-            return
-        }
-        if (!initialPageApplied) {
-            return
-        }
-        val desiredIndex = pagerPages.indexOfFirst { page ->
-            page is InboxPage.CategoryPage && page.category == selectedCategory
-        }
-        if (desiredIndex >= 0 && pagerPages.getOrNull(selectedPageIndex) is InboxPage.CategoryPage) selectedPageIndex = desiredIndex
-    }
 
-    private fun getInitialCategory(): MessageCategory {
-        val defaultTab = SettingsActivity.getDefaultTab(this)
-        return when (defaultTab) {
-            SettingsActivity.DefaultTab.PERSONAL -> MessageCategory.PERSONAL
-            SettingsActivity.DefaultTab.TRANSACTIONAL -> MessageCategory.TRANSACTIONAL
-            SettingsActivity.DefaultTab.SERVICE -> MessageCategory.SERVICE
-            SettingsActivity.DefaultTab.PROMOTIONAL -> MessageCategory.PROMOTIONAL
-            SettingsActivity.DefaultTab.GOVERNMENT -> MessageCategory.GOVERNMENT
-            SettingsActivity.DefaultTab.OTP -> MessageCategory.PERSONAL // fallback for OTP
-            SettingsActivity.DefaultTab.ALL -> MessageCategory.PERSONAL // fallback for All
-        }
-    }
 
-    private fun getInitialPageIndexForTab(defaultTab: SettingsActivity.DefaultTab): Int {
-        return when (defaultTab) {
-            SettingsActivity.DefaultTab.OTP -> {
-                pagerPages.indexOfFirst { it is InboxPage.Otp }.takeIf { it >= 0 } ?: 0
-            }
-            SettingsActivity.DefaultTab.PERSONAL -> {
-                pagerPages.indexOfFirst { page ->
-                    page is InboxPage.CategoryPage && page.category == MessageCategory.PERSONAL
-                }.takeIf { it >= 0 } ?: 0
-            }
-            SettingsActivity.DefaultTab.TRANSACTIONAL -> {
-                pagerPages.indexOfFirst { page ->
-                    page is InboxPage.CategoryPage && page.category == MessageCategory.TRANSACTIONAL
-                }.takeIf { it >= 0 } ?: 0
-            }
-            SettingsActivity.DefaultTab.SERVICE -> {
-                pagerPages.indexOfFirst { page ->
-                    page is InboxPage.CategoryPage && page.category == MessageCategory.SERVICE
-                }.takeIf { it >= 0 } ?: 0
-            }
-            SettingsActivity.DefaultTab.PROMOTIONAL -> {
-                pagerPages.indexOfFirst { page ->
-                    page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL
-                }.takeIf { it >= 0 } ?: 0
-            }
-            SettingsActivity.DefaultTab.GOVERNMENT -> {
-                pagerPages.indexOfFirst { page ->
-                    page is InboxPage.CategoryPage && page.category == MessageCategory.GOVERNMENT
-                }.takeIf { it >= 0 } ?: 0
-            }
-            SettingsActivity.DefaultTab.ALL -> {
-                pagerPages.indexOfFirst { it is InboxPage.All }.takeIf { it >= 0 } ?: 0
-            }
-        }
-    }
 
-    private fun applyInitialPageIfNeeded() {
-        if (initialPageApplied) return
-        initialPageApplied = true
-    }
 
     private fun openThreadDetail(threadItem: ThreadItem, targetMessageId: Long? = null) {
         startActivity(
@@ -430,7 +260,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openThreadDetailFromOtp(item: OtpMessageItem) {
-        val existingThread = allThreads.firstOrNull { it.threadId == item.threadId }
+        val existingThread = inbox.allThreads.firstOrNull { it.threadId == item.threadId }
         val threadItem = if (existingThread != null) {
             existingThread.copy(
                 contactName = existingThread.contactName ?: item.contactName,
@@ -454,16 +284,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleThreadClick(item: ThreadItem) {
-        if (selectionMode) {
-            toggleThreadSelection(item)
+        if (inbox.selectionMode) {
+            inbox.toggleThreadSelection(item)
         } else {
             openThreadDetail(item)
         }
     }
 
     private fun handleThreadAvatarClick(item: ThreadItem) {
-        if (selectionMode) {
-            toggleThreadSelection(item)
+        if (inbox.selectionMode) {
+            inbox.toggleThreadSelection(item)
             return
         }
         if (item.hasSavedContact) {
@@ -487,16 +317,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleOtpClick(item: OtpMessageItem) {
-        if (selectionMode) {
-            toggleOtpSelection(item)
+        if (inbox.selectionMode) {
+            inbox.toggleOtpSelection(item)
         } else {
             openThreadDetailFromOtp(item)
         }
     }
 
     private fun handleOtpAvatarClick(item: OtpMessageItem) {
-        if (selectionMode) {
-            toggleOtpSelection(item)
+        if (inbox.selectionMode) {
+            inbox.toggleOtpSelection(item)
             return
         }
         if (item.hasSavedContact) {
@@ -505,227 +335,17 @@ class MainActivity : AppCompatActivity() {
         // OTP messages are service messages - no add-to-contacts for unknown senders
     }
 
-    private fun startThreadSelection(item: ThreadItem) {
-        if (!selectionMode) {
-            selectionMode = true
-            selectedThreadIds = emptySet()
-            selectedMessageIds = emptySet()
-        }
-        selectedThreadIds = selectedThreadIds + item.threadId
-    }
 
-    private fun startOtpSelection(item: OtpMessageItem) {
-        if (!selectionMode) {
-            selectionMode = true
-            selectedThreadIds = emptySet()
-            selectedMessageIds = emptySet()
-        }
-        selectedMessageIds = selectedMessageIds + item.messageId
-    }
 
-    private fun toggleThreadSelection(item: ThreadItem) {
-        if (!selectionMode) {
-            startThreadSelection(item)
-            return
-        }
-        selectedThreadIds = if (item.threadId in selectedThreadIds) selectedThreadIds - item.threadId else selectedThreadIds + item.threadId
-        if (selectionMode && selectionCount() == 0) {
-            exitSelectionMode()
-        }
-    }
 
-    private fun toggleOtpSelection(item: OtpMessageItem) {
-        if (!selectionMode) {
-            startOtpSelection(item)
-            return
-        }
-        selectedMessageIds = if (item.messageId in selectedMessageIds) selectedMessageIds - item.messageId else selectedMessageIds + item.messageId
-        if (selectionMode && selectionCount() == 0) {
-            exitSelectionMode()
-        }
-    }
 
-    private fun selectionCount(): Int = selectedThreadIds.size + selectedMessageIds.size
 
-    private fun updateSelectionUi() {
-        if (selectionMode && selectionCount() == 0) exitSelectionMode()
-    }
 
-    private fun exitSelectionMode() {
-        if (!selectionMode && selectedThreadIds.isEmpty() && selectedMessageIds.isEmpty()) return
-        selectionMode = false
-        selectedThreadIds = emptySet()
-        selectedMessageIds = emptySet()
-    }
 
-    private fun toggleSelectAll() {
-        if (!selectionMode) return
 
-        val currentPage = pagerPages.getOrNull(selectedPageIndex) ?: return
 
-        // Get filtered items based on unread filter
-        val filteredThreads = if (unreadOnlyFilter) {
-            allThreads.filter { it.hasUnread }
-        } else {
-            allThreads
-        }
-        val filteredOtp = if (unreadOnlyFilter) {
-            otpMessages.filter { it.isUnread }
-        } else {
-            otpMessages
-        }
 
-        when (currentPage) {
-            is InboxPage.All -> {
-                // No selection mode on the All page (chronological view, mirrors search).
-            }
-            is InboxPage.Otp -> {
-                val allOtpIds = filteredOtp.map { it.messageId }.toSet()
-                val allSelected = allOtpIds.isNotEmpty() && allOtpIds.all { it in selectedMessageIds }
 
-                if (allSelected) {
-                    // Deselect all OTP messages
-                    selectedMessageIds = selectedMessageIds - allOtpIds
-                    if (selectionCount() == 0) {
-                        exitSelectionMode()
-                        return
-                    }
-                } else {
-                    // Select all OTP messages
-                    selectedMessageIds = selectedMessageIds + allOtpIds
-                }
-            }
-            is InboxPage.CategoryPage -> {
-                val categoryThreads = filteredThreads.filter { it.category == currentPage.category }
-                val allThreadIdsInCategory = categoryThreads.map { it.threadId }.toSet()
-                val allSelected = allThreadIdsInCategory.isNotEmpty() && allThreadIdsInCategory.all { it in selectedThreadIds }
-
-                if (allSelected) {
-                    // Deselect all threads in this category
-                    selectedThreadIds = selectedThreadIds - allThreadIdsInCategory
-                    if (selectionCount() == 0) {
-                        exitSelectionMode()
-                        return
-                    }
-                } else {
-                    // Select all threads in this category
-                    selectedThreadIds = selectedThreadIds + allThreadIdsInCategory
-                }
-            }
-        }
-    }
-
-    private fun confirmDeleteSelection() {
-        val totalSelected = selectionCount()
-        if (totalSelected == 0) {
-            exitSelectionMode()
-            return
-        }
-        showDeleteDialog = true
-    }
-
-    private fun markSelectionAsRead() {
-        val threadIds = selectedThreadIds.toSet()
-        val messageIds = selectedMessageIds.toSet()
-        if (threadIds.isEmpty() && messageIds.isEmpty()) {
-            exitSelectionMode()
-            return
-        }
-
-        lifecycleScope.launch {
-            val success = withContext(Dispatchers.IO) {
-                val values = ContentValues(1).apply { put(Telephony.Sms.READ, 1) }
-                try {
-                    threadIds.forEach { threadId ->
-                        contentResolver.update(
-                            Telephony.Sms.CONTENT_URI,
-                            values,
-                            "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
-                            arrayOf(threadId.toString()),
-                        )
-                    }
-                    messageIds.forEach { messageId ->
-                        contentResolver.update(
-                            ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, messageId),
-                            values,
-                            "${Telephony.Sms.READ} = 0",
-                            null,
-                        )
-                    }
-                    true
-                } catch (error: SecurityException) {
-                    Log.w("MainActivity", "Failed to mark selection read: ${error.javaClass.simpleName}")
-                    false
-                } catch (error: IllegalArgumentException) {
-                    Log.w("MainActivity", "Failed to mark selection read: ${error.javaClass.simpleName}")
-                    false
-                }
-            }
-            exitSelectionMode()
-            Toast.makeText(
-                this@MainActivity,
-                getString(if (success) R.string.toast_messages_marked_read else R.string.toast_messages_mark_read_failed),
-                Toast.LENGTH_SHORT,
-            ).show()
-            refreshThreadsAsync()
-        }
-    }
-
-    private fun performDeletion() {
-        showDeleteDialog = false
-        val threadIds = selectedThreadIds.toSet()
-        val messageIds = selectedMessageIds.toSet()
-        if (threadIds.isEmpty() && messageIds.isEmpty()) {
-            exitSelectionMode()
-            return
-        }
-        val messageToThread = otpMessages.associate { it.messageId to it.threadId }
-        val filteredMessageIds = messageIds.filter { id ->
-            val threadId = messageToThread[id]
-            threadId == null || !threadIds.contains(threadId)
-        }
-
-        lifecycleScope.launch {
-            val deletedCount = withContext(Dispatchers.IO) {
-                val uris = threadIds.map { ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, it) } +
-                    filteredMessageIds.map { ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, it) }
-                uris.sumOf { uri ->
-                    try {
-                        contentResolver.delete(uri, null, null).coerceAtLeast(0)
-                    } catch (e: RuntimeException) {
-                        // One failed row must not abort the rest of a bulk delete.
-                        Log.w("MainActivity", "Failed to delete selection item: ${e.javaClass.simpleName}")
-                        0
-                    }
-                }
-            }
-            exitSelectionMode()
-            val message = if (deletedCount > 0) R.string.toast_messages_deleted else R.string.toast_messages_delete_failed
-            Toast.makeText(this@MainActivity, getString(message), Toast.LENGTH_SHORT).show()
-            refreshThreadsAsync()
-        }
-    }
-
-    private fun pruneSelection(): Boolean {
-        var changed = false
-        val validThreadIds = allThreads.map { it.threadId }.toSet()
-        val validMessageIds = otpMessages.map { it.messageId }.toSet()
-        val retainedThreads = selectedThreadIds.intersect(validThreadIds)
-        val retainedMessages = selectedMessageIds.intersect(validMessageIds)
-        if (retainedThreads != selectedThreadIds) {
-            selectedThreadIds = retainedThreads
-            changed = true
-        }
-        if (retainedMessages != selectedMessageIds) {
-            selectedMessageIds = retainedMessages
-            changed = true
-        }
-        if (selectionMode && selectionCount() == 0) {
-            exitSelectionMode()
-            return true
-        }
-        return changed
-    }
 
     private fun openContactFromThread(item: ThreadItem) {
         if (!hasContactsPermission() || item.contactName.isNullOrBlank()) return
@@ -791,141 +411,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Query the SMS content provider and build a list of ThreadItem where each thread appears once
-     * with the most recent message's date and snippet. We query content://sms sorted by date desc
-     * and pick the first message we see for each thread_id.
-     */
-    private fun loadSmsThreads(): List<ThreadItem> {
-        val uri: Uri = "content://sms".toUri()
-        val projection = arrayOf("thread_id", "address", "date", "body", "read")
-        val sortOrder = "date DESC"
-        val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
-        val map = LinkedHashMap<Long, ThreadItem>()
-        val unreadCounts = mutableMapOf<Long, Int>()
-        val threadsWithSpam = mutableSetOf<Long>()
 
-        cursor?.use { c ->
-            val idxThread = c.getColumnIndex("thread_id")
-            val idxAddress = c.getColumnIndex("address")
-            val idxDate = c.getColumnIndex("date")
-            val idxBody = c.getColumnIndex("body")
-            val idxRead = c.getColumnIndex("read")
 
-            while (c.moveToNext()) {
-                val threadId = if (idxThread >= 0) c.getLong(idxThread) else -1L
-                val body = if (idxBody >= 0) c.getString(idxBody) ?: "" else ""
-                
-                // Check if this message is spam
-                if (SpamDetector.isSpam(body)) {
-                    threadsWithSpam.add(threadId)
-                }
-                
-                if (!map.containsKey(threadId)) {
-                    val address = if (idxAddress >= 0) c.getString(idxAddress) ?: "Unknown" else "Unknown"
-                    val date = if (idxDate >= 0) c.getLong(idxDate) else 0L
-                    
-                    // Categorize the thread
-                    val category = CategoryStorage.getCategoryOrCompute(this, address, threadId)
-                    
-                    map[threadId] = ThreadItem(threadId, address, date, body, category = category)
-                }
-                val isUnread = idxRead >= 0 && c.getInt(idxRead) == 0
-                if (isUnread) {
-                    unreadCounts[threadId] = (unreadCounts[threadId] ?: 0) + 1
-                }
-            }
-        }
-
-        return map.values.map { item ->
-            val unread = unreadCounts[item.threadId] ?: 0
-            val hasSpam = threadsWithSpam.contains(item.threadId)
-            item.copy(unreadCount = unread, hasSpam = hasSpam)
-        }
-    }
-
-    private fun loadOtpMessages(): List<OtpMessageItem> {
-        val uri: Uri = "content://sms".toUri()
-    val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id")
-        val selection = "type = ?"
-        val selectionArgs = arrayOf("1") // Inbox / received messages
-        val sortOrder = "date DESC"
-
-        val results = mutableListOf<OtpMessageItem>()
-
-        contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
-            val idxId = cursor.getColumnIndex("_id")
-            val idxThread = cursor.getColumnIndex("thread_id")
-            val idxAddress = cursor.getColumnIndex("address")
-            val idxBody = cursor.getColumnIndex("body")
-            val idxDate = cursor.getColumnIndex("date")
-            val idxRead = cursor.getColumnIndex("read")
-            val idxSubId = cursor.getColumnIndex("sub_id")
-
-            while (cursor.moveToNext() && results.size < otpFetchLimit) {
-                val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
-                val otpCode = extractOtpFromBody(body)
-                if (otpCode != null) {
-                    val messageId = if (idxId >= 0) cursor.getLong(idxId) else -1L
-                    val threadId = if (idxThread >= 0) cursor.getLong(idxThread) else -1L
-                    val address = if (idxAddress >= 0) {
-                        cursor.getString(idxAddress)?.takeIf { it.isNotBlank() } ?: "Unknown"
-                    } else "Unknown"
-                    val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
-                    val isRead = idxRead >= 0 && cursor.getInt(idxRead) != 0
-                    if (messageId != -1L && threadId != -1L) {
-                        val subIdRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
-                        val subscriptionId = if (subIdRaw >= 0) subIdRaw else null
-                        val simSlot = subscriptionId?.let(simSlots::slotFor)
-                        results.add(
-                            OtpMessageItem(
-                                messageId = messageId,
-                                threadId = threadId,
-                                address = address,
-                                body = body,
-                                date = date,
-                                otpCode = otpCode,
-                                subscriptionId = subscriptionId,
-                                simSlot = simSlot,
-                                isRead = isRead
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        return results
-    }
-
-    private fun extractOtpFromBody(body: String?): String? {
-        if (body.isNullOrBlank()) return null
-        return CategoryClassifier.extractHighPrecisionOtp(body)
-    }
 
     // ========== Overflow Menu ==========
     
-    private fun setUnreadFilter(enabled: Boolean) {
-        unreadOnlyFilter = enabled
-        updatePagerContent(selectedPageIndex)
-    }
 
-    private fun selectPage(index: Int) {
-        if (index !in pagerPages.indices) return
-        if (selectedPageIndex == index) {
-            scrollToTopRequest++
-        } else {
-            selectedPageIndex = index
-        }
-        (pagerPages[index] as? InboxPage.CategoryPage)?.let { selectedCategory = it.category }
-    }
 
-    private fun updateSearchQuery(query: String) {
-        searchQuery = query
-        searchRunnable?.let(searchHandler::removeCallbacks)
-        searchRunnable = Runnable { performSearch(query) }
-        searchHandler.postDelayed(searchRunnable!!, searchDebounceMs)
-    }
 
     private fun copyOtp(code: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
@@ -933,120 +425,16 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, R.string.toast_otp_copied, Toast.LENGTH_SHORT).show()
     }
 
-    private fun enterSearchMode() {
-        isSearchMode = true
-        loadAllMessagesForSearch()
-    }
 
-    private fun exitSearchMode() {
-        isSearchMode = false
-        searchRunnable?.let { searchHandler.removeCallbacks(it) }
-        searchQuery = ""
-        searchResults = emptyList()
-    }
     
-    private fun loadAllItemsForAllTab() {
-        val unreadOnly = unreadOnlyFilter
-        val threadsById = allThreads.associateBy { it.threadId }
-        allTabLoad?.cancel()
-        allTabLoad = lifecycleScope.launch {
-            allTabItems = withContext(Dispatchers.IO) {
-                queryAllMessagesForSearch(threadsById)
-                    .let { if (unreadOnly) it.filter { item -> item.isUnread } else it }
-                    .sortedByDescending { it.date }
-            }
-        }
-    }
 
-    private fun loadAllMessagesForSearch() {
-        val threadsById = allThreads.associateBy { it.threadId }
-        searchLoad?.cancel()
-        searchLoad = lifecycleScope.launch {
-            val messages = withContext(Dispatchers.IO) { queryAllMessagesForSearch(threadsById) }
-            allMessagesForSearch = messages
-            // Show all messages initially in chronological order
-            updateSearchResults(messages.sortedByDescending { it.date })
-        }
-    }
     
-    private fun queryAllMessagesForSearch(threadsById: Map<Long, ThreadItem>): List<SearchResultItem> {
-        val uri = "content://sms".toUri()
-        val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id")
-        val sortOrder = "date DESC"
-
-        val results = mutableListOf<SearchResultItem>()
-
-        try {
-            contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
-                val idxId = cursor.getColumnIndex("_id")
-                val idxThreadId = cursor.getColumnIndex("thread_id")
-                val idxAddress = cursor.getColumnIndex("address")
-                val idxBody = cursor.getColumnIndex("body")
-                val idxDate = cursor.getColumnIndex("date")
-                val idxRead = cursor.getColumnIndex("read")
-                val idxSubId = cursor.getColumnIndex("sub_id")
-
-                while (cursor.moveToNext()) {
-                    val messageId = if (idxId >= 0) cursor.getLong(idxId) else continue
-                    val threadId = if (idxThreadId >= 0) cursor.getLong(idxThreadId) else -1L
-                    val address = if (idxAddress >= 0) cursor.getString(idxAddress) ?: "" else ""
-                    val body = if (idxBody >= 0) cursor.getString(idxBody) ?: "" else ""
-                    val date = if (idxDate >= 0) cursor.getLong(idxDate) else 0L
-                    val read = if (idxRead >= 0) cursor.getInt(idxRead) else 1
-                    val subIdRaw = if (idxSubId >= 0) cursor.getInt(idxSubId) else -1
-                    val subscriptionId = if (subIdRaw >= 0) subIdRaw else null
-                    val simSlot = subscriptionId?.let(simSlots::slotFor)
-
-                    if (body.isBlank()) continue
-
-                    // Contact info and category come from the already-enriched thread list
-                    val existingThread = threadsById[threadId]
-                    val contactName = existingThread?.contactName
-                    val contactPhotoUri = existingThread?.contactPhotoUri
-                    val contactLookupUri = existingThread?.contactLookupUri
-                    val category = existingThread?.category ?: MessageCategory.UNKNOWN
-
-                    results.add(SearchResultItem(
-                        messageId = messageId,
-                        threadId = threadId,
-                        sender = address,
-                        senderDisplay = contactName,
-                        body = body,
-                        date = date,
-                        contactPhotoUri = contactPhotoUri,
-                        contactLookupUri = contactLookupUri,
-                        category = category,
-                        isUnread = read == 0,
-                        subscriptionId = subscriptionId,
-                        simSlot = simSlot
-                    ))
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to query messages for search: ${e.message}")
-        }
-
-        return results
-    }
     
-    private fun performSearch(query: String) {
-        if (query.isBlank()) {
-            // Show all messages in chronological order when no query
-            updateSearchResults(allMessagesForSearch.sortedByDescending { it.date })
-        } else {
-            // Perform fuzzy search
-            val results = FuzzySearch.search(allMessagesForSearch, query)
-            updateSearchResults(results)
-        }
-    }
     
-    private fun updateSearchResults(results: List<SearchResultItem>) {
-        searchResults = results
-    }
     
     private fun handleSearchResultClick(item: SearchResultItem) {
         // Find or create thread item to navigate
-        val existingThread = allThreads.firstOrNull { it.threadId == item.threadId }
+        val existingThread = inbox.allThreads.firstOrNull { it.threadId == item.threadId }
         val threadItem = existingThread ?: ThreadItem(
             threadId = item.threadId,
             nameOrAddress = item.sender,

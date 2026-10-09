@@ -45,8 +45,8 @@ class InboxLiveUpdateTest {
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
         context.getSharedPreferences("CleanSmsPrefs", Context.MODE_PRIVATE).edit()
             .putBoolean("onboarding_completed", true).commit()
-        SettingsActivity.setAllTabEnabled(context, false)
-        SettingsActivity.setDefaultTab(context, SettingsActivity.DefaultTab.OTP)
+        AppSettings.setAllTabEnabled(context, false)
+        AppSettings.setDefaultTab(context, AppSettings.DefaultTab.OTP)
         cleanUp()
     }
 

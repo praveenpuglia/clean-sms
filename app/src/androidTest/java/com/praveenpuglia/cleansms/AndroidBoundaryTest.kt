@@ -39,8 +39,8 @@ class AndroidBoundaryTest {
     @After
     fun restoreStablePreferences() {
         settings.edit().clear().putBoolean("onboarding_completed", true).commit()
-        SettingsActivity.setThemeMode(context, SettingsActivity.THEME_DARK)
-        SettingsActivity.setFontFamily(context, SettingsActivity.FontFamily.SANS_SERIF)
+        AppSettings.setThemeMode(context, AppSettings.THEME_DARK)
+        AppSettings.setFontFamily(context, AppSettings.FontFamily.SANS_SERIF)
         categories.edit().clear().commit()
         runCatching {
             context.contentResolver.delete(
@@ -53,37 +53,37 @@ class AndroidBoundaryTest {
 
     @Test
     fun settingsDefaultsRoundTripAndLegacyTabNamesMigrate() {
-        assertEquals(SettingsActivity.THEME_SYSTEM, SettingsActivity.getThemeMode(context))
-        assertEquals(SettingsActivity.DefaultTab.OTP, SettingsActivity.getDefaultTab(context))
-        assertEquals(SettingsActivity.FontFamily.SANS_SERIF, SettingsActivity.getFontFamily(context))
-        assertTrue(SettingsActivity.getPromoNotificationsEnabled(context))
-        assertFalse(SettingsActivity.getAllTabEnabled(context))
+        assertEquals(AppSettings.THEME_SYSTEM, AppSettings.getThemeMode(context))
+        assertEquals(AppSettings.DefaultTab.OTP, AppSettings.getDefaultTab(context))
+        assertEquals(AppSettings.FontFamily.SANS_SERIF, AppSettings.getFontFamily(context))
+        assertTrue(AppSettings.getPromoNotificationsEnabled(context))
+        assertFalse(AppSettings.getAllTabEnabled(context))
 
-        SettingsActivity.setThemeMode(context, SettingsActivity.THEME_LIGHT)
-        SettingsActivity.setFontFamily(context, SettingsActivity.FontFamily.MONOSPACE)
-        SettingsActivity.setPromoNotificationsEnabled(context, false)
-        SettingsActivity.setAllTabEnabled(context, true)
-        assertEquals(SettingsActivity.THEME_LIGHT, SettingsActivity.getThemeMode(context))
-        assertEquals(SettingsActivity.FontFamily.MONOSPACE, SettingsActivity.getFontFamily(context))
-        assertFalse(SettingsActivity.getPromoNotificationsEnabled(context))
-        assertTrue(SettingsActivity.getAllTabEnabled(context))
+        AppSettings.setThemeMode(context, AppSettings.THEME_LIGHT)
+        AppSettings.setFontFamily(context, AppSettings.FontFamily.MONOSPACE)
+        AppSettings.setPromoNotificationsEnabled(context, false)
+        AppSettings.setAllTabEnabled(context, true)
+        assertEquals(AppSettings.THEME_LIGHT, AppSettings.getThemeMode(context))
+        assertEquals(AppSettings.FontFamily.MONOSPACE, AppSettings.getFontFamily(context))
+        assertFalse(AppSettings.getPromoNotificationsEnabled(context))
+        assertTrue(AppSettings.getAllTabEnabled(context))
 
         mapOf(
-            "OTPs" to SettingsActivity.DefaultTab.OTP,
-            "Personal" to SettingsActivity.DefaultTab.PERSONAL,
-            "Transactions" to SettingsActivity.DefaultTab.TRANSACTIONAL,
-            "Services" to SettingsActivity.DefaultTab.SERVICE,
-            "Promotions" to SettingsActivity.DefaultTab.PROMOTIONAL,
-            "Governmental" to SettingsActivity.DefaultTab.GOVERNMENT,
-            "All" to SettingsActivity.DefaultTab.ALL,
+            "OTPs" to AppSettings.DefaultTab.OTP,
+            "Personal" to AppSettings.DefaultTab.PERSONAL,
+            "Transactions" to AppSettings.DefaultTab.TRANSACTIONAL,
+            "Services" to AppSettings.DefaultTab.SERVICE,
+            "Promotions" to AppSettings.DefaultTab.PROMOTIONAL,
+            "Governmental" to AppSettings.DefaultTab.GOVERNMENT,
+            "All" to AppSettings.DefaultTab.ALL,
         ).forEach { (legacy, expected) ->
             settings.edit().putString("default_tab", legacy).commit()
-            assertEquals(legacy, expected, SettingsActivity.getDefaultTab(context))
+            assertEquals(legacy, expected, AppSettings.getDefaultTab(context))
             assertEquals(expected.ordinal, settings.getInt("default_tab", -1))
         }
 
         settings.edit().putInt("default_tab", Int.MAX_VALUE).commit()
-        assertEquals(SettingsActivity.DefaultTab.OTP, SettingsActivity.getDefaultTab(context))
+        assertEquals(AppSettings.DefaultTab.OTP, AppSettings.getDefaultTab(context))
     }
 
     @Test

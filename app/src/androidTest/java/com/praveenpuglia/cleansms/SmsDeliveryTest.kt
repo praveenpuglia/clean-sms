@@ -28,7 +28,7 @@ class SmsDeliveryTest {
 
     @After
     fun cleanUp() {
-        SettingsActivity.setPromoNotificationsEnabled(context, true)
+        AppSettings.setPromoNotificationsEnabled(context, true)
         notifications.cancelAll()
         ADDRESSES.forEach { address ->
             context.contentResolver.delete(Telephony.Sms.CONTENT_URI, "${Telephony.Sms.ADDRESS} = ?", arrayOf(address))
@@ -55,7 +55,7 @@ class SmsDeliveryTest {
 
     @Test
     fun mutedPromotionsAreStoredButNotNotifiedWhileOtpsStillAre() {
-        SettingsActivity.setPromoNotificationsEnabled(context, false)
+        AppSettings.setPromoNotificationsEnabled(context, false)
 
         SmsDeliverReceiver.deliver(context, PROMO_SENDER, "Flat 50% off this weekend only")
         assertEquals(0, storedReadFlag(PROMO_SENDER, "Flat 50% off this weekend only"))

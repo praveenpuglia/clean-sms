@@ -28,7 +28,7 @@ class NewMessageActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         FontThemeHelper.apply(this)
-        AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
+        AppCompatDelegate.setDefaultNightMode(AppSettings.getThemeMode(this))
         super.onCreate(savedInstanceState)
 
         loadContacts()

@@ -26,7 +26,7 @@ class StatsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         FontThemeHelper.apply(this)
-        AppCompatDelegate.setDefaultNightMode(SettingsActivity.getThemeMode(this))
+        AppCompatDelegate.setDefaultNightMode(AppSettings.getThemeMode(this))
         super.onCreate(savedInstanceState)
 
         setContent {
