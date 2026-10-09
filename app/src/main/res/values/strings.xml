@@ -122,6 +122,7 @@
     <string name="thread_contact_avatar">Contact avatar</string>
     <string name="thread_call">Call</string>
     <string name="thread_sent_status">Sent</string>
+    <string name="thread_failed_status">Not sent</string>
     <string name="thread_spam_warning">Spam warning</string>
     <string name="thread_spam">SPAM</string>
     <string name="thread_message_hint">Message</string>

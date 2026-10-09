@@ -89,6 +89,10 @@
             android:name=".OtpCopyReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".SmsSentReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

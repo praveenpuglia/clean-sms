@@ -301,7 +301,24 @@ private fun MessageBubble(
                             Spacer(Modifier.width(4.dp))
                             SimIndicator(it, color = contentColor)
                         }
-                        if (!incoming && message.status != 64) {
+                        // Outbox/queued messages show no mark until the radio reports back.
+                        val failed = message.type == TelephonyMessageType.FAILED || message.status == STATUS_FAILED
+                        if (failed) {
+                            Icon(
+                                painterResource(R.drawable.ic_warning),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .padding(start = 4.dp)
+                                    .size(12.dp),
+                            )
+                            Text(
+                                stringResource(R.string.thread_failed_status),
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(start = 2.dp),
+                            )
+                        } else if (message.type == TelephonyMessageType.SENT) {
                             Icon(
                                 painterResource(R.drawable.ic_tick_single),
                                 contentDescription = stringResource(R.string.thread_sent_status),
@@ -471,7 +488,11 @@ private fun MessageComposer(
 
 private object TelephonyMessageType {
     const val INCOMING = 1
+    const val SENT = 2
+    const val FAILED = 5
 }
+
+private const val STATUS_FAILED = 64
 
 fun createMessageListItems(messages: List<Message>, nowMillis: Long = System.currentTimeMillis()): List<MessageListItem> {
     if (messages.isEmpty()) return emptyList()
