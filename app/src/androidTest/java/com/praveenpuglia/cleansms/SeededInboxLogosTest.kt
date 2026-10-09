@@ -69,12 +69,15 @@ class SeededInboxLogosTest {
             "57575" to null, // reference number + "we never ask for OTP"
             "AD-UNIONB-S" to null, // bank ref number + "never share OTP/PIN"
         )
+        val seededIds = seededMessageIds()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             var codes = emptyMap<String, String>()
             val deadline = SystemClock.uptimeMillis() + 10_000
             while (SystemClock.uptimeMillis() < deadline) {
                 scenario.onActivity { activity ->
+                    // Seeded rows only, so messages that arrived on the device meanwhile can't interfere.
                     codes = ViewModelProvider(activity)[InboxViewModel::class.java].otpMessages
+                        .filter { it.messageId in seededIds }
                         .groupBy { it.address }.mapValues { it.value.first().otpCode }
                 }
                 if (expected.filterValues { it != null }.keys.all { it in codes }) break
@@ -98,6 +101,11 @@ class SeededInboxLogosTest {
             return threads
         }
     }
+
+    private fun seededMessageIds(): Set<Long> = context.contentResolver.query(
+        Telephony.Sms.CONTENT_URI, arrayOf(Telephony.Sms._ID),
+        "${Telephony.Sms.SERVICE_CENTER} = ?", arrayOf("CLEAN_SMS_DEBUG_SEED"), null,
+    )?.use { c -> buildSet { while (c.moveToNext()) add(c.getLong(0)) } }.orEmpty()
 
     private fun seeded(): Boolean = context.contentResolver.query(
         Telephony.Sms.CONTENT_URI, arrayOf(Telephony.Sms._ID),
