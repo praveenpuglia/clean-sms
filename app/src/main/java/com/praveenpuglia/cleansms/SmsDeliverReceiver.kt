@@ -94,7 +94,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 address = address,
                 title = enriched?.name ?: address,
                 body = body,
-                photoUri = enriched?.photoUri,
+                photoUri = enriched?.photoUri ?: SenderBrands.logoUri(context, address),
                 lookupUri = enriched?.lookupUri,
                 category = CategoryStorage.getCategoryOrCompute(context, address, threadId),
                 otpCode = CategoryClassifier.extractHighPrecisionOtp(body),

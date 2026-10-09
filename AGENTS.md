@@ -25,6 +25,7 @@ app/src/main/java/com/praveenpuglia/cleansms/
 ├── SmsSender.kt                 # Single send path (multipart + Sent box record)
 ├── ContactDirectory.kt          # Contact matching/index for SMS addresses
 ├── SimSlots.kt                  # SIM list and subscription → slot mapping
+├── SenderBrands.kt              # Bundled brand logos for DLT sender headers
 ├── ThreadDetailActivity.kt      # Conversation view
 ├── NewMessageActivity.kt        # New message creation
 ├── SettingsActivity.kt          # App settings
@@ -247,6 +248,12 @@ See [RELEASE_GUIDE.md](RELEASE_GUIDE.md) for detailed instructions.
 1. Add enum value in `MessageCategory.kt`
 2. Update classification logic in `CategoryClassifier.kt`
 3. Update UI in relevant adapters
+
+### Adding a sender logo
+1. Find the brand's exact registered company name(s) in `data/dlt/jio-headers.csv` (case-sensitive; never match on header text, look-alikes exist).
+2. Add the brand to `data/brands.json` with `owners` and either `play` (its own Play Store app, developer verified) or `domain`.
+3. `scripts/dlt/fetch_logos.py <brand_id>`, then check the logo by eye: no app sub-brands, no NEW/OLD badges, no State Emblem.
+4. `scripts/dlt/build_brand_map.py` to regenerate `app/src/main/assets/sender_brands.tsv`.
 
 ### Modifying notification behavior
 - Edit `SmsDeliverReceiver.kt` for incoming SMS notifications
