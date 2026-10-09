@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms
 
 import android.Manifest
+import android.annotation.SuppressLint
 import androidx.core.net.toUri
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -209,6 +210,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Product decision (2026-10): keep the one-tap exemption in onboarding. Stock Android delivers
+    // SMS to the default app in Doze without it (verified on API 37); revisit if Play review objects.
+    @SuppressLint("BatteryLife")
     private fun requestBatteryOptimizationExemption() {
         try {
             startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
