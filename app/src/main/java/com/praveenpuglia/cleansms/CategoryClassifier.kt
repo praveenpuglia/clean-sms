@@ -84,6 +84,9 @@ object CategoryClassifier {
         """(?i)\b(?:ref(?:erence)?|txn|transaction|order|a/?c|acct|account|card|policy|awb|pnr|train|trn|flight|booking|ticket|invoice|complaint|request|case|sr|id|utr|rrn)\.?\s*(?:no\.?|number|id|#)?\s*[:#.\-]?\s*$"""
     )
 
+    // Mask characters right before digits: "*8890", "...6612", "XX 4521"
+    private val maskedDigitsPrefixRegex = Regex("""(?:\*+|\.{2,}|\b[xX]{2,})\s?$""")
+
     // A 4-digit year at the end of a date (08/10/2026, 08-10-2026, 08.10.2026, 08-Oct-2026, 8 Oct 2026)
     private val datePrefixRegex = Regex("""(?i)\b\d{1,2}\s*[/.\-]\s*(?:\d{1,2}|[a-z]{3,9})\s*[/.\-]\s*$|\b\d{1,2}\s+[a-z]{3,9},?\s+$""")
 
@@ -233,6 +236,9 @@ object CategoryClassifier {
 
         // A number labelled as a reference, order, account, train, etc. is not an OTP
         if (otherPurposeLabelRegex.containsMatchIn(prefix)) return false
+
+        // Masked account/card digits ("A/c *8890", "...6612", "XX 4521") are not an OTP
+        if (maskedDigitsPrefixRegex.containsMatchIn(prefix)) return false
 
         // Check if it looks like a phone number (10+ consecutive digits in context)
         val lookAround = body.substring(

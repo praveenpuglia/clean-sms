@@ -157,6 +157,9 @@ class CategoryClassifierTest {
             "Complaint 662810 registered. We never ask for OTP.",
             "For help call our toll free no. 1800 266 9970. Do not share OTP with anyone.",
             "Questions? Call 98765-43210. Never share your OTP.",
+            "A/c *8890 Debited for Rs:1,999.00 on 05-10-2026 by Mob Bk. Never share OTP/PIN. -Acme Bank",
+            "Rs.780.00 transferred from A/c ...6612 to VPA asha.m@acme. Do not share OTP with anyone.",
+            "Card XX 4521 used for Rs.320 at CITY MART. Do not share OTP or CVV.",
         ).forEach { message -> assertNull(message, CategoryClassifier.extractHighPrecisionOtp(message)) }
     }
 
