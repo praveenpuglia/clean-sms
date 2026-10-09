@@ -572,37 +572,38 @@ private fun ThreadRow(
             )
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        item.contactName ?: item.nameOrAddress,
-                        fontSize = 16.sp,
-                        fontWeight = if (item.hasUnread) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(formatInboxDate(item.date), fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
-                }
-                Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        item.snippet,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (item.hasUnread) {
-                        // M3 badge: a circle for one digit, growing into a pill for more.
-                        Badge(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(start = 8.dp).testTag(MainInboxTestTags.unreadBadge(item.threadId)),
-                        ) {
-                            Text(item.unreadCount.toString(), fontWeight = FontWeight.Bold)
+                    // Name shrinks (ellipsis) before the badge does, so the count stays visible.
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            item.contactName ?: item.nameOrAddress,
+                            fontSize = 16.sp,
+                            fontWeight = if (item.hasUnread) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (item.hasUnread) {
+                            // M3 badge: a circle for one digit, growing into a pill for more.
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(start = 8.dp).testTag(MainInboxTestTags.unreadBadge(item.threadId)),
+                            ) {
+                                Text(item.unreadCount.toString(), fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
+                    Text(formatInboxDate(item.date), fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
                 }
+                Text(
+                    item.snippet,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
             }
         }
     }

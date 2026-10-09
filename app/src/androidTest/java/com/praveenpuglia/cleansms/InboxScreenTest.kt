@@ -99,6 +99,12 @@ class InboxScreenTest {
         composeRule.onNodeWithTag(MainInboxTestTags.unreadBadge(11), useUnmergedTree = true).getBoundsInRoot().let {
             assertTrue((it.right - it.left) > (it.bottom - it.top))
         }
+        // Badge sits on the sender line, right after the name (above the snippet, left of the time).
+        val badge = composeRule.onNodeWithTag(MainInboxTestTags.unreadBadge(10), useUnmergedTree = true).getBoundsInRoot()
+        val name = composeRule.onNodeWithText("Mom", useUnmergedTree = true).getBoundsInRoot()
+        val snippet = composeRule.onNodeWithText("Call me", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue(badge.left >= name.right)
+        assertTrue(badge.bottom <= snippet.top)
         composeRule.onNodeWithContentDescription("Contains spam").assertIsDisplayed()
 
         composeRule.onNodeWithTag(MainInboxTestTags.MORE).performClick()
