@@ -56,7 +56,9 @@ class ThreadDetailScreenTest {
         composeRule.onNodeWithTag(ThreadDetailTestTags.message(1)).assertIsDisplayed()
         composeRule.onNodeWithTag(ThreadDetailTestTags.message(2)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Sent").assertIsDisplayed()
-        composeRule.waitUntil(timeoutMillis = 3_000) { highlightFinished }
+        // Highlight is ~800ms of animation on the test clock; advance it instead of waiting on wall time.
+        composeRule.mainClock.advanceTimeBy(2_000)
+        composeRule.waitForIdle()
         assertTrue(highlightFinished)
     }
 
