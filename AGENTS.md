@@ -219,6 +219,13 @@ Enduring rules that govern all changes. PR descriptions should call out any devi
 scripts/e2e-smoke.sh
 ```
 
+### Local CI signoff
+Run the checks locally and post them to the PR as `signoff/unit` and `signoff/emulator` (needs `gh extension install basecamp/gh-signoff`, a running emulator, a clean tree and a pushed HEAD):
+```bash
+scripts/signoff.sh            # both
+scripts/signoff.sh unit       # unit tests + lint only
+```
+
 ## Release Process
 
 1. Create a git tag: `git tag v1.2.0`
