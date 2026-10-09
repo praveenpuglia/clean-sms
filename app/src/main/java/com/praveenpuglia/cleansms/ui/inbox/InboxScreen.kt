@@ -245,7 +245,7 @@ private fun SearchHeader(query: String, onQueryChange: (String) -> Unit, onClose
     }
     Surface {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {

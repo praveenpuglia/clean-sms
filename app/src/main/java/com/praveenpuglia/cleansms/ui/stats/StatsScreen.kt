@@ -108,7 +108,7 @@ private fun StatsHeader(onBack: () -> Unit) {
     Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
         ) {
             IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                 Icon(
