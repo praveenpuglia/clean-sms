@@ -222,6 +222,8 @@ class NewMessageActivity : AppCompatActivity() {
         val body = messageText.trim()
         if (body.isBlank()) return
 
+        // ponytail: synchronous on purpose — finish() follows immediately, and an async send could
+        // outlive a rotation and leave the text in place for an accidental duplicate send.
         try {
             val subscriptionId = availableSims.getOrNull(selectedSimIndex)?.subscriptionId
             selectedRecipients.forEach { recipient ->
@@ -234,7 +236,6 @@ class NewMessageActivity : AppCompatActivity() {
                 .orEmpty()
             val message = if (selectedRecipients.size == 1) "Message sent$sim" else "Messages sent$sim"
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-            MainActivity.refreshThreadsIfActive()
             finish()
         } catch (_: SecurityException) {
             Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()

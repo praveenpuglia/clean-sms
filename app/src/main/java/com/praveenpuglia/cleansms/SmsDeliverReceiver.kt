@@ -12,8 +12,6 @@ import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteException
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.os.Handler
-import android.os.Looper
 import android.provider.Telephony
 import android.util.Log
 import android.widget.RemoteViews
@@ -68,7 +66,6 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Delivery failed: ${e.javaClass.simpleName}")
             },
         )
-        private val mainHandler = Handler(Looper.getMainLooper())
 
         /** Stores the message and notifies. Blocking: call off the main thread. */
         internal fun deliver(context: Context, address: String, body: String) {
@@ -102,8 +99,6 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 category = CategoryStorage.getCategoryOrCompute(context, address, threadId),
                 otpCode = CategoryClassifier.extractHighPrecisionOtp(body),
             )
-
-            mainHandler.post { MainActivity.refreshThreadsIfActive() }
         }
 
         private fun postNotification(

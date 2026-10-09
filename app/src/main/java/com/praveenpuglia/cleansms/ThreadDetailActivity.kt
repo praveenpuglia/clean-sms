@@ -24,6 +24,11 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 import com.praveenpuglia.cleansms.ui.thread.ThreadDetailScreen
 
@@ -40,6 +45,8 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var highlightedMessageId by mutableStateOf<Long?>(null)
     private var scrollRequest by mutableIntStateOf(0)
     private var highlightInProgress = false
+    private var sending = false
+    private var loadJob: Job? = null
 
     private var availableSims by mutableStateOf<List<SubscriptionInfo>>(emptyList())
     private var selectedSimIndex by mutableIntStateOf(0)
@@ -207,42 +214,41 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
 
-        Thread {
+        if (sending) return // a double tap must not send twice
+        sending = true
+        val selectedSim = availableSims.getOrNull(selectedSimIndex)
+        lifecycleScope.launch {
             try {
-                val selectedSim = availableSims.getOrNull(selectedSimIndex)
-                SmsSender.send(this, address, body, selectedSim?.subscriptionId, threadId)
-
+                withContext(Dispatchers.IO) { SmsSender.send(this@ThreadDetailActivity, address, body, selectedSim?.subscriptionId, threadId) }
                 val simInfo = selectedSim?.takeIf { availableSims.size > 1 }
                     ?.let { " via SIM ${it.simSlotIndex + 1}" }
                     .orEmpty()
-                runOnUiThread {
-                    messageText = ""
-                    Toast.makeText(this, getString(R.string.toast_message_sent, simInfo), Toast.LENGTH_SHORT).show()
-                    loadMessages()
-                }
+                messageText = ""
+                Toast.makeText(this@ThreadDetailActivity, getString(R.string.toast_message_sent, simInfo), Toast.LENGTH_SHORT).show()
+                loadMessages()
             } catch (error: RuntimeException) {
-                runOnUiThread {
-                    Toast.makeText(this, getString(R.string.toast_message_send_failed, error.message.orEmpty()), Toast.LENGTH_SHORT).show()
-                }
+                Toast.makeText(this@ThreadDetailActivity, getString(R.string.toast_message_send_failed, error.message.orEmpty()), Toast.LENGTH_SHORT).show()
+            } finally {
+                sending = false
             }
-        }.start()
+        }
     }
 
     private fun loadMessages() {
-        Thread {
-            val loaded = queryMessagesForThread(threadId)
-            markThreadAsRead(threadId)
-            runOnUiThread {
-                messages = loaded
-                val target = targetMessageId
-                if (target != null) {
-                    highlightedMessageId = loaded.firstOrNull { it.id == target }?.id ?: loaded.lastOrNull()?.id
-                    highlightInProgress = highlightedMessageId != null
-                    targetMessageId = null
-                }
-                scrollRequest++
+        loadJob?.cancel() // newest load wins
+        loadJob = lifecycleScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                queryMessagesForThread(threadId).also { markThreadAsRead(threadId) }
             }
-        }.start()
+            messages = loaded
+            val target = targetMessageId
+            if (target != null) {
+                highlightedMessageId = loaded.firstOrNull { it.id == target }?.id ?: loaded.lastOrNull()?.id
+                highlightInProgress = highlightedMessageId != null
+                targetMessageId = null
+            }
+            scrollRequest++
+        }
     }
 
     private fun queryMessagesForThread(id: Long): List<Message> {
@@ -289,7 +295,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                 "thread_id = ? AND read = 0",
                 arrayOf(id.toString()),
             )
-            MainActivity.refreshThreadsIfActive()
         } catch (error: RuntimeException) {
             android.util.Log.w("ThreadDetailActivity", "Failed to mark thread read: ${error.javaClass.simpleName}")
         }

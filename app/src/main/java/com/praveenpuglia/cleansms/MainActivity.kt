@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.ContentUris
 import android.provider.Telephony
 import android.app.role.RoleManager
+import android.database.ContentObserver
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
@@ -36,18 +37,24 @@ import com.praveenpuglia.cleansms.ui.onboarding.OnboardingUiState
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
 import java.util.LinkedHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
-    companion object {
-        // Weak-ish reference for receiver to trigger refresh without leaking context
-        private var activeInstance: MainActivity? = null
-
-        fun refreshThreadsIfActive() {
-            activeInstance?.refreshThreadsAsync()
+    private val observerHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val reloadFromObserver = Runnable { reloadInboxData() }
+    // Reload while visible when SMS change (incoming, other apps, our own writes); debounced.
+    private val smsObserver = object : ContentObserver(observerHandler) {
+        override fun onChange(selfChange: Boolean) {
+            observerHandler.removeCallbacks(reloadFromObserver)
+            observerHandler.postDelayed(reloadFromObserver, OBSERVER_DEBOUNCE_MS)
         }
     }
+    private var inboxLoad: Job? = null
+    private var inboxReloadPending = false
+    private var allTabLoad: Job? = null
+    private var searchLoad: Job? = null
     private val requestSmsRoleLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { _ ->
         // Re-evaluate default status after user interaction
         setupDefaultSmsUi()
@@ -195,7 +202,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        activeInstance = this
+        contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, smsObserver)
         // Re-check after potential default change
         setupDefaultSmsUi()
         // If the All-tab preference changed in Settings, simplest path is to rebuild the activity.
@@ -211,8 +218,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        observerHandler.removeCallbacks(reloadFromObserver)
+        contentResolver.unregisterContentObserver(smsObserver)
         super.onPause()
-        if (activeInstance === this) activeInstance = null
     }
 
     override fun onDestroy() {
@@ -297,28 +305,36 @@ class MainActivity : AppCompatActivity() {
         reloadInboxData()
     }
 
+    /**
+     * Loads are coalesced: never two at once, and a request arriving mid-load triggers exactly
+     * one more pass afterwards, so the newest provider state always wins.
+     */
     private fun reloadInboxData() {
-        val restorePageIndex = if (initialPageApplied) selectedPageIndex else null
-        Thread {
-            val threads = loadSmsThreads()
-            val otpRaw = loadOtpMessages()
-
-            val enrichedThreads = threads.map { t ->
-                val hit = ContactDirectory.resolve(this, t.nameOrAddress)?.takeIf(ContactInfo::hasAny)
-                hit?.let { t.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: t
-            }
-            val enrichedOtp = otpRaw.map { item ->
-                val hit = ContactDirectory.resolve(this, item.address)?.takeIf(ContactInfo::hasAny)
-                hit?.let { item.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: item
-            }
-
-            runOnUiThread {
-                allThreads = enrichedThreads
-                otpMessages = enrichedOtp
+        if (inboxLoad?.isActive == true) {
+            inboxReloadPending = true
+            return
+        }
+        inboxLoad = lifecycleScope.launch {
+            do {
+                inboxReloadPending = false
+                val (threads, otp) = withContext(Dispatchers.IO) {
+                    val enrichedThreads = loadSmsThreads().map { t ->
+                        val hit = ContactDirectory.resolve(this@MainActivity, t.nameOrAddress)?.takeIf(ContactInfo::hasAny)
+                        hit?.let { t.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: t
+                    }
+                    val enrichedOtp = loadOtpMessages().map { item ->
+                        val hit = ContactDirectory.resolve(this@MainActivity, item.address)?.takeIf(ContactInfo::hasAny)
+                        hit?.let { item.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) } ?: item
+                    }
+                    enrichedThreads to enrichedOtp
+                }
+                val restorePageIndex = if (initialPageApplied) selectedPageIndex else null
+                allThreads = threads
+                otpMessages = otp
                 updatePagerContent(restorePageIndex)
                 applyInitialPageIfNeeded()
-            }
-        }.start()
+            } while (inboxReloadPending)
+        }
     }
 
     private fun showThreadsUi() {
@@ -669,38 +685,25 @@ class MainActivity : AppCompatActivity() {
             threadId == null || !threadIds.contains(threadId)
         }
 
-        Thread {
-            var deletedCount = 0
-            val resolver = contentResolver
-            threadIds.forEach { threadId ->
-                try {
-                    val uri = ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, threadId)
-                    val rows = resolver.delete(uri, null, null)
-                    if (rows > 0) deletedCount += rows
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "Failed to delete thread $threadId: ${e.message}")
+        lifecycleScope.launch {
+            val deletedCount = withContext(Dispatchers.IO) {
+                val uris = threadIds.map { ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, it) } +
+                    filteredMessageIds.map { ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, it) }
+                uris.sumOf { uri ->
+                    try {
+                        contentResolver.delete(uri, null, null).coerceAtLeast(0)
+                    } catch (e: RuntimeException) {
+                        // One failed row must not abort the rest of a bulk delete.
+                        Log.w("MainActivity", "Failed to delete selection item: ${e.javaClass.simpleName}")
+                        0
+                    }
                 }
             }
-            filteredMessageIds.forEach { messageId ->
-                try {
-                    val uri = ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, messageId)
-                    val rows = resolver.delete(uri, null, null)
-                    if (rows > 0) deletedCount += rows
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "Failed to delete message $messageId: ${e.message}")
-                }
-            }
-            runOnUiThread {
-                val success = deletedCount > 0
-                exitSelectionMode()
-                if (success) {
-                    Toast.makeText(this, getString(R.string.toast_messages_deleted), Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, getString(R.string.toast_messages_delete_failed), Toast.LENGTH_SHORT).show()
-                }
-                refreshThreadsAsync()
-            }
-        }.start()
+            exitSelectionMode()
+            val message = if (deletedCount > 0) R.string.toast_messages_deleted else R.string.toast_messages_delete_failed
+            Toast.makeText(this@MainActivity, getString(message), Toast.LENGTH_SHORT).show()
+            refreshThreadsAsync()
+        }
     }
 
     private fun pruneSelection(): Boolean {
@@ -745,16 +748,16 @@ class MainActivity : AppCompatActivity() {
             launchContactIntent(existingUri)
             return
         }
-        Thread {
-            val resolvedUri = ContactDirectory.findLookupUri(this, rawAddress, contactName, contactPhotoUri)
-            if (resolvedUri != null) {
-                runOnUiThread { launchContactIntent(resolvedUri) }
-            } else {
-                runOnUiThread {
-                    Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
-                }
+        lifecycleScope.launch {
+            val resolvedUri = withContext(Dispatchers.IO) {
+                ContactDirectory.findLookupUri(this@MainActivity, rawAddress, contactName, contactPhotoUri)
             }
-        }.start()
+            if (resolvedUri != null) {
+                launchContactIntent(resolvedUri)
+            } else {
+                Toast.makeText(this@MainActivity, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun launchContactIntent(contactUri: Uri) {
@@ -944,28 +947,29 @@ class MainActivity : AppCompatActivity() {
     
     private fun loadAllItemsForAllTab() {
         val unreadOnly = unreadOnlyFilter
-        Thread {
-            val messages = queryAllMessagesForSearch()
-                .let { if (unreadOnly) it.filter { item -> item.isUnread } else it }
-                .sortedByDescending { it.date }
-            runOnUiThread {
-                allTabItems = messages
+        val threadsById = allThreads.associateBy { it.threadId }
+        allTabLoad?.cancel()
+        allTabLoad = lifecycleScope.launch {
+            allTabItems = withContext(Dispatchers.IO) {
+                queryAllMessagesForSearch(threadsById)
+                    .let { if (unreadOnly) it.filter { item -> item.isUnread } else it }
+                    .sortedByDescending { it.date }
             }
-        }.start()
+        }
     }
 
     private fun loadAllMessagesForSearch() {
-        Thread {
-            val messages = queryAllMessagesForSearch()
-            runOnUiThread {
-                allMessagesForSearch = messages
-                // Show all messages initially in chronological order
-                updateSearchResults(messages.sortedByDescending { it.date })
-            }
-        }.start()
+        val threadsById = allThreads.associateBy { it.threadId }
+        searchLoad?.cancel()
+        searchLoad = lifecycleScope.launch {
+            val messages = withContext(Dispatchers.IO) { queryAllMessagesForSearch(threadsById) }
+            allMessagesForSearch = messages
+            // Show all messages initially in chronological order
+            updateSearchResults(messages.sortedByDescending { it.date })
+        }
     }
     
-    private fun queryAllMessagesForSearch(): List<SearchResultItem> {
+    private fun queryAllMessagesForSearch(threadsById: Map<Long, ThreadItem>): List<SearchResultItem> {
         val uri = "content://sms".toUri()
         val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id")
         val sortOrder = "date DESC"
@@ -995,8 +999,8 @@ class MainActivity : AppCompatActivity() {
 
                     if (body.isBlank()) continue
 
-                    // Try to get contact info from cache or thread
-                    val existingThread = allThreads.firstOrNull { it.threadId == threadId }
+                    // Contact info and category come from the already-enriched thread list
+                    val existingThread = threadsById[threadId]
                     val contactName = existingThread?.contactName
                     val contactPhotoUri = existingThread?.contactPhotoUri
                     val contactLookupUri = existingThread?.contactLookupUri
@@ -1055,5 +1059,9 @@ class MainActivity : AppCompatActivity() {
         )
         
         openThreadDetail(threadItem, item.messageId)
+    }
+
+    private companion object {
+        const val OBSERVER_DEBOUNCE_MS = 300L
     }
 }
