@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ContentUris
 import android.content.ContentValues
 import android.database.Cursor
+import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
@@ -237,8 +238,10 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
                     ))
                 }
             }
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to query messages for search: ${e.message}")
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Failed to query messages for search: ${e.javaClass.simpleName}")
+        } catch (e: SQLiteException) {
+            Log.w(TAG, "Failed to query messages for search: ${e.javaClass.simpleName}")
         }
 
         return results
@@ -406,10 +409,10 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     true
                 } catch (error: SecurityException) {
-                    Log.w("MainActivity", "Failed to mark selection read: ${error.javaClass.simpleName}")
+                    Log.w(TAG, "Failed to mark selection read: ${error.javaClass.simpleName}")
                     false
                 } catch (error: IllegalArgumentException) {
-                    Log.w("MainActivity", "Failed to mark selection read: ${error.javaClass.simpleName}")
+                    Log.w(TAG, "Failed to mark selection read: ${error.javaClass.simpleName}")
                     false
                 }
             }
@@ -446,7 +449,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
                         resolver.delete(uri, null, null).coerceAtLeast(0)
                     } catch (e: RuntimeException) {
                         // One failed row must not abort the rest of a bulk delete.
-                        Log.w("MainActivity", "Failed to delete selection item: ${e.javaClass.simpleName}")
+                        Log.w(TAG, "Failed to delete selection item: ${e.javaClass.simpleName}")
                         0
                     }
                 }
@@ -619,5 +622,6 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         const val SEARCH_DEBOUNCE_MS = 300L
+        const val TAG = "InboxViewModel"
     }
 }

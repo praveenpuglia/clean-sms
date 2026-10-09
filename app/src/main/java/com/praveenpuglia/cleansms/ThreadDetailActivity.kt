@@ -220,11 +220,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 withContext(Dispatchers.IO) { SmsSender.send(this@ThreadDetailActivity, address, body, selectedSim?.subscriptionId, threadId) }
-                val simInfo = selectedSim?.takeIf { availableSims.size > 1 }
-                    ?.let { " via SIM ${it.simSlotIndex + 1}" }
-                    .orEmpty()
                 messageText = ""
-                Toast.makeText(this@ThreadDetailActivity, getString(R.string.toast_message_sent, simInfo), Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ThreadDetailActivity, selectedSim?.takeIf { availableSims.size > 1 }
+                    ?.let { getString(R.string.toast_message_sent_via_sim, it.simSlotIndex + 1) }
+                    ?: getString(R.string.toast_message_sent), Toast.LENGTH_SHORT).show()
                 loadMessages()
             } catch (error: RuntimeException) {
                 Toast.makeText(this@ThreadDetailActivity, getString(R.string.toast_message_send_failed, error.message.orEmpty()), Toast.LENGTH_SHORT).show()

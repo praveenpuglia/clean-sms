@@ -74,8 +74,15 @@ class SmsDeliveryTest {
             null,
         )?.use { if (it.moveToFirst()) it.getInt(0) else null }
 
-    private fun postedFor(address: String) =
-        notifications.activeNotifications.firstOrNull { it.id == address.hashCode() }
+    /** notify() is enqueued asynchronously by the system, so give a posted notification a moment to appear. */
+    private fun postedFor(address: String): android.service.notification.StatusBarNotification? {
+        val deadline = android.os.SystemClock.uptimeMillis() + 2_000
+        while (true) {
+            notifications.activeNotifications.firstOrNull { it.id == address.hashCode() }?.let { return it }
+            if (android.os.SystemClock.uptimeMillis() > deadline) return null
+            android.os.SystemClock.sleep(100)
+        }
+    }
 
     private fun shell(command: String) {
         val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)

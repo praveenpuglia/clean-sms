@@ -230,17 +230,18 @@ class NewMessageActivity : AppCompatActivity() {
                 SmsSender.send(this, recipient.phoneNumber, body, subscriptionId)
             }
 
-            val sim = availableSims.getOrNull(selectedSimIndex)
-                ?.takeIf { availableSims.size > 1 }
-                ?.let { " via SIM ${it.simSlotIndex + 1}" }
-                .orEmpty()
-            val message = if (selectedRecipients.size == 1) "Message sent$sim" else "Messages sent$sim"
+            val simNumber = availableSims.getOrNull(selectedSimIndex)?.takeIf { availableSims.size > 1 }?.simSlotIndex?.plus(1)
+            val single = selectedRecipients.size == 1
+            val message = when {
+                simNumber == null -> getString(if (single) R.string.toast_message_sent else R.string.toast_messages_sent)
+                else -> getString(if (single) R.string.toast_message_sent_via_sim else R.string.toast_messages_sent_via_sim, simNumber)
+            }
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
             finish()
         } catch (_: SecurityException) {
-            Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_message_send_failed_generic, Toast.LENGTH_SHORT).show()
         } catch (_: IllegalArgumentException) {
-            Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_message_send_failed_generic, Toast.LENGTH_SHORT).show()
         }
     }
 

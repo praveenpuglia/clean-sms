@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.Telephony
 import android.app.role.RoleManager
@@ -168,9 +169,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupDefaultSmsUi() {
-        val telephonyDefault = Telephony.Sms.getDefaultSmsPackage(this)
-        val roleManager = getSystemService(RoleManager::class.java)
-        val roleHeld = try { roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true && roleManager.isRoleHeld(RoleManager.ROLE_SMS) } catch (_: Exception) { false }
         val isDefault = DefaultSmsHelper.isDefaultSmsApp(this)
         val powerManager = getSystemService(PowerManager::class.java)
         val isBatteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
@@ -178,7 +176,7 @@ class MainActivity : AppCompatActivity() {
         
         val hasCompletedOnboarding = AppSettings.isOnboardingCompleted(this)
         
-        Log.d("DefaultSmsUI", "telephonyDefault=$telephonyDefault roleHeld=$roleHeld helper=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored hasCompletedOnboarding=$hasCompletedOnboarding")
+        Log.d("DefaultSmsUI", "isDefault=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored hasCompletedOnboarding=$hasCompletedOnboarding")
         
         if (!isDefault || !hasCompletedOnboarding) {
             showOnboarding = true
@@ -311,7 +309,7 @@ class MainActivity : AppCompatActivity() {
         }
         try {
             startActivity(intent)
-        } catch (e: Exception) {
+        } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
         }
     }
@@ -384,8 +382,8 @@ class MainActivity : AppCompatActivity() {
         try {
             val intent = Intent(Intent.ACTION_VIEW, contactUri)
             startActivity(intent)
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to open contact: ${e.message}")
+        } catch (e: ActivityNotFoundException) {
+            Log.w("MainActivity", "Failed to open contact: ${e.javaClass.simpleName}")
             Toast.makeText(this, getString(R.string.toast_contact_not_found), Toast.LENGTH_SHORT).show()
         }
     }

@@ -1,6 +1,8 @@
 package com.praveenpuglia.cleansms
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -47,6 +49,8 @@ class StatsScreenTest {
         composeRule.onNodeWithTag(StatsTestTags.TOTAL_MESSAGES).assertTextEquals("3")
         composeRule.onNodeWithTag(StatsTestTags.CATEGORIES).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(StatsTestTags.category(MessageCategory.SERVICE)).assertIsDisplayed()
+        // Each category here has exactly one message in one thread: singular, not "1 messages".
+        composeRule.onAllNodesWithText("1 message · 1 thread").assertCountEquals(3)
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.runOnIdle { assertTrue(wentBack) }
     }
