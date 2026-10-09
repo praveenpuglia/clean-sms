@@ -25,6 +25,7 @@ import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
 import com.praveenpuglia.cleansms.ui.thread.ThreadDetailTestTags
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -98,21 +99,42 @@ class InboxLiveUpdateTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             composeRule.waitForIdle()
             repeat(5) { SmsDeliverReceiver.deliver(context, LIVE_SENDER, "Your OTP is 70000$it for login") }
-            // Coalesced reloads must end on the newest provider state. The list keeps its scroll
-            // anchor when rows are inserted above it, so scroll to the newest row's key to check.
-            val all = ids(LIVE_SENDER).also { assertEquals(5, it.size) }
-            val oldest = all.min()
-            waitForTag(MainInboxTestTags.otpCode(oldest))
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                runCatching {
-                    // Innermost scrollable holding the row is the OTP list (the pager also matches).
-                    composeRule.onAllNodes(hasScrollToKeyAction() and hasAnyDescendant(hasTestTag(MainInboxTestTags.otp(oldest))))
-                        .run { get(fetchSemanticsNodes().lastIndex) }
-                        .performScrollToKey(all.max())
-                }.isSuccess && composeRule.onAllNodesWithTag(MainInboxTestTags.otpCode(all.max())).fetchSemanticsNodes().isNotEmpty()
-            }
+            // Coalesced reloads end on the newest state, and the list follows new rows to the top.
+            val newest = ids(LIVE_SENDER).also { assertEquals(5, it.size) }.max()
+            waitForTag(MainInboxTestTags.otpCode(newest))
         }
     }
+
+    @Test
+    fun readerScrolledDownIsNotYankedToTopByANewMessage() {
+        shell("am broadcast -n ${context.packageName}/.DebugSeedReceiver -a com.praveenpuglia.cleansms.DEBUG_SEED")
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        while (otpIdsNewestFirst().size <= 12 && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(200)
+        ActivityScenario.launch(MainActivity::class.java).use {
+            val existing = otpIdsNewestFirst()
+            check(existing.size > 12) { "needs a scrollable OTP list (seeded inbox)" }
+            val readingId = existing[10]
+            waitForTag(MainInboxTestTags.otp(existing.first()))
+            otpList(existing.first()).performScrollToKey(readingId)
+            waitForTag(MainInboxTestTags.otp(readingId))
+
+            SmsDeliverReceiver.deliver(context, LIVE_SENDER, "Your OTP is 650213 for login")
+            val newId = idFor(LIVE_SENDER)
+            SystemClock.sleep(1_500) // observer debounce + reload
+            composeRule.waitForIdle()
+            assertTrue(composeRule.onAllNodesWithTag(MainInboxTestTags.otp(readingId)).fetchSemanticsNodes().isNotEmpty())
+            assertTrue(composeRule.onAllNodesWithTag(MainInboxTestTags.otp(newId)).fetchSemanticsNodes().isEmpty())
+        }
+    }
+
+    private fun otpList(anyRowId: Long) =
+        // Innermost scrollable holding the row is the OTP list (the pager also matches).
+        composeRule.onAllNodes(hasScrollToKeyAction() and hasAnyDescendant(hasTestTag(MainInboxTestTags.otp(anyRowId))))
+            .run { get(fetchSemanticsNodes().lastIndex) }
+
+    private fun otpIdsNewestFirst(): List<Long> =
+        context.contentResolver.query(Telephony.Sms.Inbox.CONTENT_URI, arrayOf(Telephony.Sms._ID, Telephony.Sms.BODY), null, null, "${Telephony.Sms.DATE} DESC")!!
+            .use { c -> buildList { while (c.moveToNext()) if (CategoryClassifier.extractHighPrecisionOtp(c.getString(1).orEmpty()) != null) add(c.getLong(0)) } }
 
     @Test
     fun messageArrivingInAnOpenThreadAppears() {
