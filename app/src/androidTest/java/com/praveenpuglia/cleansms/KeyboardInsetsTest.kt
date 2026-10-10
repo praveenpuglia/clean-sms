@@ -124,12 +124,13 @@ class KeyboardInsetsTest {
     private fun awaitKeyboardTop(scenario: ActivityScenario<Activity>): Float {
         val start = SystemClock.uptimeMillis()
         var top = Float.NaN
-        var asked = false
+        var nextAsk = start + 1_500
         while (SystemClock.uptimeMillis() < start + 8_000) {
             // A tap doesn't always open the IME when the whole suite runs (focus/window state left
-            // by earlier tests). We're testing layout, not the tap, so ask the window directly.
-            if (!asked && SystemClock.uptimeMillis() > start + 1_500) {
-                asked = true
+            // by earlier tests), and one request can be dropped too. We're testing layout, not the
+            // tap, so keep asking the window directly until it shows.
+            if (SystemClock.uptimeMillis() > nextAsk) {
+                nextAsk += 2_000
                 scenario.onActivity { activity ->
                     WindowCompat.getInsetsController(activity.window, activity.window.decorView).show(WindowInsetsCompat.Type.ime())
                 }

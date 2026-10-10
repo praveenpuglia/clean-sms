@@ -5,6 +5,7 @@ import android.content.ContentProviderOperation
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.provider.ContactsContract
 import android.provider.ContactsContract.CommonDataKinds.Phone
@@ -23,6 +24,8 @@ import android.widget.Toast
  *   --ez clear true      // wipe previously-seeded test rows first (default: true)
  *   --ez seed false      // clear without inserting a new seed set
  *   --ei count 5000      // generate a large inbox across 500 threads (max: 5,000)
+ *   --ez demo true       // store-screenshot inbox: fictional brands and people only. On an
+ *                        // emulator it first wipes every SMS so nothing else shows up.
  */
 class DebugSeedReceiver : BroadcastReceiver() {
 
@@ -53,9 +56,13 @@ class DebugSeedReceiver : BroadcastReceiver() {
 
         val shouldClear = intent.getBooleanExtra(EXTRA_CLEAR, true)
         val resolver = context.contentResolver
+        val demo = intent.getBooleanExtra(EXTRA_DEMO, false)
 
         var deleted = 0
-        if (shouldClear) {
+        if (demo && Build.HARDWARE in EMULATOR_HARDWARE) {
+            deleted = resolver.delete(Telephony.Sms.CONTENT_URI, null, null)
+            Log.i(TAG, "Demo: wiped $deleted emulator messages")
+        } else if (shouldClear) {
             try {
                 deleted = resolver.delete(
                     Telephony.Sms.CONTENT_URI,
@@ -76,10 +83,10 @@ class DebugSeedReceiver : BroadcastReceiver() {
         }
 
         val now = System.currentTimeMillis()
-        val messages = if (performanceCount == 0) {
-            SEED_MESSAGES
-        } else {
-            List(performanceCount) { performanceSeed(it) }
+        val messages = when {
+            demo -> DEMO_MESSAGES
+            performanceCount == 0 -> SEED_MESSAGES
+            else -> List(performanceCount) { performanceSeed(it) }
         }
         var inserted = 0
         for (batch in messages.chunked(INSERT_BATCH_SIZE)) {
@@ -91,7 +98,11 @@ class DebugSeedReceiver : BroadcastReceiver() {
             }
         }
 
-        val contacts = if (performanceCount == 0) seedContacts(context) else 0
+        val contacts = when {
+            demo -> seedContacts(context, DEMO_CONTACTS)
+            performanceCount == 0 -> seedContacts(context, SEED_CONTACTS)
+            else -> 0
+        }
 
         val summary = buildString {
             append("Seeded $inserted msgs")
@@ -113,10 +124,10 @@ class DebugSeedReceiver : BroadcastReceiver() {
      * Idempotent: skips numbers that already have a contact (so re-seeding the inbox doesn't keep
      * adding duplicates). Requires WRITE_CONTACTS, granted via the debug manifest + adb pm grant.
      */
-    private fun seedContacts(context: Context): Int {
+    private fun seedContacts(context: Context, contacts: List<Pair<String, String>>): Int {
         val resolver = context.contentResolver
         var added = 0
-        for ((name, number) in SEED_CONTACTS) {
+        for ((name, number) in contacts) {
             if (contactExistsForNumber(context, number)) continue
 
             val ops = arrayListOf<ContentProviderOperation>(
@@ -199,6 +210,8 @@ class DebugSeedReceiver : BroadcastReceiver() {
         const val EXTRA_CLEAR = "clear"
         const val EXTRA_SEED = "seed"
         const val EXTRA_COUNT = "count"
+        const val EXTRA_DEMO = "demo"
+        private val EMULATOR_HARDWARE = setOf("ranchu", "goldfish")
 
         private const val MAX_SEED_COUNT = 5_000
         private const val PERFORMANCE_MESSAGES_PER_THREAD = 10
@@ -218,6 +231,64 @@ class DebugSeedReceiver : BroadcastReceiver() {
             "Vikram (Boss)" to "+918877665544",
             "Priya Iyer" to "+919876512345",
             "Aditi" to "+919812345678",
+        )
+
+        // Store screenshots: fictional people and brands only (logos from debug assets/sender_brands_demo.tsv),
+        // so the listing shows no real company's name or trademark.
+        private val DEMO_CONTACTS = listOf(
+            "Ananya" to "+919800000101",
+            "Mom" to "+919800000102",
+            "Rohan" to "+919800000103",
+            "Kabir (Work)" to "+919800000104",
+            "Dad" to "+919800000105",
+            "Priya Iyer" to "+919800000106",
+        )
+
+        private val DEMO_MESSAGES = listOf(
+            // OTPs
+            Seed("VM-ZIPRDE-S", "Your ZipRide driver Ravi is 3 mins away in a white sedan (KA 01 AB 1234). Share OTP 4821 with the driver to start your ride.", ageMinutes = 2),
+            Seed("VK-NWBANK-T", "482913 is the OTP for a payment of Rs.2,499.00 at ORBIT MART on your Northwind Bank card ending 4521. Valid for 10 minutes. Never share it with anyone.", ageMinutes = 6),
+            Seed("JD-BSKETO-S", "8213 is the delivery code for your Basketo order BK-55120. Share it only with the delivery partner at your door.", ageMinutes = 18),
+            Seed("AX-KITEPY-T", "Use 739204 to log in to Kite Pay. Never share this code, not even with Kite Pay staff.", ageMinutes = 52, read = true),
+            Seed("VM-BLUJAY-S", "Bluejay Air: 615038 is your code to manage booking 6Y7Q2K. Valid for 15 minutes.", ageMinutes = 190, read = true),
+            Seed("JM-NMBSMB-T", "Your Nimbus Mobile verification code is 270415. It expires in 5 minutes.", ageMinutes = 1500, read = true),
+
+            // Transactions
+            Seed("VK-NWBANK-T", "Rs.640.00 debited from A/c XX1234 at TIFFIN BOX via UPI on 10-Oct. Avl Bal: Rs.26,590.50 -Northwind Bank", ageMinutes = 300, read = true),
+            Seed("VK-NWBANK-T", "Rs.1,250.00 credited to A/c XX1234 via UPI from ANANYA R on 10-Oct. Avl Bal: Rs.27,840.50 -Northwind Bank", ageMinutes = 40),
+            Seed("AX-KITEPY-T", "Rs.299 paid to TIFFIN BOX from your Kite Pay wallet. UPI Ref 628104990012.", ageMinutes = 180, read = true),
+            Seed("VM-HRBRBK-T", "Salary of Rs.86,400.00 credited to your Harbor Bank A/c XX7781 on 10-Oct. Avl Bal: Rs.1,12,306.18", ageMinutes = 230),
+            Seed("JD-PEAKCC-T", "Rs.3,240.00 spent on Peak Credit Card XX0912 at CITY FUELS on 10-Oct. Available limit: Rs.1,46,760.00", ageMinutes = 400, read = true),
+            Seed("AX-COINLY-T", "Your SIP of Rs.5,000 in Coinly Nifty Index Fund is successful. Units will be allotted by 13 Oct.", ageMinutes = 700, read = true),
+            Seed("VM-SHLDLF-T", "Premium of Rs.12,034 received for policy SL-55210. Your cover continues till 10 Oct 2027. -Shield Life", ageMinutes = 2000, read = true),
+
+            // Service
+            Seed("VM-BLUJAY-S", "Flight 6Y 214 BLR to GOI on Sat 11 Oct, 07:30 is on time. Web check-in is now open in the Bluejay app.", ageMinutes = 120),
+            Seed("JM-NMBSMB-S", "Your Nimbus plan renews in 2 days: Rs.349 | 2GB/day | Unlimited calls. Recharge in the Nimbus app.", ageMinutes = 260, read = true),
+            Seed("AD-MTRPWR-S", "Your Metro Power bill of Rs.1,842 for September is ready. Due on 18 Oct. Pay in the app to avoid late fees.", ageMinutes = 1400, read = true),
+            Seed("JD-BSKETO-S", "Your Basketo order of 12 items has been delivered. Enjoy!", ageMinutes = 1600, read = true),
+            Seed("VK-PRCLGO-S", "Your ParcelGo shipment PG4471902 is out for delivery and will arrive by 7 PM today.", ageMinutes = 150),
+            Seed("AD-CTYGAS-S", "Your City Gas bill of Rs.612 for Sep-Oct is generated. Pay by 20 Oct to avoid a late fee.", ageMinutes = 2600, read = true),
+
+            // Promotions
+            Seed("BP-ORBITM-P", "Festive Sale is live! Up to 60% off on headphones, watches and more. Ends Sunday: orbitmart.example/sale", ageMinutes = 340),
+            Seed("BP-TIFFIN-P", "Lunch sorted? Flat 40% off your next 2 orders on Tiffin Box. Code LUNCH40.", ageMinutes = 500, read = true),
+            Seed("JK-STYLKT-P", "New season, new fits. Flat 30% off on the Autumn collection at StyleKart, this weekend only.", ageMinutes = 1100, read = true),
+            Seed("BP-BLUJAY-P", "Fly to Goa from Rs.2,999 this festive season. Book on the Bluejay app by Sunday.", ageMinutes = 3000, read = true),
+
+            // Personal
+            Seed("+919800000101", "Booked the Bluejay tickets for Goa! \u2708\uFE0F", ageMinutes = 75, read = true),
+            Seed("+919800000101", "Yesss \uD83D\uDE4C What time is the flight?", ageMinutes = 74, read = true, type = Telephony.Sms.MESSAGE_TYPE_SENT),
+            Seed("+919800000101", "7:30 on Saturday. Cab at 5 \uD83D\uDE2C", ageMinutes = 72, read = true),
+            Seed("+919800000101", "Ouch. I'll book a ZipRide and pick you up on the way", ageMinutes = 70, read = true, type = Telephony.Sms.MESSAGE_TYPE_SENT),
+            Seed("+919800000101", "You're the best. Sent you my half for the tickets", ageMinutes = 41, read = true),
+            Seed("+919800000101", "Got it! Packing list: sunscreen, swimsuit, zero laptops \uD83D\uDE04", ageMinutes = 38, read = true, type = Telephony.Sms.MESSAGE_TYPE_SENT),
+            Seed("+919800000101", "Deal \uD83D\uDE02 See you Saturday!", ageMinutes = 35),
+            Seed("+919800000102", "Did you eat? Call me when you're free.", ageMinutes = 95),
+            Seed("+919800000103", "Football at 7 tomorrow? We need one more player", ageMinutes = 210, read = true),
+            Seed("+919800000104", "Standup moved to 10:30 tomorrow. Bring the demo!", ageMinutes = 420, read = true),
+            Seed("+919800000105", "Sent you the photos from Sunday \uD83D\uDCF7", ageMinutes = 1300, read = true),
+            Seed("+919800000106", "Thanks for the book recommendation, finished it in two days!", ageMinutes = 2900, read = true),
         )
 
         // ageMinutes is "minutes ago"; spread across ~14 days for thread/list realism.

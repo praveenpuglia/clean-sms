@@ -87,6 +87,9 @@ object CategoryClassifier {
     // Mask characters right before digits: "*8890", "...6612", "XX 4521"
     private val maskedDigitsPrefixRegex = Regex("""(?:\*+|\.{2,}|\b[xX]{2,})\s?$""")
 
+    // Indian vehicle registration right before the digits: "KA 01 AB 1234", "MH-12-DE-4567"
+    private val vehiclePlatePrefixRegex = Regex("""\b[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?$""")
+
     // A 4-digit year at the end of a date (08/10/2026, 08-10-2026, 08.10.2026, 08-Oct-2026, 8 Oct 2026)
     private val datePrefixRegex = Regex("""(?i)\b\d{1,2}\s*[/.\-]\s*(?:\d{1,2}|[a-z]{3,9})\s*[/.\-]\s*$|\b\d{1,2}\s+[a-z]{3,9},?\s+$""")
 
@@ -140,20 +143,22 @@ object CategoryClassifier {
         val keywords = keywordMatches.map { it.range }
         val codes = otpCodeRegex.findAll(body).toList()
 
-        // Filter and find valid codes
-        for (codeMatch in codes) {
-            if (!isValidOtpCode(body, codeMatch.range.first, codeMatch.value)) continue
-
-            // Check if code is near a keyword (within 80 chars after, 40 chars before)
-            val nearKeyword = keywords.any { kw ->
-                val afterKeywordDistance = codeMatch.range.first - kw.last
-                val beforeKeywordDistance = kw.first - codeMatch.range.last
-                (afterKeywordDistance in 0..80) || (beforeKeywordDistance in 0..40)
+        // The valid code closest to a keyword (within 80 chars after, 40 chars before), so a number
+        // just before "Share OTP 4821" (a car plate, an amount) doesn't win over the code itself
+        return codes
+            .filter { isValidOtpCode(body, it.range.first, it.value) }
+            .mapNotNull { codeMatch ->
+                keywords.mapNotNull { kw ->
+                    val afterKeywordDistance = codeMatch.range.first - kw.last
+                    val beforeKeywordDistance = kw.first - codeMatch.range.last
+                    when {
+                        afterKeywordDistance in 0..80 -> afterKeywordDistance
+                        beforeKeywordDistance in 0..40 -> beforeKeywordDistance
+                        else -> null
+                    }
+                }.minOrNull()?.let { codeMatch.value to it }
             }
-            if (nearKeyword) return codeMatch.value
-        }
-
-        return null
+            .minByOrNull { it.second }?.first
     }
 
     /**
@@ -239,6 +244,9 @@ object CategoryClassifier {
 
         // Masked account/card digits ("A/c *8890", "...6612", "XX 4521") are not an OTP
         if (maskedDigitsPrefixRegex.containsMatchIn(prefix)) return false
+
+        // The last four of a vehicle number ("white sedan KA 01 AB 1234") are not an OTP
+        if (vehiclePlatePrefixRegex.containsMatchIn(prefix)) return false
 
         // Check if it looks like a phone number (10+ consecutive digits in context)
         val lookAround = body.substring(

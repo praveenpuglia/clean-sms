@@ -1,0 +1,18 @@
+# Debug only: fictional brands for store screenshots (DebugSeedReceiver --ez demo true).
+# None of these headers is registered in TRAI's DLT registry (checked against data/dlt).
+NWBANK	demo_northwind
+KITEPY	demo_kitepay
+BSKETO	demo_basketo
+ZIPRDE	demo_zipride
+BLUJAY	demo_bluejay
+NMBSMB	demo_nimbus
+MTRPWR	demo_metropower
+TIFFIN	demo_tiffin
+ORBITM	demo_orbitmart
+HRBRBK	demo_harbor
+PEAKCC	demo_peak
+COINLY	demo_coinly
+SHLDLF	demo_shield
+PRCLGO	demo_parcelgo
+CTYGAS	demo_citygas
+STYLKT	demo_stylekart
