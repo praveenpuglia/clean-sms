@@ -17,6 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -117,8 +123,21 @@ fun ThreadDetailScreen(
         listState.scrollToItem(targetIndex ?: listItems.lastIndex)
     }
 
+    // The list shrinks while the keyboard opens and would keep its top item anchored, pushing the
+    // newest messages out of view. If the reader was at the end, keep it pinned there; if they had
+    // scrolled up to older messages, leave their position alone.
+    val imeInsets = WindowInsets.ime
+    val density = LocalDensity.current
+    LaunchedEffect(listState) {
+        var stickToEnd = true
+        snapshotFlow { imeInsets.getBottom(density) to listState.isAtEnd() }.collect { (imeBottom, atEnd) ->
+            val count = listState.layoutInfo.totalItemsCount
+            if (imeBottom == 0) stickToEnd = atEnd else if (stickToEnd && count > 0) listState.scrollToItem(count - 1)
+        }
+    }
+
     Surface(color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().systemBarsPadding()) {
+        Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
             ThreadHeader(
                 contactName = contactName,
                 contactAddress = contactAddress,
@@ -484,6 +503,11 @@ private fun MessageComposer(
             }
         }
     }
+}
+
+private fun LazyListState.isAtEnd(): Boolean {
+    val last = layoutInfo.visibleItemsInfo.lastOrNull() ?: return true
+    return last.index == layoutInfo.totalItemsCount - 1
 }
 
 private object TelephonyMessageType {
