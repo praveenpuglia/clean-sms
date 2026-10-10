@@ -35,6 +35,24 @@
     { "id": "zepto", "name": "Zepto", "domain": "zeptonow.com", "play": "com.zeptoconsumerapp", "owners": ["KIRANAKART TECHNOLOGIES PRIVATE LIMITED"] },
     { "id": "bigbasket", "name": "bigbasket", "domain": "bigbasket.com", "play": "com.bigbasket.mobileapp", "owners": ["Supermarket Grocery Supplied Private Limited"] },
     { "id": "blinkit", "name": "Blinkit", "domain": "blinkit.com", "owners": ["BLINK COMMERCE PRIVATE LIMITED"] },
-    { "id": "nykaa", "name": "Nykaa", "domain": "nykaa.com", "play": "com.fsn.nykaa", "owners": ["NYKAA E-Retail Private Limited", "Nykaa Fashion Private Limited"] }
+    { "id": "nykaa", "name": "Nykaa", "domain": "nykaa.com", "play": "com.fsn.nykaa", "owners": ["NYKAA E-Retail Private Limited", "Nykaa Fashion Private Limited"] },
+    { "id": "smallcase", "name": "smallcase", "domain": "smallcase.com", "play": "com.smallcase.android", "owners": ["SMALLCASE TECHNOLOGIES PRIVATE LIMITED"] },
+    { "id": "mf_central", "name": "MF Central", "domain": "mfcentral.com", "play": "com.mfcentral.app", "owners": ["COMPUTER AGE MANAGEMENT SERVICES LIMITED"], "headers": ["MFCENT"] },
+    { "id": "xpressbees", "name": "XpressBees", "domain": "xpressbees.com", "play": "com.xpressbees.unified_new_arch", "owners": ["busybees logistics solutions private limited"] },
+    { "id": "hsbc", "name": "HSBC India", "domain": "hsbc.co.in", "owners": ["The Hongkong & Shanghai Banking Corporation Limited"] },
+    { "id": "firstcry", "name": "FirstCry", "domain": "firstcry.com", "play": "fc.admin.fcexpressadmin", "owners": ["Brainbees Solutions Limited"] },
+    { "id": "bobcard", "name": "BOBCARD", "domain": "bobcard.co.in", "play": "com.bob.fe", "owners": ["BOBCARD LIMITED"] },
+    { "id": "indian_bank", "name": "Indian Bank", "domain": "indianbank.in", "owners": ["Indian Bank"] },
+    { "id": "pluxee", "name": "Pluxee", "domain": "pluxee.in", "owners": ["Pluxee India Pvt Ltd"] },
+    { "id": "apollo247", "name": "Apollo 24|7", "domain": "apollo247.com", "play": "com.apollo.patientapp", "owners": ["Apollo Healthco Limited"] },
+    { "id": "tickertape", "name": "Tickertape", "domain": "tickertape.in", "play": "in.tickertape", "owners": ["Anchorage Technologies Private Limited"] },
+    { "id": "rainbow_hospitals", "name": "Rainbow Children's Hospital", "domain": "rainbowhospitals.in", "play": "com.sparctechnologies.rainbow", "owners": ["Rainbow Childrens Medicare Pvt Ltd"] },
+    { "id": "bluedart", "name": "Blue Dart", "domain": "bluedart.com", "owners": ["BLUE DART EXPRESS LIMITED"] },
+    { "id": "cibil", "name": "CIBIL", "domain": "cibil.com", "play": "com.tuci.cibilindia", "owners": ["Transunion CIBIL Limited"] },
+    { "id": "bisleri", "name": "Bisleri", "domain": "bisleri.com", "play": "com.bisleri.bisleri", "owners": ["Bisleri International Private Limited"] },
+    { "id": "finvu", "name": "Finvu", "domain": "finvu.in", "play": "com.finvu", "owners": ["Cookiejar Technologies Pvt Ltd"] },
+    { "id": "playo", "name": "Playo", "domain": "playo.co", "play": "com.techmash.playo", "owners": ["TechMash Solutions Private Limited"] },
+    { "id": "dezerv", "name": "Dezerv", "domain": "dezerv.in", "play": "com.dezerv", "owners": ["DEZERV INVESTMENTS PRIVATE LIMITED"] },
+    { "id": "cred", "name": "CRED", "domain": "cred.club", "play": "com.dreamplug.androidapp", "owners": ["DREAMPLUG TECHNOLOGIES PRIVATE LIMITED"] }
   ]
 }

@@ -257,7 +257,7 @@ See [RELEASE_GUIDE.md](RELEASE_GUIDE.md) for detailed instructions.
 
 ### Adding a sender logo
 1. Find the brand's exact registered company name(s) in `data/dlt/jio-headers.csv` (case-sensitive; never match on header text, look-alikes exist).
-2. Add the brand to `data/brands.json` with `owners` and either `play` (its own Play Store app, developer verified) or `domain`.
+2. Add the brand to `data/brands.json` with `owners` and either `play` (its own Play Store app, developer verified) or `domain`. If the owner sends for several brands (e.g. CAMS also runs MF Central), restrict with `headers`. If the brand isn't in Jio's list, copy its rows from Vi's public list into `data/dlt/extra-headers.csv`.
 3. `scripts/dlt/fetch_logos.py <brand_id>`, then check the logo by eye: no app sub-brands, no NEW/OLD badges, no State Emblem. If the app icon is a sub-brand (common for banks), use the bank's mark from the [Indian Banks SVG Logos Figma file](https://www.figma.com/design/CCPeJdnX8tpsNpjsmvAfp1) ("Bank Logos (Small)") or a companieslogo.com icon/symbol SVG, scaled to ~70% on white so a circular avatar doesn't clip it, and record the source in `data/logo-sources.json`.
 4. `scripts/dlt/build_brand_map.py` to regenerate `app/src/main/assets/sender_brands.tsv`.
 
