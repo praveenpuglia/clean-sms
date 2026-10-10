@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -24,6 +25,7 @@ import com.praveenpuglia.cleansms.ui.thread.ThreadDetailTestTags
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -120,9 +122,18 @@ class KeyboardInsetsTest {
 
     /** Keyboard top edge in dp from the top of the Compose root (edge-to-edge: the whole window). */
     private fun awaitKeyboardTop(scenario: ActivityScenario<Activity>): Float {
-        val deadline = SystemClock.uptimeMillis() + 5_000
+        val start = SystemClock.uptimeMillis()
         var top = Float.NaN
-        while (SystemClock.uptimeMillis() < deadline) {
+        var asked = false
+        while (SystemClock.uptimeMillis() < start + 8_000) {
+            // A tap doesn't always open the IME when the whole suite runs (focus/window state left
+            // by earlier tests). We're testing layout, not the tap, so ask the window directly.
+            if (!asked && SystemClock.uptimeMillis() > start + 1_500) {
+                asked = true
+                scenario.onActivity { activity ->
+                    WindowCompat.getInsetsController(activity.window, activity.window.decorView).show(WindowInsetsCompat.Type.ime())
+                }
+            }
             scenario.onActivity { activity ->
                 val root = activity.findViewById<View>(android.R.id.content)
                 val insets = ViewCompat.getRootWindowInsets(root)
@@ -147,8 +158,28 @@ class KeyboardInsetsTest {
         assertTrue("$what bottom=$bottom dp is under the keyboard top=$imeTop dp", bottom <= imeTop + 1f)
     }
 
-    private fun shell(command: String): String {
-        val descriptor = instrumentation.uiAutomation.executeShellCommand(command)
-        return ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes().decodeToString() }
+    private fun shell(command: String): String = shellCommand(command)
+
+    companion object {
+        private fun shellCommand(command: String): String {
+            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+            return ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes().decodeToString() }
+        }
+
+        /**
+         * Gboard remembers "floating" mode, where it takes no space at the bottom and these tests
+         * can't measure anything. Reset it to its docked default once (emulator only; harmless
+         * where Gboard isn't installed).
+         */
+        @JvmStatic
+        @BeforeClass
+        fun dockGboard() {
+            val gboard = "com.google.android.inputmethod.latin"
+            if (shellCommand("pm list packages $gboard").contains(gboard)) {
+                shellCommand("pm clear $gboard")
+                shellCommand("ime enable $gboard/com.android.inputmethod.latin.LatinIME")
+                shellCommand("ime set $gboard/com.android.inputmethod.latin.LatinIME")
+            }
+        }
     }
 }
