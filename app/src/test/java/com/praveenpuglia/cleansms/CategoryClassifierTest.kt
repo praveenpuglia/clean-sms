@@ -136,6 +136,9 @@ class CategoryClassifierTest {
             "Dear Customer,\nOTP for your transaction of Rs. 1,325.00 at CITY MART is 4011.\nValid for 3 minutes.\n- Acme Bank" to "4011",
             "OTP 7302 for login on 08/10/2026. Valid for 5 minutes. Do not share it." to "7302",
             "Ride booked: Car KA01AB1234, Driver: Ravi, Pickup: 09 Oct 2026 10:30 AM, Share OTP: 4821 with the driver to start." to "4821",
+            "Your driver Ravi is 3 mins away in a white sedan (KA 01 AB 1234). Share OTP 4821 with the driver to start your ride." to "4821",
+            "Driver Ravi, MH-12-DE-4567, arriving now. OTP 3390. Do not share it." to "3390",
+            "Order 5521 confirmed. Your delivery code is 8840." to "8840",
         ).forEach { (message, expected) -> assertOtp(expected, message) }
     }
 
