@@ -13,6 +13,9 @@ import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -48,6 +51,7 @@ class KeyboardInsetsTest {
         // Emulators often report a hardware keyboard, which hides the on-screen one; real phones don't.
         previousShowImeWithHardKeyboard = shell("settings get secure show_ime_with_hard_keyboard").trim().ifEmpty { "0" }
         shell("settings put secure show_ime_with_hard_keyboard 1")
+        shell("cmd statusbar collapse") // a shade left open by an earlier test keeps window focus
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
         AppSettings.setOnboardingCompleted(context)
     }
@@ -100,7 +104,7 @@ class KeyboardInsetsTest {
             val intent = ThreadDetailActivity.intent(context, threadId, address, null, null, null, MessageCategory.PERSONAL)
             ActivityScenario.launch<Activity>(intent).use { scenario ->
                 composeRule.waitUntil(5_000) { composeRule.onAllNodesWithTag(ThreadDetailTestTags.message(latestId)).fetchSemanticsNodes().isNotEmpty() }
-                composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER_INPUT).performClick()
+                focus(ThreadDetailTestTags.COMPOSER_INPUT)
                 val imeTop = awaitKeyboardTop(scenario)
                 assertAbove(imeTop, "latest message", composeRule.onNodeWithTag(ThreadDetailTestTags.message(latestId)))
             }
@@ -118,6 +122,17 @@ class KeyboardInsetsTest {
             assertAbove(imeTop, "search field", composeRule.onNodeWithTag(MainInboxTestTags.SEARCH_INPUT))
             assertAbove(imeTop, "search results", composeRule.onNodeWithTag(MainInboxTestTags.SEARCH_RESULTS))
         }
+    }
+
+    /**
+     * A tap can land while a long thread is still scrolling to its end and not focus the field, and
+     * the IME only shows for a focused editor. We test layout, not the tap: fall back to focusing it.
+     */
+    private fun focus(tag: String) {
+        val node = composeRule.onNodeWithTag(tag)
+        node.performClick()
+        val focused = runCatching { composeRule.waitUntil(2_000) { node.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Focused) == true } }
+        if (focused.isFailure) node.requestFocus()
     }
 
     /** Keyboard top edge in dp from the top of the Compose root (edge-to-edge: the whole window). */

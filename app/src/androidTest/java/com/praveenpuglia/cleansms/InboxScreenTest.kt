@@ -43,6 +43,7 @@ class InboxScreenTest {
                     allThreads = listOf(thread, busyThread),
                     otpMessages = listOf(otp),
                     allItems = listOf(all),
+                    starredItems = emptyList(),
                     searchResults = emptyList(),
                     searchMode = false,
                     searchQuery = "",

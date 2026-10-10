@@ -31,6 +31,8 @@
     <string name="category_unknown">Unknown</string>
     <string name="tab_otp">OTPs</string>
     <string name="tab_all">All</string>
+    <string name="tab_starred">Starred</string>
+    <string name="starred_empty">Star a message from its ⋮ menu to keep it here</string>
     <string name="settings_all_tab_title">All messages tab</string>
     <string name="settings_all_tab_subtitle">Browse every message in one chronological list. The same view is also available from search</string>
     <string name="settings_font_label">Font</string>
@@ -129,6 +131,18 @@
     <string name="thread_spam_warning">Spam warning</string>
     <string name="thread_spam">SPAM</string>
     <string name="thread_message_hint">Message</string>
+    <string name="thread_report_spam">Report spam to TRAI</string>
+    <string name="thread_report_spam_expired">Only within 7 days of receiving it</string>
+    <string name="thread_message_options">Message options</string>
+    <string name="thread_star">Star</string>
+    <string name="thread_unstar">Unstar</string>
+    <string name="thread_starred">Starred</string>
+    <string name="trai_report_title">Report to TRAI?</string>
+    <string name="trai_report_body">This sends a complaint by SMS to 1909, TRAI\'s free spam helpline, from the number that got this message. Your operator will reply with a complaint number.</string>
+    <string name="trai_report_body_sim">This sends a complaint by SMS to 1909, TRAI\'s free spam helpline, from SIM %1$d, the number that got this message. Your operator will reply with a complaint number.</string>
+    <string name="trai_report_send">Send report</string>
+    <string name="trai_report_cancel">Cancel</string>
+    <string name="toast_trai_report_sent">Report sent to 1909</string>
     <string name="toast_sms_permission_required">SMS permission not granted</string>
     <string name="toast_message_sent">Message sent</string>
     <string name="toast_message_sent_via_sim">Message sent via SIM %1$d</string>

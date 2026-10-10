@@ -69,6 +69,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,6 +87,7 @@ import java.util.Locale
 sealed interface InboxPage {
     data object All : InboxPage
     data object Otp : InboxPage
+    data object Starred : InboxPage
     data class CategoryPage(val category: MessageCategory) : InboxPage
 }
 
@@ -98,6 +100,7 @@ object MainInboxTestTags {
     const val CLEAR_SEARCH = "main_clear_search"
     const val MORE = "main_more"
     const val STATS = "main_stats"
+    const val EMPTY = "main_empty"
     const val UNREAD_CHIP = "main_unread_chip"
     const val FAB = "main_fab"
     const val DELETE_DIALOG = "main_delete_dialog"
@@ -118,6 +121,7 @@ fun InboxScreen(
     allThreads: List<ThreadItem>,
     otpMessages: List<OtpMessageItem>,
     allItems: List<SearchResultItem>,
+    starredItems: List<SearchResultItem>,
     searchResults: List<SearchResultItem>,
     searchMode: Boolean,
     searchQuery: String,
@@ -211,6 +215,7 @@ fun InboxScreen(
                     threads = allThreads,
                     otpMessages = otpMessages,
                     allItems = allItems,
+                    starredItems = starredItems,
                     unreadOnly = unreadOnly,
                     selectionMode = selectionMode,
                     selectedThreadIds = selectedThreadIds,
@@ -404,6 +409,7 @@ private fun InboxTabs(
             val unread = when (page) {
                 InboxPage.All -> threads.any(ThreadItem::hasUnread) || otpMessages.any(OtpMessageItem::isUnread)
                 InboxPage.Otp -> otpMessages.any(OtpMessageItem::isUnread)
+                InboxPage.Starred -> false
                 is InboxPage.CategoryPage -> threads.any { it.category == page.category && it.hasUnread }
             }
             Tab(
@@ -435,6 +441,7 @@ private fun InboxTabs(
 private fun pageLabel(page: InboxPage): String = when (page) {
     InboxPage.All -> stringResource(R.string.tab_all)
     InboxPage.Otp -> stringResource(R.string.tab_otp)
+    InboxPage.Starred -> stringResource(R.string.tab_starred)
     is InboxPage.CategoryPage -> when (page.category) {
         MessageCategory.PERSONAL -> stringResource(R.string.category_personal)
         MessageCategory.TRANSACTIONAL -> stringResource(R.string.category_transactions)
@@ -454,6 +461,7 @@ private fun InboxPager(
     threads: List<ThreadItem>,
     otpMessages: List<OtpMessageItem>,
     allItems: List<SearchResultItem>,
+    starredItems: List<SearchResultItem>,
     unreadOnly: Boolean,
     selectionMode: Boolean,
     selectedThreadIds: Set<Long>,
@@ -486,6 +494,11 @@ private fun InboxPager(
         val state = listStates[pageIndex]
         when (page) {
             InboxPage.All -> MessageList(allItems, "", onMessageClick, Modifier.fillMaxSize(), state)
+            InboxPage.Starred -> {
+                val items = if (unreadOnly) starredItems.filter(SearchResultItem::isUnread) else starredItems
+                if (items.isEmpty()) EmptyPage(stringResource(R.string.starred_empty))
+                else MessageList(items, "", onMessageClick, Modifier.fillMaxSize(), state)
+            }
             InboxPage.Otp -> OtpList(
                 if (unreadOnly) otpMessages.filter(OtpMessageItem::isUnread) else otpMessages,
                 selectionMode,
@@ -826,3 +839,16 @@ private fun sameDay(first: Calendar, second: Calendar) =
 
 private val DAY_NAMES = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 private val MONTH_NAMES = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+@Composable
+private fun EmptyPage(text: String) {
+    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.testTag(MainInboxTestTags.EMPTY),
+        )
+    }
+}

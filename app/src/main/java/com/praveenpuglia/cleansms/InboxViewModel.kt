@@ -47,6 +47,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
     var allThreads by mutableStateOf<List<ThreadItem>>(emptyList()); private set
     var otpMessages by mutableStateOf<List<OtpMessageItem>>(emptyList()); private set
     var allTabItems by mutableStateOf<List<SearchResultItem>>(emptyList()); private set
+    var starredItems by mutableStateOf<List<SearchResultItem>>(emptyList()); private set
     var unreadOnly by mutableStateOf(false); private set
     var selectionMode by mutableStateOf(false); private set
     var selectedThreadIds by mutableStateOf<Set<Long>>(emptySet()); private set
@@ -185,7 +186,10 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         return CategoryClassifier.extractHighPrecisionOtp(body)
     }
 
-    private fun queryAllMessagesForSearch(threadsById: Map<Long, ThreadItem>): List<SearchResultItem> {
+    private fun queryAllMessagesForSearch(
+        threadsById: Map<Long, ThreadItem>,
+        selection: String? = null,
+    ): List<SearchResultItem> {
         val uri = "content://sms".toUri()
         val projection = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id")
         val sortOrder = "date DESC"
@@ -193,7 +197,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         val results = mutableListOf<SearchResultItem>()
 
         try {
-            resolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
+            resolver.query(uri, projection, selection, null, sortOrder)?.use { cursor ->
                 val idxId = cursor.getColumnIndex("_id")
                 val idxThreadId = cursor.getColumnIndex("thread_id")
                 val idxAddress = cursor.getColumnIndex("address")
@@ -331,8 +335,8 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         when (currentPage) {
-            is InboxPage.All -> {
-                // No selection mode on the All page (chronological view, mirrors search).
+            is InboxPage.All, is InboxPage.Starred -> {
+                // No selection mode on message lists (chronological view, mirrors search).
             }
             is InboxPage.Otp -> {
                 val allOtpIds = filteredOtp.map { it.messageId }.toSet()
@@ -532,6 +536,13 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Newest first; ids are numbers from our own storage, so they go straight into the selection. */
+    private fun loadStarred(threads: List<ThreadItem>): List<SearchResultItem> {
+        val ids = StarredMessages.ids(app)
+        if (ids.isEmpty()) return emptyList()
+        return queryAllMessagesForSearch(threads.associateBy { it.threadId }, "_id IN (${ids.joinToString(",")})")
+    }
+
     private fun loadAllMessagesForSearch() {
         val threadsById = allThreads.associateBy { it.threadId }
         searchLoad?.cancel()
@@ -555,7 +566,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         inboxLoad = viewModelScope.launch {
             do {
                 inboxReloadPending = false
-                val (threads, otp) = withContext(Dispatchers.IO) {
+                val (threads, otp, starred) = withContext(Dispatchers.IO) {
                     val enrichedThreads = loadSmsThreads().map { t ->
                         val hit = ContactDirectory.resolve(app, t.nameOrAddress)?.takeIf(ContactInfo::hasAny)
                         // No contact: a bundled brand logo (verified DLT owner) fills the avatar.
@@ -567,10 +578,11 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
                         hit?.let { item.copy(contactName = it.name, contactPhotoUri = it.photoUri, contactLookupUri = it.lookupUri) }
                             ?: item.copy(contactPhotoUri = SenderBrands.logoUri(app, item.address))
                     }
-                    enrichedThreads to enrichedOtp
+                    Triple(enrichedThreads, enrichedOtp, loadStarred(enrichedThreads))
                 }
                 allThreads = threads
                 otpMessages = otp
+                starredItems = starred
                 updatePagerContent()
             } while (inboxReloadPending)
         }
@@ -619,7 +631,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun buildPagerPages(allTabEnabled: Boolean): List<InboxPage> {
-        val base = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) }
+        val base = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) } + InboxPage.Starred
         return if (allTabEnabled) listOf(InboxPage.All) + base else base
     }
 
