@@ -1,7 +1,7 @@
 # Clean SMS
 
 <p align="center">
-  <img src="./screenshots/onboarding.jpg" alt="Clean SMS Icon" width="300"/>
+  <img src="./play-store-assets/feature-graphic.png" alt="Clean SMS" width="600"/>
 </p>
 
 A privacy-focused, clutter-free SMS client for Android that keeps your inbox organized and your OTPs easily accessible.

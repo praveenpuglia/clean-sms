@@ -91,19 +91,12 @@ For questions about this privacy policy, contact: [your-email@example.com]
    - No alpha channel
    - Extract from `app/src/main/res/mipmap-xxxhdpi/ic_launcher.png` and upscale
 
-2. **Feature Graphic** (REQUIRED)
-   - 1024x500 PNG or JPG
-   - Showcases your app's main feature
-   - Use a design tool (Canva, Figma) or hire a designer
+2. **Feature Graphic** (REQUIRED): `play-store-assets/feature-graphic.png` (1024x500)
 
-3. **Screenshots** (minimum 2, maximum 8)
-   - Phone: 320-3840px on longest side
-   - Take screenshots of:
-     - Messages list view
-     - Thread detail view
-     - New message composition
-     - OTP notification
-   - Use Android Studio's Device Manager to get clean screenshots
+3. **Screenshots**: `play-store-assets/screenshots/01-08*.png` (1080x1920, upload in order)
+   - Regenerate on the Pixel emulator: `./gradlew installDebug && play-store-assets/capture.sh && play-store-assets/render.sh`
+   - `capture.sh` uses the debug demo seed (fictional people and brands, so no real company's name or logo
+     appears in the listing); copy and layout live in `play-store-assets/frames.html`
 
 4. **Optional but Recommended**:
    - Video (YouTube): 30s-2min demo

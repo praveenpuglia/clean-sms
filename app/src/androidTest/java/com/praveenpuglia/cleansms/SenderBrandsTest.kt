@@ -112,11 +112,14 @@ class SenderBrandsTest {
 
     @Test
     fun everyMappedBrandHasABundledLogoThatDecodes() {
-        val brands = context.assets.open("sender_brands.tsv").bufferedReader().readLines()
-            .filter { it.isNotBlank() && !it.startsWith("#") }
-            .map { it.substringAfter('\t') }
-            .toSet()
+        // The debug build also ships the fictional demo brands used for store screenshots.
+        val brands = listOf("sender_brands.tsv", "sender_brands_demo.tsv").flatMap { name ->
+            context.assets.open(name).bufferedReader().readLines()
+                .filter { it.isNotBlank() && !it.startsWith("#") }
+                .map { it.substringAfter('\t') }
+        }.toSet()
         assertTrue(brands.size >= 20)
+        assertEquals("demo_northwind", SenderBrands.brandFor(context, "VK-NWBANK-T"))
         brands.forEach { brand ->
             val uri = "android.resource://${context.packageName}/drawable/brand_$brand".toUri()
             val bitmap = context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }

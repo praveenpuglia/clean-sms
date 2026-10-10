@@ -13,6 +13,8 @@ import java.io.IOException
  */
 object SenderBrands {
     private const val TAG = "SenderBrands"
+    /** Fictional brands for store screenshots; only the debug build ships this file. */
+    private const val DEMO_MAP = "sender_brands_demo.tsv"
     private val traiHeader = Regex("^[A-Za-z]{2}-([A-Za-z0-9]{1,6})(?:-[A-Za-z])?$")
     @Volatile private var brandByHeader: Map<String, String>? = null
 
@@ -43,17 +45,19 @@ object SenderBrands {
     @Synchronized
     private fun load(context: Context): Map<String, String> {
         brandByHeader?.let { return it }
-        val map = try {
-            context.assets.open("sender_brands.tsv").bufferedReader().useLines { lines ->
-                lines.filter { it.isNotBlank() && !it.startsWith("#") }
-                    .mapNotNull { line -> line.split('\t').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
-                    .toMap()
-            }
-        } catch (e: IOException) {
-            Log.w(TAG, "Brand map unavailable: ${e.javaClass.simpleName}")
-            emptyMap()
-        }
+        val map = read(context, "sender_brands.tsv", required = true) + read(context, DEMO_MAP, required = false)
         brandByHeader = map
         return map
+    }
+
+    private fun read(context: Context, name: String, required: Boolean): Map<String, String> = try {
+        context.assets.open(name).bufferedReader().useLines { lines ->
+            lines.filter { it.isNotBlank() && !it.startsWith("#") }
+                .mapNotNull { line -> line.split('\t').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+                .toMap()
+        }
+    } catch (e: IOException) {
+        if (required) Log.w(TAG, "Brand map unavailable: ${e.javaClass.simpleName}")
+        emptyMap()
     }
 }
