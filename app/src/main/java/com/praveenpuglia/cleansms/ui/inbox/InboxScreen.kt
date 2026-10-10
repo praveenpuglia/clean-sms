@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -93,6 +94,7 @@ object MainInboxTestTags {
     const val TABS = "main_tabs"
     const val SEARCH = "main_search"
     const val SEARCH_INPUT = "main_search_input"
+    const val SEARCH_RESULTS = "main_search_results"
     const val CLEAR_SEARCH = "main_clear_search"
     const val MORE = "main_more"
     const val STATS = "main_stats"
@@ -165,7 +167,7 @@ fun InboxScreen(
     }
 
     Surface(color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().systemBarsPadding()) {
+        Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
             if (searchMode) {
                 SearchHeader(
                     query = searchQuery,
@@ -200,7 +202,7 @@ fun InboxScreen(
                     style = MaterialTheme.typography.bodyLarge,
                 )
             } else if (searchMode) {
-                MessageList(searchResults, searchQuery, onMessageClick, Modifier.weight(1f))
+                MessageList(searchResults, searchQuery, onMessageClick, Modifier.weight(1f).testTag(MainInboxTestTags.SEARCH_RESULTS))
             } else {
                 InboxPager(
                     pages = pages,
