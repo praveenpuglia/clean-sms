@@ -45,9 +45,11 @@ class SeededInboxLogosTest {
             "VM-OLACAB-S" to "ola", "VM-IRCTCi-S" to "irctc", "VM-HDFCBK-T" to "hdfc_bank",
             "JM-ICICIB-T" to "icici_bank", "AD-SBIBNK-T" to "sbi", "VK-AXISBK-T" to "axis_bank",
             "VM-KOTAKB-T" to "kotak", "VM-INDIGO-S" to "indigo",
-            // No logo: look-alikes, a paint company sharing IndiGo's name, government, CRIS (not IRCTC),
+            "JZ-NDMAEW-G" to "ndma", "VM-CDSLTX-S" to "cdsl", "VM-MEDPLS-T" to "medplus",
+            "VM-INPOST-S" to "india_post", "AD-EPFOHO-G" to "epfo",
+            // No logo: look-alikes, a paint company sharing IndiGo's name, CRIS railway alerts (emblem),
             // unregistered and numeric headers, shortcodes, and personal numbers.
-            "VK-GOOGLE-T" to null, "BP-NETFLX-T" to null, "AD-Indigo-P" to null, "JZ-NDMAEW-G" to null,
+            "VK-GOOGLE-T" to null, "BP-NETFLX-T" to null, "AD-Indigo-P" to null,
             "VM-IRSMSa-G" to null, "AX-QWZXKP-S" to null, "VM-650018-P" to null, "57575" to null,
         )
         val threads = inboxThreads(expected.keys)

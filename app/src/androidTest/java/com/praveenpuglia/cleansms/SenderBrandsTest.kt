@@ -66,6 +66,41 @@ class SenderBrandsTest {
     }
 
     @Test
+    fun brandRulesForSharedOwnersAndExclusions() {
+        // CAMS owns many headers; only MFCENT is MF Central.
+        assertEquals("mf_central", SenderBrands.brandFor(context, "AX-MFCENT-S"))
+        assertNull(SenderBrands.brandFor(context, "AX-CAMSAD-S"))
+        // RAINBO is the hospital, rainbo a supermarket: no logo for the lowercase one or other cases.
+        assertEquals("rainbow_hospitals", SenderBrands.brandFor(context, "VM-RAINBO-S"))
+        assertNull(SenderBrands.brandFor(context, "VM-rainbo-S"))
+        assertNull(SenderBrands.brandFor(context, "VM-Rainbo-S"))
+        // From the Vi supplement (missing in Jio's list).
+        assertEquals("playo", SenderBrands.brandFor(context, "JD-PLAYOO-S"))
+        // Registered as "dezerv"; one owner across cases, so "Dezerv" falls back.
+        assertEquals("dezerv", SenderBrands.brandFor(context, "VM-Dezerv-S"))
+        // Deliberately excluded: Aadhaar (UIDAI restricts its logo) and Qwikcilver's Amazon header.
+        assertNull(SenderBrands.brandFor(context, "AD-ADHAAR-S"))
+        assertNull(SenderBrands.brandFor(context, "AD-QCAMZN-S"))
+    }
+
+    @Test
+    fun governmentLogosOnlyWithoutTheStateEmblemAndForTheRegisteredBody() {
+        assertEquals("india_post", SenderBrands.brandFor(context, "VM-INPOST-S"))
+        assertEquals("epfo", SenderBrands.brandFor(context, "AD-EPFOHO-G"))
+        assertEquals("ndma", SenderBrands.brandFor(context, "JZ-NDMAEW-G"))
+        assertEquals("cdsl", SenderBrands.brandFor(context, "VM-CDSLTX-S"))
+        // MEDPLS is MedPlus (Optival); MedPLS is an unrelated Medicure Plus.
+        assertEquals("medplus", SenderBrands.brandFor(context, "VM-MEDPLS-T"))
+        assertNull(SenderBrands.brandFor(context, "VM-MedPLS-T"))
+        // Excluded: RBI (misuse rules, impersonation), Income Tax and Indian Railways (State Emblem).
+        assertNull(SenderBrands.brandFor(context, "VM-RBISAY-G"))
+        assertNull(SenderBrands.brandFor(context, "AD-ITDCPC-G"))
+        assertNull(SenderBrands.brandFor(context, "VM-IRSMSa-G"))
+        // ECIsms is the Election Commission, ECISMS a private shop: neither gets a logo here.
+        assertNull(SenderBrands.brandFor(context, "VM-ECISMS-G"))
+    }
+
+    @Test
     fun differentCaseFallsBackOnlyWhenUnambiguous() {
         // Registered as AIRTEL, delivered as "Airtel": one owner across case variants -> fallback.
         assertEquals("airtel", SenderBrands.brandFor(context, "VM-Airtel-S"))

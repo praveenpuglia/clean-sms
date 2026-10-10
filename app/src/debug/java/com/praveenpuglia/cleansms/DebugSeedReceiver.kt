@@ -469,6 +469,27 @@ class DebugSeedReceiver : BroadcastReceiver() {
             Seed("VM-OLACAB-S", "Ride booked: White Sedan KA01AB1234, Driver: Ravi (98xxxxxx10), Pickup: 09 Oct 2026 10:30 AM. Share OTP: 4821 with the driver to start the ride.", ageMinutes = 10),
             Seed("VM-IRCTCi-S", "PNR 4729381056: Train 12951 Coach B2 Berth 34 confirmed for 14-Oct-2026. Charting at 20:15. Never share OTP with anyone claiming to be from Railways.", ageMinutes = 1300, read = true),
 
+            Seed("VM-SMLCSE-S", "Your smallcase order for ACME Momentum (5 stocks) was placed successfully. Track it in the smallcase app.", ageMinutes = 1700, read = true),
+            Seed("AX-MFCENT-S", "Your consolidated account statement for the period Apr-Sep 2026 is ready. Download it from MF Central.", ageMinutes = 3300, read = true),
+            Seed("JD-XPBEES-S", "Your XpressBees shipment 1342270099881 is out for delivery today. Track: xb.example/t", ageMinutes = 380, read = true),
+            Seed("VK-HSBCIN-T", "HSBC: INR 2,450.00 spent on your credit card ending 7720 at CITY MART on 09-10-26. Avl limit INR 1,48,210.", ageMinutes = 560, read = true),
+            Seed("VM-BOBCRD-S", "Your BOBCARD statement is ready. Total due Rs.8,912.00, minimum due Rs.446.00, payment due date 20-10-2026.", ageMinutes = 2600, read = true),
+            Seed("AD-INDBNK-S", "Your A/c XX4419 is credited with Rs.3,000.00 on 09-10-2026 by UPI. Avl Bal Rs.11,207.80 -Indian Bank", ageMinutes = 980, read = true),
+            Seed("JM-Pluxee-S", "Rs.2,200 meal benefits have been added to your Pluxee card. Use them at any partner outlet.", ageMinutes = 4100, read = true),
+            Seed("VM-APWELL-S", "Your Apollo 24|7 order of 3 medicines has been dispatched and will reach you by 6 PM today.", ageMinutes = 210, read = true),
+            Seed("VM-TKRTPE-S", "Price alert: ACME LTD crossed your target of Rs.1,850 on NSE. See the stock on Tickertape.", ageMinutes = 300, read = true),
+            Seed("JD-RAINBO-S", "Appointment confirmed with Dr. K. Menon, Paediatrics, on 12-Oct-2026 at 10:30 AM. -Rainbow Children's Hospital", ageMinutes = 1450, read = true),
+            Seed("VK-BLUDRT-S", "Your Blue Dart shipment 75839021654 has been delivered. Thank you for choosing Blue Dart.", ageMinutes = 5200, read = true),
+            Seed("AX-CIBILA-S", "Your CIBIL Score has been updated. Log in to myscore.cibil.example to view your latest report.", ageMinutes = 6100, read = true),
+            Seed("VM-BSLERI-S", "Your Bisleri order of 2 x 20L jars is confirmed for delivery tomorrow between 9 AM and 12 PM.", ageMinutes = 7300, read = true),
+            Seed("VM-FINVUU-S", "You have approved sharing your bank statement with ACME LENDING via Finvu. Manage consents in the Finvu app.", ageMinutes = 2400, read = true),
+            Seed("JD-PLAYOO-S", "Your badminton slot at ACME ARENA is booked for 11-Oct, 7-8 PM. See you on court! -Playo", ageMinutes = 690, read = true),
+            Seed("VM-Dezerv-S", "Your Dezerv portfolio review for September is ready. Open the Dezerv app to see how your investments did.", ageMinutes = 8100, read = true),
+            Seed("VM-CREDIN-S", "Your ACME Bank credit card bill of Rs.12,480 is due in 3 days. Pay on CRED and earn rewards.", ageMinutes = 1150, read = true),
+
+            Seed("VM-INPOST-S", "Your Speed Post article EE123456789IN has been delivered. Track more at indiapost.example/track -India Post", ageMinutes = 3500, read = true),
+            Seed("AD-EPFOHO-G", "Dear Member, a contribution of Rs.3,600 for Sep-2026 has been credited to your PF account. Check your passbook on the EPFO portal.", ageMinutes = 4900, read = true),
+
             // Shapes that must NOT get a brand logo
             Seed("AD-Indigo-P", "Diwali colours are here! Get 15% off on premium wall paints this week. Visit your nearest dealer. -Indigo Paints", ageMinutes = 9000, read = true),
             Seed("AX-QWZXKP-S", "Your appointment with Dr. A. Rao is confirmed for 10-Oct-2026 at 11:00 AM. Reply C to cancel. -Acme Clinic", ageMinutes = 820),

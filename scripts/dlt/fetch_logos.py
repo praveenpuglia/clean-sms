@@ -21,7 +21,7 @@ def get(url):
     """curl uses the system trust store and is blocked less often than urllib."""
     with tempfile.NamedTemporaryFile() as f:
         r = subprocess.run(['curl', '-sSL', '--compressed', '-m', '30', '-A', UA['User-Agent'], '-o', f.name,
-                            '-w', '%{http_code} %{url_effective}', url], capture_output=True, text=True)
+                            '-w', '%{http_code} %{url_effective}', url.replace(' ', '%20')], capture_output=True, text=True)
         code, _, final = r.stdout.partition(' ')
         if r.returncode != 0 or not code.startswith('2'):
             raise IOError(f"HTTP {code or r.stderr.strip()}")

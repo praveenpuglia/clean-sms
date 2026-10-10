@@ -12,6 +12,8 @@ from collections import Counter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REGISTRY = os.path.join(ROOT, 'data/dlt/jio-headers.csv')
+# Rows from Vi/BSNL/MTNL's shared public list for curated brands missing from Jio's (see data/dlt/README.md)
+EXTRA = os.path.join(ROOT, 'data/dlt/extra-headers.csv')
 BRANDS = os.path.join(ROOT, 'data/brands.json')
 LOGOS = os.path.join(ROOT, 'app/src/main/res/drawable-nodpi')
 OUT = os.path.join(ROOT, 'app/src/main/assets/sender_brands.tsv')
@@ -27,16 +29,32 @@ def main():
             owner_to_brand[owner] = b['id']
 
     rows = list(csv.DictReader(open(REGISTRY, encoding='utf-8')))
+    jio_owner = {r['header']: r['principal_entity'] for r in rows}
+    for r in csv.DictReader(open(EXTRA, encoding='utf-8')):
+        if r['header'] in jio_owner and jio_owner[r['header']] != r['principal_entity']:
+            errors.append(f"extra header {r['header']!r} conflicts with Jio's registry owner {jio_owner[r['header']]!r}")
+        elif r['header'] not in jio_owner:
+            rows.append(r)
     known_owners = {r['principal_entity'] for r in rows}
     errors += [f"owner not in registry: {o!r}" for o in owner_to_brand if o not in known_owners]
+    # Optional per-brand header allowlist, for owners that send for many brands (e.g. CAMS also runs
+    # MF Central). Every listed header must still be registered to one of the brand's owners.
+    owner_of = {r['header']: r['principal_entity'] for r in rows}
+    only = {b['id']: set(b['headers']) for b in brands if b.get('headers')}
+    for b in brands:
+        for h in b.get('headers', []):
+            if owner_of.get(h) not in b['owners']:
+                errors.append(f"{b['id']}: header {h!r} is registered to {owner_of.get(h)!r}, not an owner")
     if errors:
         sys.exit("\n".join(errors))
 
     # Brands without an approved logo keep their curated owners but are left out of the app map.
     with_logo = {b['id'] for b in brands if os.path.exists(os.path.join(LOGOS, f"brand_{b['id']}.webp"))}
     pending = sorted({b['id'] for b in brands} - with_logo)
-    mapping = sorted((r['header'], owner_to_brand[r['principal_entity']])
-                     for r in rows if owner_to_brand.get(r['principal_entity']) in with_logo)
+    def allowed(r):
+        brand = owner_to_brand.get(r['principal_entity'])
+        return brand in with_logo and (brand not in only or r['header'] in only[brand])
+    mapping = sorted((r['header'], owner_to_brand[r['principal_entity']]) for r in rows if allowed(r))
     # Networks sometimes deliver a header in a different case than registered ("Airtel" for AIRTEL).
     # Allow a case-insensitive match ("~UPPER" keys) only when every case variant of that header in
     # the whole registry belongs to the same company, so INDIGO/IndiGo (airline) vs Indigo (paints)

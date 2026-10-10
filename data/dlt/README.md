@@ -9,5 +9,6 @@
   Indigo Paints. Never normalize case when matching.
 - **Look-alike headers exist**: a header that reads like a brand may be registered to someone else.
   Brand matching must go through the registered principal entity (see `data/brands.json`).
-- Vi/BSNL/MTNL publish a larger shared list (~952k headers) at https://www.vilpower.in/header_link_doc/
-  if a brand is missing here.
+- `extra-headers.csv`: rows copied from Vi/BSNL/MTNL's larger shared list (~952k headers, public PDF at
+  https://www.vilpower.in/header_link_doc/, as on 9 Oct 2026) for curated brands missing from Jio's
+  list. Only the rows we need are kept; the generator fails if one ever disagrees with Jio's owner.
