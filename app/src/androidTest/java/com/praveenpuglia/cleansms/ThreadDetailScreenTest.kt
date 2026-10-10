@@ -43,6 +43,7 @@ class ThreadDetailScreenTest {
                     showSimSelector = true,
                     highlightedMessageId = 1,
                     scrollRequest = 1,
+                    starredIds = emptySet(),
                     onBack = {},
                     onAvatarClick = {},
                     onCall = {},
@@ -50,6 +51,8 @@ class ThreadDetailScreenTest {
                     onSimToggle = {},
                     onSend = {},
                     onHighlightFinished = { highlightFinished = true },
+                    onToggleStar = {},
+                    onReportSpam = {},
                 )
             }
         }
@@ -84,6 +87,7 @@ class ThreadDetailScreenTest {
                     showSimSelector = false,
                     highlightedMessageId = null,
                     scrollRequest = 0,
+                    starredIds = emptySet(),
                     onBack = {},
                     onAvatarClick = {},
                     onCall = {},
@@ -91,6 +95,8 @@ class ThreadDetailScreenTest {
                     onSimToggle = {},
                     onSend = {},
                     onHighlightFinished = {},
+                    onToggleStar = {},
+                    onReportSpam = {},
                 )
             }
         }
@@ -117,6 +123,7 @@ class ThreadDetailScreenTest {
                     showSimSelector = false,
                     highlightedMessageId = null,
                     scrollRequest = 0,
+                    starredIds = emptySet(),
                     onBack = {},
                     onAvatarClick = {},
                     onCall = {},
@@ -124,6 +131,8 @@ class ThreadDetailScreenTest {
                     onSimToggle = {},
                     onSend = {},
                     onHighlightFinished = {},
+                    onToggleStar = {},
+                    onReportSpam = {},
                 )
             }
         }

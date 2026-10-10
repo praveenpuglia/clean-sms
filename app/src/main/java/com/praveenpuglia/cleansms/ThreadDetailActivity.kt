@@ -48,6 +48,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var sending = false
     private var loadJob: Job? = null
 
+    private var starredIds by mutableStateOf<Set<Long>>(emptySet())
     private var availableSims by mutableStateOf<List<SubscriptionInfo>>(emptyList())
     private var selectedSimIndex by mutableIntStateOf(0)
     private val simSlots by lazy { SimSlots.resolver(this) }
@@ -85,6 +86,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         messageText = savedInstanceState?.getString(STATE_MESSAGE).orEmpty()
 
         setupSimSelector()
+        starredIds = StarredMessages.ids(this)
         setContent {
             CleanSmsTheme {
                 ThreadDetailScreen(
@@ -99,6 +101,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     showSimSelector = availableSims.size > 1,
                     highlightedMessageId = highlightedMessageId,
                     scrollRequest = scrollRequest,
+                    starredIds = starredIds,
                     onBack = ::finish,
                     onAvatarClick = ::openContactFromHeader,
                     onCall = ::openDialer,
@@ -113,6 +116,8 @@ class ThreadDetailActivity : AppCompatActivity() {
                         highlightInProgress = false
                         highlightedMessageId = null
                     },
+                    onToggleStar = { starredIds = StarredMessages.toggle(this, it.id) },
+                    onReportSpam = ::reportSpam,
                 )
             }
         }
@@ -200,6 +205,23 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (messageCategory == MessageCategory.PERSONAL) return true
         val address = contactAddress?.trim().orEmpty()
         return address.isNotEmpty() && address.none(Char::isLetter)
+    }
+
+    /** The user confirmed the exact complaint text; it must go from the SIM that got the spam. */
+    private fun reportSpam(message: Message) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, R.string.toast_sms_permission_required, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val complaint = TraiReport.complaint(message.body, message.address, message.date)
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) { SmsSender.send(this@ThreadDetailActivity, TraiReport.SHORT_CODE, complaint, message.subscriptionId) }
+                Toast.makeText(this@ThreadDetailActivity, R.string.toast_trai_report_sent, Toast.LENGTH_SHORT).show()
+            } catch (error: RuntimeException) {
+                Toast.makeText(this@ThreadDetailActivity, getString(R.string.toast_message_send_failed, error.message.orEmpty()), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupSimSelector() {

@@ -33,6 +33,23 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.praveenpuglia.cleansms.TraiReport
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.indication
+import androidx.compose.material3.ripple
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -86,6 +103,12 @@ object ThreadDetailTestTags {
     const val COMPOSER = "thread_composer"
     const val COMPOSER_INPUT = "thread_composer_input"
     const val SEND = "thread_send"
+    const val STAR = "thread_star"
+    const val REPORT_SPAM = "thread_report_spam"
+    const val REPORT_DIALOG = "thread_report_dialog"
+    const val REPORT_CONFIRM = "thread_report_confirm"
+    fun messageMenu(id: Long) = "thread_message_menu_$id"
+    fun starred(id: Long) = "thread_starred_$id"
     fun message(id: Long) = "thread_message_$id"
 }
 
@@ -103,6 +126,7 @@ fun ThreadDetailScreen(
     showSimSelector: Boolean,
     highlightedMessageId: Long?,
     scrollRequest: Int,
+    starredIds: Set<Long>,
     onBack: () -> Unit,
     onAvatarClick: () -> Unit,
     onCall: () -> Unit,
@@ -110,8 +134,25 @@ fun ThreadDetailScreen(
     onSimToggle: () -> Unit,
     onSend: () -> Unit,
     onHighlightFinished: () -> Unit,
+    onToggleStar: (Message) -> Unit,
+    onReportSpam: (Message) -> Unit,
 ) {
     val listItems = remember(messages) { createMessageListItems(messages) }
+    // TRAI takes complaints for 7 days, from the number that got the message (see TraiReport)
+    val now = remember(messages) { System.currentTimeMillis() }
+    val firstLineMiddle = rememberFirstLineMiddle()
+    var pendingReport by remember { mutableStateOf<Message?>(null) }
+    pendingReport?.let { message ->
+        TraiReportDialog(
+            message = message,
+            showSimSlot = showSimSelector,
+            onConfirm = {
+                pendingReport = null
+                onReportSpam(message)
+            },
+            onDismiss = { pendingReport = null },
+        )
+    }
     val listState = rememberLazyListState()
 
     LaunchedEffect(scrollRequest) {
@@ -171,6 +212,11 @@ fun ThreadDetailScreen(
                                 message = item.message,
                                 highlighted = item.message.id == highlightedMessageId,
                                 onHighlightFinished = onHighlightFinished,
+                                starred = item.message.id in starredIds,
+                                now = now,
+                                firstLineMiddle = firstLineMiddle,
+                                onToggleStar = { onToggleStar(item.message) },
+                                onReport = { pendingReport = item.message },
                             )
                         }
                     }
@@ -264,6 +310,11 @@ private fun MessageBubble(
     message: Message,
     highlighted: Boolean,
     onHighlightFinished: () -> Unit,
+    starred: Boolean,
+    now: Long,
+    firstLineMiddle: Dp,
+    onToggleStar: () -> Unit,
+    onReport: () -> Unit,
 ) {
     val incoming = message.type == TelephonyMessageType.INCOMING
     val spam = incoming && SpamDetector.isSpam(message.body)
@@ -281,15 +332,35 @@ private fun MessageBubble(
         }
     }
 
-    Box(
+    val menu = @Composable { modifier: Modifier, iconTop: Dp, iconEnd: Dp ->
+        MessageMenu(
+            messageId = message.id,
+            starred = starred,
+            // TRAI takes complaints about any received message, labelled or not, for 7 days
+            report = when {
+                !incoming || message.address == TraiReport.SHORT_CODE -> ReportOption.Hidden
+                TraiReport.canReport(message.date, now) -> ReportOption.Available
+                else -> ReportOption.Expired
+            },
+            tint = contentColor.copy(alpha = 0.7f),
+            iconTop = iconTop,
+            iconEnd = iconEnd,
+            onToggleStar = onToggleStar,
+            onReport = onReport,
+            modifier = modifier,
+        )
+    }
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = if (incoming) 7.dp else 2.dp)
             .testTag(ThreadDetailTestTags.message(message.id)),
-        contentAlignment = if (incoming) Alignment.CenterStart else Alignment.CenterEnd,
+        horizontalArrangement = if (incoming) Arrangement.Start else Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
+                .weight(1f, fill = false)
                 .padding(
                     start = if (incoming) 0.dp else 60.dp,
                     end = if (incoming) 60.dp else 0.dp,
@@ -300,54 +371,71 @@ private fun MessageBubble(
                 color = lerp(baseColor, MaterialTheme.colorScheme.primary, highlight.value * 0.32f),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                Column(
-                    Modifier.padding(
-                        start = 12.dp,
-                        top = if (spam) 16.dp else 12.dp,
-                        end = 12.dp,
-                        bottom = 12.dp,
-                    ),
-                ) {
-                    MessageBody(message.body, contentColor)
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.End)
-                            .padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(formatMessageTime(message.date), color = contentColor, fontSize = 11.sp)
-                        message.simSlot?.let {
-                            Spacer(Modifier.width(4.dp))
-                            SimIndicator(it, color = contentColor)
-                        }
-                        // Outbox/queued messages show no mark until the radio reports back.
-                        val failed = message.type == TelephonyMessageType.FAILED || message.status == STATUS_FAILED
-                        if (failed) {
-                            Icon(
-                                painterResource(R.drawable.ic_warning),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier
-                                    .padding(start = 4.dp)
-                                    .size(12.dp),
-                            )
-                            Text(
-                                stringResource(R.string.thread_failed_status),
-                                color = MaterialTheme.colorScheme.error,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(start = 2.dp),
-                            )
-                        } else if (message.type == TelephonyMessageType.SENT) {
-                            Icon(
-                                painterResource(R.drawable.ic_tick_single),
-                                contentDescription = stringResource(R.string.thread_sent_status),
-                                tint = contentColor,
-                                modifier = Modifier
-                                    .padding(start = 4.dp)
-                                    .size(11.dp),
-                            )
+                Box {
+                    val topPadding = if (spam) 16.dp else 12.dp
+                    Column(Modifier.padding(start = 12.dp, top = topPadding, end = 12.dp, bottom = 12.dp)) {
+                        // Only the text makes room for the menu's dots; the time row keeps the bubble's edge
+                        MessageBody(message.body, contentColor, Modifier.padding(end = 20.dp))
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(top = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (starred) {
+                                Icon(
+                                    painterResource(R.drawable.ic_star),
+                                    contentDescription = stringResource(R.string.thread_starred),
+                                    tint = contentColor,
+                                    modifier = Modifier
+                                        .padding(end = 4.dp)
+                                        .size(12.dp)
+                                        .testTag(ThreadDetailTestTags.starred(message.id)),
+                                )
+                            }
+                            // Status before the time, so the SIM (or the time) always ends the row under the menu.
+                            // Outbox/queued messages show no mark until the radio reports back.
+                            val failed = message.type == TelephonyMessageType.FAILED || message.status == STATUS_FAILED
+                            if (failed) {
+                                Icon(
+                                    painterResource(R.drawable.ic_warning),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(12.dp),
+                                )
+                                Text(
+                                    stringResource(R.string.thread_failed_status),
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(start = 2.dp, end = 4.dp),
+                                )
+                            } else if (message.type == TelephonyMessageType.SENT) {
+                                Icon(
+                                    painterResource(R.drawable.ic_tick_single),
+                                    contentDescription = stringResource(R.string.thread_sent_status),
+                                    tint = contentColor,
+                                    modifier = Modifier
+                                        .padding(end = 4.dp)
+                                        .size(11.dp),
+                                )
+                            }
+                            Text(formatMessageTime(message.date), color = contentColor, fontSize = 11.sp)
+                            message.simSlot?.let {
+                                Spacer(Modifier.width(4.dp))
+                                SimIndicator(it, color = contentColor)
+                            }
                         }
                     }
+                    // The 48dp touch target sits inside the bubble's top-right corner (clipped to it). Within
+                    // it, the visible dots line up with the visible end of the time row below and sit level
+                    // with the first line of text. Insets measured from the artwork: the dots end 7.5dp inside
+                    // their 18dp icon, the SIM card outline 4.5dp inside its 18dp glyph; text ends flush.
+                    val rowEndInset = if (message.simSlot != null) SIM_GLYPH_END_INSET else 0.dp
+                    menu(
+                        Modifier.align(Alignment.TopEnd),
+                        topPadding + firstLineMiddle - MENU_ICON_SIZE / 2,
+                        12.dp + rowEndInset - MENU_DOTS_END_INSET,
+                    )
                 }
             }
             if (spam) {
@@ -361,8 +449,134 @@ private fun MessageBubble(
     }
 }
 
+private enum class ReportOption { Hidden, Available, Expired }
+
 @Composable
-private fun MessageBody(body: String, color: Color) {
+private fun MessageMenu(
+    messageId: Long,
+    starred: Boolean,
+    report: ReportOption,
+    tint: Color,
+    iconTop: Dp,
+    iconEnd: Dp,
+    onToggleStar: () -> Unit,
+    onReport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val description = stringResource(R.string.thread_message_options)
+    Box(
+        modifier
+            .size(48.dp)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button) { expanded = true }
+            .semantics { contentDescription = description }
+            .testTag(ThreadDetailTestTags.messageMenu(messageId)),
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_more_vert),
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = iconTop, end = iconEnd)
+                .size(MENU_ICON_SIZE)
+                .indication(interaction, ripple(bounded = false, radius = 16.dp)),
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(if (starred) R.string.thread_unstar else R.string.thread_star)) },
+                leadingIcon = { Icon(painterResource(if (starred) R.drawable.ic_star else R.drawable.ic_star_outline), contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onToggleStar()
+                },
+                modifier = Modifier.testTag(ThreadDetailTestTags.STAR),
+            )
+            if (report != ReportOption.Hidden) {
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(stringResource(R.string.thread_report_spam))
+                            if (report == ReportOption.Expired) {
+                                Text(
+                                    stringResource(R.string.thread_report_spam_expired),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_flag), contentDescription = null) },
+                    enabled = report == ReportOption.Available,
+                    onClick = {
+                        expanded = false
+                        onReport()
+                    },
+                    modifier = Modifier.testTag(ThreadDetailTestTags.REPORT_SPAM),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TraiReportDialog(message: Message, showSimSlot: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        modifier = Modifier.testTag(ThreadDetailTestTags.REPORT_DIALOG),
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.trai_report_title)) },
+        text = {
+            Column {
+                val slot = message.simSlot?.takeIf { showSimSlot }
+                Text(
+                    if (slot != null) stringResource(R.string.trai_report_body_sim, slot)
+                    else stringResource(R.string.trai_report_body),
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.padding(top = 16.dp).fillMaxWidth(),
+                ) {
+                    // The whole message goes in the complaint; long ones scroll here
+                    Text(
+                        TraiReport.complaint(message.body, message.address, message.date),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, modifier = Modifier.testTag(ThreadDetailTestTags.REPORT_CONFIRM)) {
+                Text(stringResource(R.string.trai_report_send))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.trai_report_cancel)) } },
+    )
+}
+
+/**
+ * Optical middle of a message's first line, from the top of the text: its baseline minus half the cap
+ * height (~0.7em in the app's fonts). Measured once with the body's own style, so it follows the
+ * user's font and text size. (Writing each bubble's text layout into state instead kept long threads
+ * re-laying out, which stopped the keyboard from opening.)
+ */
+@Composable
+private fun rememberFirstLineMiddle(): Dp {
+    val measurer = rememberTextMeasurer(cacheSize = 1)
+    val style = LocalTextStyle.current.merge(TextStyle(fontSize = MESSAGE_FONT_SIZE, lineHeight = MESSAGE_LINE_HEIGHT))
+    val density = LocalDensity.current
+    return remember(style, density) {
+        val baseline = measurer.measure("H", style).firstBaseline
+        with(density) { baseline.toDp() - MESSAGE_FONT_SIZE.toDp() * 0.35f }
+    }
+}
+
+@Composable
+private fun MessageBody(body: String, color: Color, modifier: Modifier = Modifier) {
     val linkColor = MaterialTheme.colorScheme.primary
     val text = remember(body, linkColor) {
         val linked = LinkifyUtil.linkify(body)
@@ -381,7 +595,7 @@ private fun MessageBody(body: String, color: Color) {
         }
     }
     SelectionContainer {
-        Text(text, color = color, fontSize = 15.sp, lineHeight = 17.sp)
+        Text(text, color = color, fontSize = MESSAGE_FONT_SIZE, lineHeight = MESSAGE_LINE_HEIGHT, modifier = modifier)
     }
 }
 
@@ -517,6 +731,11 @@ private object TelephonyMessageType {
 }
 
 private const val STATUS_FAILED = 64
+private val MESSAGE_FONT_SIZE = 15.sp
+private val MESSAGE_LINE_HEIGHT = 17.sp
+private val MENU_ICON_SIZE = 18.dp
+private val MENU_DOTS_END_INSET = 7.5.dp // ic_more_vert dots end at x=14 of 24
+private val SIM_GLYPH_END_INSET = 4.5.dp // ic_sim_outline ends at x≈18.3 of 24, drawn 17dp wide in an 18dp box
 
 fun createMessageListItems(messages: List<Message>, nowMillis: Long = System.currentTimeMillis()): List<MessageListItem> {
     if (messages.isEmpty()) return emptyList()

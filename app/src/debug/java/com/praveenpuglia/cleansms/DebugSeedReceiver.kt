@@ -498,6 +498,9 @@ class DebugSeedReceiver : BroadcastReceiver() {
             Seed("+911140404040",
                 "Airtel Warning: SPAM|Get a personal loan up to Rs.10 Lakh with no documents. Call 9999988888 now!",
                 ageMinutes = 7500, read = true),
+            Seed("+919000077788",
+                "Jio Alert : SPAM Earn Rs.5,000 a day from home, no experience needed. Join now: earnfast.example/j",
+                ageMinutes = 180),
 
             // ===== Edge cases for OTP false-positive guarding =====
             // Order number (NOT an OTP — excluded by codeForPattern)

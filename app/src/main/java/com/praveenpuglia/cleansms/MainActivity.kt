@@ -96,6 +96,7 @@ class MainActivity : AppCompatActivity() {
                         allThreads = inbox.allThreads,
                         otpMessages = inbox.otpMessages,
                         allItems = inbox.allTabItems,
+                        starredItems = inbox.starredItems,
                         searchResults = inbox.searchResults,
                         searchMode = inbox.searchMode,
                         searchQuery = inbox.searchQuery,
