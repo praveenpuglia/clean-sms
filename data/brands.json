@@ -1,5 +1,5 @@
 {
-  "_comment": "Curated sender brands. A header gets a brand's logo only when its DLT principal entity is EXACTLY one of the brand's owners (case-sensitive). Never match on header text: look-alikes exist (e.g. GOOGLE, NETFLX are registered to unrelated companies). Government senders are excluded on purpose: many government logos include the State Emblem, whose use is restricted by law. Logos come from the brand's own Google Play app icon (play, verified developer) or official website (domain) via scripts/dlt/fetch_logos.py, or for banks whose app icons are sub-brands, from the Indian Banks SVG Logos Figma community file and companieslogo.com icons; every source is recorded in data/logo-sources.json. Regenerate the app map with scripts/dlt/build_brand_map.py.",
+  "_comment": "Curated sender brands. A header gets a brand's logo only when its DLT principal entity is EXACTLY one of the brand's owners (case-sensitive). Never match on header text: look-alikes exist (e.g. GOOGLE, NETFLX are registered to unrelated companies). Government bodies get a logo only when it has no State Emblem (its use is restricted by law) and no explicit usage ban: Income Tax and Indian Railways carry the emblem; UIDAI (Aadhaar) and RBI are excluded over logo-misuse rules and impersonation risk. Logos come from the brand's own Google Play app icon (play, verified developer) or official website (domain) via scripts/dlt/fetch_logos.py, or for banks whose app icons are sub-brands, from the Indian Banks SVG Logos Figma community file and companieslogo.com icons; every source is recorded in data/logo-sources.json. Regenerate the app map with scripts/dlt/build_brand_map.py.",
   "brands": [
     { "id": "sbi", "name": "State Bank of India", "domain": "sbi.co.in", "play": "com.sbi.lotusintouch", "owners": ["STATE BANK OF INDIA"] },
     { "id": "hdfc_bank", "name": "HDFC Bank", "domain": "hdfcbank.com", "play": "com.hdfcbank.android.now", "owners": ["HDFC BANK LIMITED"] },
@@ -53,6 +53,11 @@
     { "id": "finvu", "name": "Finvu", "domain": "finvu.in", "play": "com.finvu", "owners": ["Cookiejar Technologies Pvt Ltd"] },
     { "id": "playo", "name": "Playo", "domain": "playo.co", "play": "com.techmash.playo", "owners": ["TechMash Solutions Private Limited"] },
     { "id": "dezerv", "name": "Dezerv", "domain": "dezerv.in", "play": "com.dezerv", "owners": ["DEZERV INVESTMENTS PRIVATE LIMITED"] },
-    { "id": "cred", "name": "CRED", "domain": "cred.club", "play": "com.dreamplug.androidapp", "owners": ["DREAMPLUG TECHNOLOGIES PRIVATE LIMITED"] }
+    { "id": "cred", "name": "CRED", "domain": "cred.club", "play": "com.dreamplug.androidapp", "owners": ["DREAMPLUG TECHNOLOGIES PRIVATE LIMITED"] },
+    { "id": "cdsl", "name": "CDSL", "domain": "cdslindia.com", "play": "com.cdsl.myeasi", "owners": ["CENTRAL DEPOSITORY SERVICES (INDIA) LIMITED"] },
+    { "id": "medplus", "name": "MedPlus", "domain": "medplusmart.com", "play": "com.medplus.mobile.android", "owners": ["OPTIVAL HEALTH SOLUTIONS PRIVATE LIMITED"] },
+    { "id": "india_post", "name": "India Post", "domain": "indiapost.gov.in", "owners": ["department of posts"] },
+    { "id": "epfo", "name": "EPFO", "domain": "epfindia.gov.in", "owners": ["Employees Provident fund Organization"] },
+    { "id": "ndma", "name": "NDMA", "domain": "ndma.gov.in", "owners": ["National Disaster Management Authority"] }
   ]
 }

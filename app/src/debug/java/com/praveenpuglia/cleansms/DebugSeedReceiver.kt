@@ -487,6 +487,9 @@ class DebugSeedReceiver : BroadcastReceiver() {
             Seed("VM-Dezerv-S", "Your Dezerv portfolio review for September is ready. Open the Dezerv app to see how your investments did.", ageMinutes = 8100, read = true),
             Seed("VM-CREDIN-S", "Your ACME Bank credit card bill of Rs.12,480 is due in 3 days. Pay on CRED and earn rewards.", ageMinutes = 1150, read = true),
 
+            Seed("VM-INPOST-S", "Your Speed Post article EE123456789IN has been delivered. Track more at indiapost.example/track -India Post", ageMinutes = 3500, read = true),
+            Seed("AD-EPFOHO-G", "Dear Member, a contribution of Rs.3,600 for Sep-2026 has been credited to your PF account. Check your passbook on the EPFO portal.", ageMinutes = 4900, read = true),
+
             // Shapes that must NOT get a brand logo
             Seed("AD-Indigo-P", "Diwali colours are here! Get 15% off on premium wall paints this week. Visit your nearest dealer. -Indigo Paints", ageMinutes = 9000, read = true),
             Seed("AX-QWZXKP-S", "Your appointment with Dr. A. Rao is confirmed for 10-Oct-2026 at 11:00 AM. Reply C to cancel. -Acme Clinic", ageMinutes = 820),

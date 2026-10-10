@@ -315,6 +315,10 @@ CBOTJF	jio
 CBOTMB	jio
 CBSSBI	sbi
 CCSALE	yes_bank
+CDSFIP	cdsl
+CDSIPF	cdsl
+CDSLEV	cdsl
+CDSLTX	cdsl
 CHTLBY	nykaa
 CIBILA	cibil
 CIBILC	cibil
@@ -332,11 +336,16 @@ CTBTRA	nykaa
 CVHTUN	airtel
 CanBnk	canara_bank
 DBAKMY	canara_bank
+DOPBNK	india_post
+DOPCBS	india_post
+DOPPLI	india_post
 DRMPLG	cred
 DSTRKT	zomato
 ECIGOV	airtel
 ENDRIF	flipkart
 ENTPCO	jio
+EPFGMS	epfo
+EPFOHO	epfo
 FBLOTP	federal_bank
 FEDBNK	federal_bank
 FEDOTP	federal_bank
@@ -388,6 +397,7 @@ INDOFF	indigo
 INDUSA	indusind
 INDUSB	indusind
 INDUSO	indusind
+INPOST	india_post
 INYKAA	nykaa
 IRCTCH	irctc
 IRCTCR	irctc
@@ -477,6 +487,7 @@ LPAYTM	paytm
 LYFHLP	jio
 LYFSVC	jio
 MAHLTD	kotak
+MEDPLS	medplus
 MFCENT	mf_central
 MGETIT	jio
 MMTAMZ	makemytrip
@@ -485,6 +496,7 @@ MMTRIP	makemytrip
 MYNRET	myntra
 MYNTRA	myntra
 Mynret	myntra
+NDMAEW	ndma
 NGOUPD	jio
 NKFIN	nykaa
 NPSTRD	lic
@@ -512,6 +524,7 @@ PAYTMB	paytm
 PAYTMC	paytm
 PAYTMH	paytm
 PAYZAP	hdfc_bank
+PFOGUR	epfo
 PHONPE	phonepe
 PLAYO	playo
 PLAYOO	playo
@@ -572,6 +585,7 @@ SLPCIR	jio
 SLPRFR	jio
 SMCASE	smallcase
 SMLCSE	smallcase
+SMNDMA	ndma
 SMTHUB	hdfc_bank
 SOCHSI	jio
 SOCVIP	jio
@@ -968,6 +982,10 @@ zeptoc	zepto
 ~CBOTMB	jio
 ~CBSSBI	sbi
 ~CCSALE	yes_bank
+~CDSFIP	cdsl
+~CDSIPF	cdsl
+~CDSLEV	cdsl
+~CDSLTX	cdsl
 ~CHTLBY	nykaa
 ~CIBILA	cibil
 ~CIBILC	cibil
@@ -983,12 +1001,17 @@ zeptoc	zepto
 ~CVHTUN	airtel
 ~DBAKMY	canara_bank
 ~DEZERV	dezerv
+~DOPBNK	india_post
+~DOPCBS	india_post
+~DOPPLI	india_post
 ~DRMPLG	cred
 ~DSTRKT	zomato
 ~EATBYM	flipkart
 ~ECIGOV	airtel
 ~ENDRIF	flipkart
 ~ENTPCO	jio
+~EPFGMS	epfo
+~EPFOHO	epfo
 ~FBLOTP	federal_bank
 ~FEDBNK	federal_bank
 ~FEDFIB	federal_bank
@@ -1038,6 +1061,7 @@ zeptoc	zepto
 ~INDUSA	indusind
 ~INDUSB	indusind
 ~INDUSO	indusind
+~INPOST	india_post
 ~INYKAA	nykaa
 ~IPAYTM	paytm
 ~IRCTCE	irctc
@@ -1136,6 +1160,7 @@ zeptoc	zepto
 ~MYAPPS	airtel
 ~MYNRET	myntra
 ~MYNTRA	myntra
+~NDMAEW	ndma
 ~NGOUPD	jio
 ~NKFIN	nykaa
 ~NPSTRD	lic
@@ -1161,6 +1186,7 @@ zeptoc	zepto
 ~PAYTMC	paytm
 ~PAYTMH	paytm
 ~PAYZAP	hdfc_bank
+~PFOGUR	epfo
 ~PHONPE	phonepe
 ~PLAYO	playo
 ~PLAYOO	playo
@@ -1218,6 +1244,7 @@ zeptoc	zepto
 ~SLPRFR	jio
 ~SMCASE	smallcase
 ~SMLCSE	smallcase
+~SMNDMA	ndma
 ~SMTHUB	hdfc_bank
 ~SOCHSI	jio
 ~SOCVIP	jio

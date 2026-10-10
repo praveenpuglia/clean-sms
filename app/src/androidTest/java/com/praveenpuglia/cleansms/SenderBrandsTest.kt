@@ -84,6 +84,23 @@ class SenderBrandsTest {
     }
 
     @Test
+    fun governmentLogosOnlyWithoutTheStateEmblemAndForTheRegisteredBody() {
+        assertEquals("india_post", SenderBrands.brandFor(context, "VM-INPOST-S"))
+        assertEquals("epfo", SenderBrands.brandFor(context, "AD-EPFOHO-G"))
+        assertEquals("ndma", SenderBrands.brandFor(context, "JZ-NDMAEW-G"))
+        assertEquals("cdsl", SenderBrands.brandFor(context, "VM-CDSLTX-S"))
+        // MEDPLS is MedPlus (Optival); MedPLS is an unrelated Medicure Plus.
+        assertEquals("medplus", SenderBrands.brandFor(context, "VM-MEDPLS-T"))
+        assertNull(SenderBrands.brandFor(context, "VM-MedPLS-T"))
+        // Excluded: RBI (misuse rules, impersonation), Income Tax and Indian Railways (State Emblem).
+        assertNull(SenderBrands.brandFor(context, "VM-RBISAY-G"))
+        assertNull(SenderBrands.brandFor(context, "AD-ITDCPC-G"))
+        assertNull(SenderBrands.brandFor(context, "VM-IRSMSa-G"))
+        // ECIsms is the Election Commission, ECISMS a private shop: neither gets a logo here.
+        assertNull(SenderBrands.brandFor(context, "VM-ECISMS-G"))
+    }
+
+    @Test
     fun differentCaseFallsBackOnlyWhenUnambiguous() {
         // Registered as AIRTEL, delivered as "Airtel": one owner across case variants -> fallback.
         assertEquals("airtel", SenderBrands.brandFor(context, "VM-Airtel-S"))
