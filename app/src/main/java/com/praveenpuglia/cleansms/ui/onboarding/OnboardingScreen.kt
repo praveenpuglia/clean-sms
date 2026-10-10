@@ -151,22 +151,20 @@ fun OnboardingScreen(
                 Spacer(Modifier.height(32.dp))
             }
 
-            Surface(shadowElevation = 8.dp) {
-                Button(
-                    onClick = onContinue,
-                    enabled = state.isDefaultSmsApp && state.isBatteryOptimizationIgnored,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .height(56.dp)
-                        .testTag(OnboardingTestTags.CONTINUE),
-                ) {
-                    Text(
-                        text = stringResource(R.string.onboarding_continue),
-                        fontSize = 16.sp,
-                    )
-                }
+            Button(
+                onClick = onContinue,
+                enabled = state.isDefaultSmsApp && state.isBatteryOptimizationIgnored,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .height(56.dp)
+                    .testTag(OnboardingTestTags.CONTINUE),
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_continue),
+                    fontSize = 16.sp,
+                )
             }
         }
     }
