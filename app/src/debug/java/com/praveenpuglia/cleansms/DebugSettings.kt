@@ -2,6 +2,7 @@ package com.praveenpuglia.cleansms
 
 import android.content.Context
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -99,7 +100,7 @@ object DebugSettings {
             onClick = {
                 val (sender, body, type) = getRandomOtpMessage()
                 deliver(sender, body)
-                showTypeToast(context, type)
+                showToast(context, R.string.settings_test_random_otp_type, type)
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -110,7 +111,7 @@ object DebugSettings {
                 val (sender, body) = messageTemplates.random()
                 deliver(sender, body)
                 // Non-OTP SMS use the default-importance channel: status bar only, no pop-up
-                Toast.makeText(context, context.getString(R.string.settings_test_random_message_sent, sender), Toast.LENGTH_SHORT).show()
+                showToast(context, R.string.settings_test_random_message_sent, sender)
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -118,11 +119,7 @@ object DebugSettings {
         }
     }
 
-    private fun showTypeToast(context: Context, type: String) {
-        Toast.makeText(
-            context,
-            context.getString(R.string.settings_test_random_otp_type, type),
-            Toast.LENGTH_SHORT,
-        ).show()
+    private fun showToast(context: Context, @StringRes message: Int, arg: String) {
+        Toast.makeText(context, context.getString(message, arg), Toast.LENGTH_SHORT).show()
     }
 }
