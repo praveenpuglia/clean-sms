@@ -17,6 +17,9 @@
    - `KEY_ALIAS`: `cleansms`
    - `KEY_PASSWORD`: `THE_PASSWORD_YOU_SET`
    - `RELEASE_TOKEN`: a fine-grained personal access token from a repo admin (see below)
+   - `SERVICE_ACCOUNT_JSON`: the JSON key of a Google Cloud service account that has the Google Play
+     Android Developer API enabled and is invited in **Play Console → Users and permissions** with
+     release permissions for this app
 
 4. Create `RELEASE_TOKEN`. `main` requires local signoffs before anything lands, and on a personal
    repo GitHub Actions can't bypass that rule, so the Release workflow pushes its version-bump
@@ -36,6 +39,10 @@ Releases are started by hand; nothing runs on push or tag.
 3. Pick the **Version bump**:
    - `auto` (default): derived from Conventional Commits since the last tag. A breaking change (`feat!:` or `BREAKING CHANGE`) bumps major, any `feat:` bumps minor, anything else bumps patch.
    - `patch`, `minor` or `major` to force one.
+4. Pick **Upload the AAB to Google Play**:
+   - `internalsharing` (default): uploads to Internal app sharing. The install link is printed in the run summary.
+   - `internal`: releases to the Internal testing track, so testers get it as a Play Store update.
+   - `none`: GitHub release only.
 
 The workflow then:
 - computes the next version from the latest `v*` tag (`versionCode = MAJOR*10000 + MINOR*100 + PATCH`) and fails if that tag already exists
@@ -43,6 +50,7 @@ The workflow then:
 - builds the signed release APK and AAB
 - only after a successful build: commits `chore: release vX.Y.Z` to `main`, tags `vX.Y.Z` and pushes both
 - creates the GitHub Release with generated notes and `CleanSMS-vX.Y.Z.apk` / `.aab` attached
+- uploads the AAB to Google Play as picked above
 
 ### Version Numbering
 

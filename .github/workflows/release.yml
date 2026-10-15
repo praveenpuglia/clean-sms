@@ -13,6 +13,15 @@ on:
           - patch
           - minor
           - major
+      play:
+        description: 'Upload the AAB to Google Play'
+        required: true
+        default: internalsharing
+        type: choice
+        options:
+          - internalsharing  # Internal app sharing: a private install link, not a release
+          - internal         # Internal testing track: a real release testers update to
+          - none
 
 permissions:
   contents: write
@@ -154,3 +163,20 @@ jobs:
             Download the APK below and install it on your Android device.
 
             **Minimum Android version:** Android 13 (API 33)
+
+      # Runs after the GitHub release so a Play failure never leaves main tagged without one.
+      - name: Upload to Google Play (${{ inputs.play }})
+        id: play
+        if: inputs.play != 'none'
+        uses: r0adkll/upload-google-play@v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          packageName: com.praveenpuglia.cleansms
+          releaseFiles: CleanSMS-v${{ steps.version.outputs.version }}.aab
+          track: ${{ inputs.play }}
+
+      - name: Show internal app sharing link
+        if: inputs.play == 'internalsharing'
+        env:
+          URL: ${{ steps.play.outputs.internalSharingDownloadUrl }}
+        run: echo "Internal app sharing link - $URL" | tee -a "$GITHUB_STEP_SUMMARY"
