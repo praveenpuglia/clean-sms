@@ -75,6 +75,27 @@ class SmsDeliveryTest {
         assertNull("brand logo must not appear in notifications", posted!!.notification.getLargeIcon())
     }
 
+    @Test
+    fun markAsReadOnEveryNotificationMarksTheThreadReadAndDismissesIt() {
+        // An earlier unread message from the same sender is read too: the notification stands for the thread.
+        SmsDeliverReceiver.deliver(context, PERSONAL_SENDER, "Are you coming?")
+        SmsDeliverReceiver.deliver(context, PERSONAL_SENDER, "See you at 7")
+        SmsDeliverReceiver.deliver(context, OTP_SENDER, "Your OTP is 482913. Do not share it.")
+
+        listOf(PERSONAL_SENDER to listOf("Are you coming?", "See you at 7"), OTP_SENDER to listOf("Your OTP is 482913. Do not share it.")).forEach { (address, bodies) ->
+            val action = postedFor(address)!!.notification.actions.orEmpty()
+                .single { it.title == context.getString(R.string.notification_mark_read) }
+            action.actionIntent.send()
+
+            val deadline = android.os.SystemClock.uptimeMillis() + 5_000
+            while (bodies.any { storedReadFlag(address, it) != 1 } && android.os.SystemClock.uptimeMillis() < deadline) {
+                android.os.SystemClock.sleep(100)
+            }
+            bodies.forEach { assertEquals("$address: $it", 1, storedReadFlag(address, it)) }
+            assertNull("$address notification still shown", notifications.activeNotifications.firstOrNull { it.id == address.hashCode() })
+        }
+    }
+
     private fun storedReadFlag(address: String, body: String): Int? =
         context.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,

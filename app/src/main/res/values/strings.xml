@@ -22,6 +22,7 @@
     <string name="main_contains_spam">Contains spam</string>
     <string name="main_avatar">Avatar</string>
     <string name="notification_copy_otp">Copy OTP</string>
+    <string name="notification_mark_read">Mark as read</string>
     <string name="toast_otp_copied">OTP copied to clipboard</string>
     <string name="category_personal">Personal</string>
     <string name="category_transactions">Transactions</string>

@@ -163,6 +163,14 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                     .setCustomBigContentView(remoteViews)
                     .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             }
+            val markReadIntent = Intent(context, MarkReadReceiver::class.java)
+                .putExtra(MarkReadReceiver.EXTRA_THREAD_ID, threadId)
+                .putExtra(MarkReadReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+            builder.addAction(
+                R.drawable.ic_mark_read,
+                context.getString(R.string.notification_mark_read),
+                PendingIntent.getBroadcast(context, notificationId, markReadIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
+            )
             loadBitmap(context, photoUri)?.let(builder::setLargeIcon)
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
             NotificationManagerCompat.from(context).notify(notificationId, builder.build())
