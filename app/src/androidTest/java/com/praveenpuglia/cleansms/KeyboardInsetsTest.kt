@@ -195,6 +195,10 @@ class KeyboardInsetsTest {
                 shellCommand("pm clear $gboard")
                 shellCommand("ime enable $gboard/com.android.inputmethod.latin.LatinIME")
                 shellCommand("ime set $gboard/com.android.inputmethod.latin.LatinIME")
+                // Clearing kills Gboard; a keyboard request before it is back up is refused for good.
+                val deadline = SystemClock.uptimeMillis() + 10_000
+                while (shellCommand("pidof $gboard").isBlank() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(200)
+                SystemClock.sleep(2_000) // let it finish starting
             }
         }
     }
