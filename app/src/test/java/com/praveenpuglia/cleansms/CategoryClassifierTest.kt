@@ -139,6 +139,7 @@ class CategoryClassifierTest {
             "Your driver Ravi is 3 mins away in a white sedan (KA 01 AB 1234). Share OTP 4821 with the driver to start your ride." to "4821",
             "Driver Ravi, MH-12-DE-4567, arriving now. OTP 3390. Do not share it." to "3390",
             "Order 5521 confirmed. Your delivery code is 8840." to "8840",
+            "Dear Applicant, OTP for authentication using EVC is F1035A. OTP will expire in 10 minutes. On expiry of time, please regenerate the OTP. GSTN" to "F1035A",
         ).forEach { (message, expected) -> assertOtp(expected, message) }
     }
 
@@ -146,6 +147,8 @@ class CategoryClassifierTest {
     fun ignoresMessagesThatOnlyMentionOtpOrCarryOtherNumbers() {
         listOf(
             "UPI AutoPay mandate of Rs.199 for Acme Streaming will be debited on 12-10-26. Never share your OTP or UPI PIN.",
+            "The OTP you requested is 10AM onwards only. Try again later.",
+            "OTP is NOT required for this login. Contact us at HELP desk.",
             "Your Acme Bank A/c has been linked to Acme Pay. Do not share OTP, PIN or CVV with anyone.",
             "Shipment AB12345678 is delivered on 08/10/2026 to Customer. Share feedback: https://acme.example/f. Never share OTP for deliveries.",
             "Rs.4,500.00 debited from A/c XX7731 on 08-10-26 to VPA rahul.k@acme. Not you? Call 18001234567. Never share OTP.",
