@@ -141,6 +141,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 // Set high priority for OTP notifications to show as heads-up
                 builder.setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                    // Android adds its own "copy code" chip for detected codes; ours is already there
+                    .setAllowSystemGeneratedContextualActions(false)
 
                 val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
                     action = OtpCopyReceiver.ACTION_COPY_OTP
