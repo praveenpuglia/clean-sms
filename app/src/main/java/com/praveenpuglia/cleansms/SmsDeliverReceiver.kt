@@ -141,12 +141,10 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 // Set high priority for OTP notifications to show as heads-up
                 builder.setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                    // Android adds its own "copy code" chip for detected codes; ours is already there
+                    .setAllowSystemGeneratedContextualActions(false)
 
-                val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
-                    action = OtpCopyReceiver.ACTION_COPY_OTP
-                    putExtra(OtpCopyReceiver.EXTRA_OTP, otpCode)
-                    putExtra(OtpCopyReceiver.EXTRA_NOTIFICATION_ID, notificationId)
-                }
+                val copyIntent = OtpCopyReceiver.intent(context, otpCode, notificationId, threadId)
                 val copyPendingIntent = PendingIntent.getBroadcast(
                     context,
                     (otpCode.hashCode() xor address.hashCode()).absoluteValue,
@@ -163,6 +161,14 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                     .setCustomBigContentView(remoteViews)
                     .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             }
+            val markReadIntent = Intent(context, MarkReadReceiver::class.java)
+                .putExtra(MarkReadReceiver.EXTRA_THREAD_ID, threadId)
+                .putExtra(MarkReadReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+            builder.addAction(
+                R.drawable.ic_mark_read,
+                context.getString(R.string.notification_mark_read),
+                PendingIntent.getBroadcast(context, notificationId, markReadIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
+            )
             loadBitmap(context, photoUri)?.let(builder::setLargeIcon)
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
             NotificationManagerCompat.from(context).notify(notificationId, builder.build())

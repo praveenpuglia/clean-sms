@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -43,6 +44,7 @@ class SmsDeliveryTest {
         val posted = postedFor(OTP_SENDER)
         assertNotNull(posted)
         assertEquals(SmsDeliverReceiver.CHANNEL_OTP, posted!!.notification.channelId)
+        assertFalse("system copy-code chip would duplicate ours", posted.notification.allowSystemGeneratedContextualActions)
     }
 
     @Test
@@ -73,6 +75,44 @@ class SmsDeliveryTest {
         val posted = postedFor(BRAND_SENDER)
         assertNotNull(posted)
         assertNull("brand logo must not appear in notifications", posted!!.notification.getLargeIcon())
+    }
+
+    @Test
+    fun markAsReadOnEveryNotificationMarksTheThreadReadAndDismissesIt() {
+        // An earlier unread message from the same sender is read too: the notification stands for the thread.
+        SmsDeliverReceiver.deliver(context, PERSONAL_SENDER, "Are you coming?")
+        SmsDeliverReceiver.deliver(context, PERSONAL_SENDER, "See you at 7")
+        SmsDeliverReceiver.deliver(context, OTP_SENDER, "Your OTP is 482913. Do not share it.")
+
+        listOf(PERSONAL_SENDER to listOf("Are you coming?", "See you at 7"), OTP_SENDER to listOf("Your OTP is 482913. Do not share it.")).forEach { (address, bodies) ->
+            val action = postedFor(address)!!.notification.actions.orEmpty()
+                .single { it.title == context.getString(R.string.notification_mark_read) }
+            action.actionIntent.send()
+
+            val deadline = android.os.SystemClock.uptimeMillis() + 5_000
+            while (bodies.any { storedReadFlag(address, it) != 1 } && android.os.SystemClock.uptimeMillis() < deadline) {
+                android.os.SystemClock.sleep(100)
+            }
+            bodies.forEach { assertEquals("$address: $it", 1, storedReadFlag(address, it)) }
+            assertNull("$address notification still shown", notifications.activeNotifications.firstOrNull { it.id == address.hashCode() })
+        }
+    }
+
+    @Test
+    fun copyingTheOtpFromItsNotificationMarksTheThreadReadAndDismissesIt() {
+        val body = "Your OTP is 482913. Do not share it."
+        SmsDeliverReceiver.deliver(context, OTP_SENDER, body)
+        assertNotNull(postedFor(OTP_SENDER))
+        val threadId = Telephony.Threads.getOrCreateThreadId(context, OTP_SENDER)
+
+        context.sendBroadcast(OtpCopyReceiver.intent(context, "482913", OTP_SENDER.hashCode(), threadId))
+
+        val deadline = android.os.SystemClock.uptimeMillis() + 5_000
+        while (storedReadFlag(OTP_SENDER, body) != 1 && android.os.SystemClock.uptimeMillis() < deadline) {
+            android.os.SystemClock.sleep(100)
+        }
+        assertEquals(1, storedReadFlag(OTP_SENDER, body))
+        assertNull("notification still shown", notifications.activeNotifications.firstOrNull { it.id == OTP_SENDER.hashCode() })
     }
 
     private fun storedReadFlag(address: String, body: String): Int? =

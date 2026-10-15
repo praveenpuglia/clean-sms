@@ -1,7 +1,6 @@
 package com.praveenpuglia.cleansms
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -258,7 +257,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         loadJob?.cancel() // newest load wins
         loadJob = lifecycleScope.launch {
             val loaded = withContext(Dispatchers.IO) {
-                queryMessagesForThread(threadId).also { markThreadAsRead(threadId) }
+                queryMessagesForThread(threadId).also { MarkReadReceiver.markThreadRead(this@ThreadDetailActivity, threadId) }
             }
             messages = loaded
             val target = targetMessageId
@@ -305,19 +304,6 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
         return messages
-    }
-
-    private fun markThreadAsRead(id: Long) {
-        try {
-            contentResolver.update(
-                Telephony.Sms.Inbox.CONTENT_URI,
-                ContentValues().apply { put(Telephony.Sms.READ, 1) },
-                "thread_id = ? AND read = 0",
-                arrayOf(id.toString()),
-            )
-        } catch (error: RuntimeException) {
-            android.util.Log.w("ThreadDetailActivity", "Failed to mark thread read: ${error.javaClass.simpleName}")
-        }
     }
 
     companion object {

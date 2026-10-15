@@ -1,14 +1,8 @@
 package com.praveenpuglia.cleansms
 
-import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.widget.RemoteViews
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,16 +10,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
-import kotlin.math.absoluteValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Debug-only settings helper. This entire file is excluded from release builds.
@@ -69,6 +62,15 @@ object DebugSettings {
         return (1..length).map { (0..9).random() }.joinToString("")
     }
 
+    // Ordinary messages (no OTP) across categories, to try notifications that aren't OTPs
+    private val messageTemplates = listOf(
+        Pair("+919876500011", "Running 10 mins late, start without me"),
+        Pair("+919876500012", "Did you see the photos I sent? Call when free."),
+        Pair("VM-HDFCBK-T", "Rs.1,250.00 credited to A/c XX1234 by UPI from ANANYA R. Avl Bal: Rs.27,840.50"),
+        Pair("JM-JIOINF-S", "Your Jio plan expires in 2 days. Recharge now to continue enjoying uninterrupted services."),
+        Pair("BP-NYKAAA-P", "Flat 30% off on skincare this weekend. Shop now: nykaa.example/glow"),
+    )
+
     private fun getRandomOtpMessage(): Triple<String, String, String> {
         val template = otpTemplates.random()
         val otpLength = listOf(4, 5, 6, 6, 6, 8).random() // Weighted towards 6 digits
@@ -89,85 +91,35 @@ object DebugSettings {
             letterSpacing = 0.7.sp,
         )
         Spacer(Modifier.height(12.dp))
+        val scope = rememberCoroutineScope()
+        // Through the real delivery path: stored like an incoming SMS, then notified exactly as one
+        val deliver = { sender: String, body: String ->
+            scope.launch(Dispatchers.IO) { SmsDeliverReceiver.deliver(context.applicationContext, sender, body) }
+        }
         OutlinedButton(
             onClick = {
                 val (sender, body, type) = getRandomOtpMessage()
-                postTestOtpNotification(context, sender, body)
-                showTypeToast(context, type)
+                deliver(sender, body)
+                showToast(context, R.string.settings_test_random_otp_type, type)
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.settings_test_random_otp))
         }
+        OutlinedButton(
+            onClick = {
+                val (sender, body) = messageTemplates.random()
+                deliver(sender, body)
+                // Non-OTP SMS use the default-importance channel: status bar only, no pop-up
+                showToast(context, R.string.settings_test_random_message_sent, sender)
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.settings_test_random_message))
+        }
     }
 
-    private fun showTypeToast(context: Context, type: String) {
-        Toast.makeText(
-            context,
-            context.getString(R.string.settings_test_random_otp_type, type),
-            Toast.LENGTH_SHORT,
-        ).show()
-    }
-
-    private fun postTestOtpNotification(context: Context, sender: String, body: String) {
-        val channelId = "otp_sms"
-        // Extract OTP using the actual classifier to test the detection logic
-        val testOtp = CategoryClassifier.extractHighPrecisionOtp(body) ?: "NO_OTP_FOUND"
-        val testSender = sender
-        val testBody = body
-
-        // Ensure channel exists
-        val nm = context.getSystemService(NotificationManager::class.java)
-        if (nm.getNotificationChannel(channelId) == null) {
-            val otpChannel = NotificationChannel(
-                channelId,
-                "OTP Messages",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "High-priority notifications for OTP codes"
-                enableVibration(true)
-                setShowBadge(true)
-            }
-            nm.createNotificationChannel(otpChannel)
-        }
-
-        val notificationId = testSender.hashCode()
-
-        // Create copy intent
-        val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
-            action = OtpCopyReceiver.ACTION_COPY_OTP
-            putExtra(OtpCopyReceiver.EXTRA_OTP, testOtp)
-            putExtra(OtpCopyReceiver.EXTRA_NOTIFICATION_ID, notificationId)
-        }
-
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        val copyPendingIntent = PendingIntent.getBroadcast(
-            context,
-            (testOtp.hashCode() xor testSender.hashCode()).absoluteValue,
-            copyIntent,
-            flags
-        )
-
-        val remoteViews = RemoteViews(context.packageName, R.layout.notification_otp).apply {
-            setTextViewText(R.id.notification_otp_text, testOtp)
-            setTextViewText(R.id.notification_sender_text, testSender)
-            setOnClickPendingIntent(R.id.notification_copy_button, copyPendingIntent)
-            setImageViewResource(R.id.notification_copy_button, R.drawable.ic_copy)
-        }
-
-        val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(testSender)
-            .setContentText(testBody)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setAutoCancel(true)
-            .setCustomContentView(remoteViews)
-            .setCustomBigContentView(remoteViews)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
-        }
+    private fun showToast(context: Context, @StringRes message: Int, arg: String) {
+        Toast.makeText(context, context.getString(message, arg), Toast.LENGTH_SHORT).show()
     }
 }

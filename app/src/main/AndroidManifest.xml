@@ -90,6 +90,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".MarkReadReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".SmsSentReceiver"
             android:exported="false" />
 
