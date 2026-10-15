@@ -23,8 +23,8 @@ android {
         applicationId = "com.praveenpuglia.cleansms"
         minSdk = 33
         targetSdk = 36
-        versionCode = 30500
-        versionName = "3.5.0"
+        versionCode = 30501
+        versionName = "3.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
