@@ -93,8 +93,9 @@ object CategoryClassifier {
     // A 4-digit year at the end of a date (08/10/2026, 08-10-2026, 08.10.2026, 08-Oct-2026, 8 Oct 2026)
     private val datePrefixRegex = Regex("""(?i)\b\d{1,2}\s*[/.\-]\s*(?:\d{1,2}|[a-z]{3,9})\s*[/.\-]\s*$|\b\d{1,2}\s+[a-z]{3,9},?\s+$""")
 
-    // Pattern for "is XXXX" which commonly follows OTP mentions
-    private val otpIsPatternRegex = Regex("""(?i)\bis\s*:?\s*(\d{4,8})\b""")
+    // Pattern for "is XXXX" which commonly follows OTP mentions. Some senders (GSTN) use uppercase
+    // alphanumeric codes ("is F1035A"): letters and digits both required, so words and times ("10AM") don't count
+    private val otpIsPatternRegex = Regex("""(?i:\bis)\s*:?\s*(\d{4,8}|(?!\d{1,2}[AP]M\b)(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{4,8})\b""")
 
     /**
      * Extract OTP code using multi-strategy cascade approach.
