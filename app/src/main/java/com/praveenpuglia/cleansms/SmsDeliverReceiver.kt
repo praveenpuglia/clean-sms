@@ -144,11 +144,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                     // Android adds its own "copy code" chip for detected codes; ours is already there
                     .setAllowSystemGeneratedContextualActions(false)
 
-                val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
-                    action = OtpCopyReceiver.ACTION_COPY_OTP
-                    putExtra(OtpCopyReceiver.EXTRA_OTP, otpCode)
-                    putExtra(OtpCopyReceiver.EXTRA_NOTIFICATION_ID, notificationId)
-                }
+                val copyIntent = OtpCopyReceiver.intent(context, otpCode, notificationId, threadId)
                 val copyPendingIntent = PendingIntent.getBroadcast(
                     context,
                     (otpCode.hashCode() xor address.hashCode()).absoluteValue,

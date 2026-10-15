@@ -14,7 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /** "Mark as read" on an SMS notification: marks the sender's whole thread read and dismisses it. */
-class MarkReadReceiver : BroadcastReceiver() {
+open class MarkReadReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         NotificationManagerCompat.from(context).cancel(intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1))
         val threadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)

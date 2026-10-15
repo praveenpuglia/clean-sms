@@ -98,6 +98,23 @@ class SmsDeliveryTest {
         }
     }
 
+    @Test
+    fun copyingTheOtpFromItsNotificationMarksTheThreadReadAndDismissesIt() {
+        val body = "Your OTP is 482913. Do not share it."
+        SmsDeliverReceiver.deliver(context, OTP_SENDER, body)
+        assertNotNull(postedFor(OTP_SENDER))
+        val threadId = Telephony.Threads.getOrCreateThreadId(context, OTP_SENDER)
+
+        context.sendBroadcast(OtpCopyReceiver.intent(context, "482913", OTP_SENDER.hashCode(), threadId))
+
+        val deadline = android.os.SystemClock.uptimeMillis() + 5_000
+        while (storedReadFlag(OTP_SENDER, body) != 1 && android.os.SystemClock.uptimeMillis() < deadline) {
+            android.os.SystemClock.sleep(100)
+        }
+        assertEquals(1, storedReadFlag(OTP_SENDER, body))
+        assertNull("notification still shown", notifications.activeNotifications.firstOrNull { it.id == OTP_SENDER.hashCode() })
+    }
+
     private fun storedReadFlag(address: String, body: String): Int? =
         context.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
