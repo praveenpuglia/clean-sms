@@ -2,5 +2,6 @@
 <resources>
     <string name="settings_debug">Debug</string>
     <string name="settings_test_random_otp">Test Random OTP</string>
+    <string name="settings_test_random_message">Test Random Message</string>
     <string name="settings_test_random_otp_type">Type: %1$s</string>
 </resources>
