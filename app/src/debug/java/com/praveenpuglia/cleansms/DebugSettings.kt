@@ -106,7 +106,12 @@ object DebugSettings {
             Text(stringResource(R.string.settings_test_random_otp))
         }
         OutlinedButton(
-            onClick = { messageTemplates.random().let { (sender, body) -> deliver(sender, body) } },
+            onClick = {
+                val (sender, body) = messageTemplates.random()
+                deliver(sender, body)
+                // Non-OTP SMS use the default-importance channel: status bar only, no pop-up
+                Toast.makeText(context, context.getString(R.string.settings_test_random_message_sent, sender), Toast.LENGTH_SHORT).show()
+            },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.settings_test_random_message))
