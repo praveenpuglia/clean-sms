@@ -86,6 +86,8 @@ class SenderBrandsTest {
         // Zeta's ZETAMB carries Pluxee meal-card messages.
         assertEquals("pluxee", SenderBrands.brandFor(context, "VM-ZETAMB-S"))
         assertNull("PPFASH is registered to an individual, not PPFAS", SenderBrands.brandFor(context, "VM-PPFASH-S"))
+        assertEquals("central_bank", SenderBrands.brandFor(context, "VM-CENTBK-S"))
+        assertNull("CBILTD is the staff co-op society, not the bank", SenderBrands.brandFor(context, "VM-CBILTD-S"))
         // Deliberately excluded: Aadhaar (UIDAI restricts its logo) and Qwikcilver's Amazon header.
         assertNull(SenderBrands.brandFor(context, "AD-ADHAAR-S"))
         assertNull(SenderBrands.brandFor(context, "AD-QCAMZN-S"))
