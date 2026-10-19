@@ -81,7 +81,6 @@
     { "id": "qubo", "name": "Qubo", "domain": "quboworld.com", "play": "com.hero.iot", "owners": ["Qubo Smart Living Private Limited"] },
     { "id": "tanishq", "name": "Tanishq", "domain": "tanishq.co.in", "play": "com.titancompany.tanishqapp", "owners": ["Titan Company Limited"], "headers": ["TANISQ", "TANSHQ", "TNISHQ"] },
     { "id": "razorpay", "name": "Razorpay", "domain": "razorpay.com", "play": "com.razorpay.payments.app", "owners": ["Razorpay software private limited"] },
-    { "id": "firstclub", "name": "FirstClub", "domain": "firstclub.site", "owners": ["YOURTAXEXPRESS PRIVATE LIMITED"], "headers": ["FRSCLB", "FRTCLB"] },
     { "id": "milkbasket", "name": "Milkbasket", "domain": "milkbasket.com", "owners": ["AAIDEA SOLUTIONS PVT. LTD."] },
     { "id": "experian", "name": "Experian", "domain": "experian.in", "owners": ["Experian Credit Information Company of India Private Limited"] },
     { "id": "ppfas", "name": "PPFAS Mutual Fund", "domain": "amc.ppfas.com", "owners": ["PPFAS Asset Management Pvt Ltd"] },
