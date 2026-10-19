@@ -55,8 +55,8 @@ fun ContactAvatar(
             .size(size)
             .clip(CircleShape)
             .background(background)
-            // White-backed logos and photos melt into the surface without an edge
-            .then(if (bitmap != null) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape) else Modifier),
+            // A faint edge so white-backed logos and photos don't melt into the surface
+            .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap != null) {
