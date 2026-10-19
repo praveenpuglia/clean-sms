@@ -169,7 +169,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (resolvedUri != null) {
             contactLookupUri = resolvedUri.toString()
             launchContactIntent(resolvedUri)
-        } else {
+        } else if (messageCategory == MessageCategory.PERSONAL) {
+            // Business senders (banks, services, promotions) aren't people to save, same as the inbox avatar
             openAddContactIntent(address)
         }
     }
