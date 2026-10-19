@@ -5,7 +5,6 @@ import androidx.core.net.toUri
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -23,8 +22,6 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,9 +51,7 @@ fun ContactAvatar(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(background)
-            // A faint edge so white-backed logos and photos don't melt into the surface
-            .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+            .background(background),
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap != null) {
