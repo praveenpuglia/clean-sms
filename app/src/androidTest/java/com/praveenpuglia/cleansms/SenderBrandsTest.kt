@@ -78,6 +78,14 @@ class SenderBrandsTest {
         assertEquals("playo", SenderBrands.brandFor(context, "JD-PLAYOO-S"))
         // Registered as "dezerv"; one owner across cases, so "Dezerv" falls back.
         assertEquals("dezerv", SenderBrands.brandFor(context, "VM-Dezerv-S"))
+        // Titan owns Tanishq, Fastrack, Titan and more; only the Tanishq headers get its logo.
+        assertEquals("tanishq", SenderBrands.brandFor(context, "VM-TNISHQ-S"))
+        assertNull(SenderBrands.brandFor(context, "VM-FASTRK-S"))
+        // Delivered as "AtherE" but registered only as "ATHERE".
+        assertEquals("ather", SenderBrands.brandFor(context, "VM-AtherE-S"))
+        // Zeta's ZETAMB carries Pluxee meal-card messages.
+        assertEquals("pluxee", SenderBrands.brandFor(context, "VM-ZETAMB-S"))
+        assertNull("PPFASH is registered to an individual, not PPFAS", SenderBrands.brandFor(context, "VM-PPFASH-S"))
         // Deliberately excluded: Aadhaar (UIDAI restricts its logo) and Qwikcilver's Amazon header.
         assertNull(SenderBrands.brandFor(context, "AD-ADHAAR-S"))
         assertNull(SenderBrands.brandFor(context, "AD-QCAMZN-S"))
