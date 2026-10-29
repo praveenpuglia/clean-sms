@@ -3,6 +3,8 @@ package com.praveenpuglia.cleansms
 import android.content.Context
 import androidx.core.content.edit
 import androidx.appcompat.app.AppCompatDelegate
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /** User preferences stored in the shared "CleanSmsPrefs" file. Keys are stable across releases. */
 object AppSettings {
@@ -17,6 +19,8 @@ object AppSettings {
     private const val KEY_ALL_TAB_ENABLED = "all_tab_enabled"
     private const val KEY_FONT_FAMILY = "font_family"
     private const val KEY_SHOW_SENDER_LOGOS = "show_sender_logos"
+    private const val KEY_OTP_AUTO_DELETE_AFTER = "otp_auto_delete_after_ms"
+    private const val KEY_OTP_CLEANUP_WATERMARK = "otp_cleanup_watermark"
     const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
     const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
     const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
@@ -75,6 +79,31 @@ object AppSettings {
 
     fun setShowSenderLogos(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putBoolean(KEY_SHOW_SENDER_LOGOS, enabled) }
+    }
+
+    /** How long received OTPs are kept before they're deleted automatically; [Duration.ZERO] when off. */
+    fun getOtpAutoDeleteAfter(context: Context): Duration =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getLong(KEY_OTP_AUTO_DELETE_AFTER, 0L).milliseconds
+
+    /**
+     * Turning it on also sets where checking starts: from the beginning ([includeExisting]), so OTPs
+     * already on the phone are deleted too, or from now, for new OTPs only. Changing the duration
+     * while it's on keeps that choice.
+     */
+    fun setOtpAutoDeleteAfter(context: Context, after: Duration, includeExisting: Boolean, now: Long = System.currentTimeMillis()) {
+        val wasOn = getOtpAutoDeleteAfter(context) > Duration.ZERO
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+            putLong(KEY_OTP_AUTO_DELETE_AFTER, after.inWholeMilliseconds)
+            if (!wasOn) putLong(KEY_OTP_CLEANUP_WATERMARK, if (includeExisting) 0L else now)
+        }
+    }
+
+    /** Messages dated at or before this are done: deleted, not OTPs, or older than when "new OTPs only" was chosen. */
+    fun getOtpCleanupWatermark(context: Context): Long =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getLong(KEY_OTP_CLEANUP_WATERMARK, 0L)
+
+    fun setOtpCleanupWatermark(context: Context, date: Long) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putLong(KEY_OTP_CLEANUP_WATERMARK, date) }
     }
 
     fun getAllTabEnabled(context: Context): Boolean {

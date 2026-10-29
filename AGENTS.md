@@ -131,12 +131,12 @@ adb shell cmd role add-role-holder android.app.role.SMS com.praveenpuglia.cleans
 
 Seed or re-seed (clears its own prior rows, leaves real messages alone):
 ```bash
-adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED
+adb shell am broadcast -p com.praveenpuglia.cleansms -a com.praveenpuglia.cleansms.DEBUG_SEED
 ```
 
 For performance testing, generate up to 5,000 messages across 500 threads. Keep the app open until the completion toast appears:
 ```bash
-adb shell am broadcast -a com.praveenpuglia.cleansms.DEBUG_SEED --ei count 5000
+adb shell am broadcast -p com.praveenpuglia.cleansms -a com.praveenpuglia.cleansms.DEBUG_SEED --ei count 5000
 ```
 
 Seeded rows are tagged via `service_center=CLEAN_SMS_DEBUG_SEED`. The receiver only exists in the `debug` source set, so release builds are unaffected.
