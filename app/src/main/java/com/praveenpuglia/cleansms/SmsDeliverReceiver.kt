@@ -88,7 +88,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
 
             val otpCode = CategoryClassifier.extractHighPrecisionOtp(body)
             // Set the auto-delete alarm for it, if the user opted in
-            if (otpCode != null && AppSettings.getOtpAutoDelete(context) != AppSettings.OtpAutoDelete.OFF) {
+            if (otpCode != null && AppSettings.getOtpAutoDeleteAfter(context).isPositive()) {
                 OtpCleanupReceiver.run(context)
             }
             val enriched = ContactDirectory.enrich(context, address)

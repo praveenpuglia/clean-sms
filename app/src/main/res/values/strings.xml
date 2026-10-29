@@ -51,12 +51,27 @@
     <string name="settings_otp_auto_delete_subtitle">Starred OTPs are always kept</string>
     <string name="settings_otp_auto_delete_never">Never</string>
     <string name="settings_otp_auto_delete_after">After %1$s</string>
-    <string name="settings_otp_auto_delete_hour">1 hour</string>
-    <string name="settings_otp_auto_delete_day">1 day</string>
-    <string name="settings_otp_auto_delete_week">7 days</string>
-    <string name="settings_otp_auto_delete_confirm_title">Delete OTPs automatically?</string>
-    <string name="settings_otp_auto_delete_confirm_message">OTPs will be deleted %1$s after they arrive. OTPs already on your phone that are older than that are deleted now. Starred OTPs are kept. Deleted OTPs can\'t be recovered.</string>
+    <string name="settings_otp_auto_delete_scope">Apply to</string>
+    <string name="settings_otp_auto_delete_new_only">New OTPs only</string>
+    <string name="settings_otp_auto_delete_new_only_detail">OTPs already on your phone are kept</string>
+    <string name="settings_otp_auto_delete_existing">All OTPs, including ones already here</string>
+    <string name="settings_otp_auto_delete_counting">Counting OTPs…</string>
+    <string name="settings_otp_auto_delete_none_now">None are older than %1$s yet, so nothing is deleted right away</string>
+    <plurals name="settings_otp_auto_delete_deleted_now">
+        <item quantity="one">%1$d OTP older than %2$s will be deleted right away</item>
+        <item quantity="other">%1$d OTPs older than %2$s will be deleted right away</item>
+    </plurals>
     <string name="settings_otp_auto_delete_confirm">Turn on</string>
+    <string name="settings_otp_auto_delete_save">Save</string>
+    <string name="settings_otp_auto_delete_turn_off">Turn off</string>
+    <plurals name="duration_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <plurals name="duration_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_promo_notifications_title">Promotional notifications</string>
     <string name="settings_promo_notifications_subtitle">Show alerts for sales and offers</string>

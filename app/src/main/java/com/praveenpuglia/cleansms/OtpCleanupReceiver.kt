@@ -14,9 +14,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 
 /**
- * Opt-in automatic deletion of received OTPs ([AppSettings.OtpAutoDelete]). There is no polling: one
+ * Opt-in automatic deletion of received OTPs ([AppSettings.getOtpAutoDeleteAfter]). There is no polling: one
  * inexact, non-waking alarm is set for when the oldest kept OTP falls due, and each run only checks
  * messages that became due since the last one. Starred OTPs are never deleted.
  *
@@ -53,7 +54,7 @@ class OtpCleanupReceiver : BroadcastReceiver() {
 
         /** Deletes the OTPs that are due and sets the alarm for the next one. Blocking: call off the main thread. */
         fun run(context: Context, now: Long = System.currentTimeMillis()) {
-            val keepFor = AppSettings.getOtpAutoDelete(context).after.inWholeMilliseconds
+            val keepFor = AppSettings.getOtpAutoDeleteAfter(context).inWholeMilliseconds
             val alarms = context.getSystemService(AlarmManager::class.java)
             if (keepFor == 0L) {
                 alarmIntent(context, PendingIntent.FLAG_NO_CREATE)?.let { alarms.cancel(it); it.cancel() }
@@ -62,7 +63,8 @@ class OtpCleanupReceiver : BroadcastReceiver() {
             val cutoff = now - keepFor
             try {
                 deleteDue(context, cutoff)
-                val next = oldestKeptOtpDate(context, cutoff)
+                // Messages at or before the watermark are done: deleted, or kept because the user chose new OTPs only
+                val next = oldestKeptOtpDate(context, maxOf(cutoff, AppSettings.getOtpCleanupWatermark(context)))
                 if (next == null) {
                     alarmIntent(context, PendingIntent.FLAG_NO_CREATE)?.let { alarms.cancel(it); it.cancel() }
                 } else {
@@ -86,26 +88,14 @@ class OtpCleanupReceiver : BroadcastReceiver() {
             flag or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        /** How many OTPs dated after [since] would be deleted right now if they were kept for [after]. Blocking. */
+        fun countDue(context: Context, after: Duration, since: Long, now: Long = System.currentTimeMillis()): Int =
+            dueOtps(context, since, now - after.inWholeMilliseconds).size
+
         private fun deleteDue(context: Context, cutoff: Long) {
             val checkedUpTo = AppSettings.getOtpCleanupWatermark(context)
             if (cutoff <= checkedUpTo) return
-            val starred = StarredMessages.ids(context)
-            val due = mutableMapOf<Long, String?>()
-            context.contentResolver.query(
-                Telephony.Sms.Inbox.CONTENT_URI,
-                arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS, Telephony.Sms.BODY),
-                "${Telephony.Sms.DATE} > ? AND ${Telephony.Sms.DATE} <= ?",
-                arrayOf(checkedUpTo.toString(), cutoff.toString()),
-                null,
-            )?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(0)
-                    val body = cursor.getString(2) ?: continue
-                    if (id !in starred && CategoryClassifier.extractHighPrecisionOtp(body) != null) {
-                        due[id] = cursor.getString(1)
-                    }
-                }
-            }
+            val due = dueOtps(context, checkedUpTo, cutoff)
             due.keys.chunked(DELETE_BATCH).forEach { ids ->
                 context.contentResolver.delete(
                     Telephony.Sms.CONTENT_URI,
@@ -120,14 +110,37 @@ class OtpCleanupReceiver : BroadcastReceiver() {
             if (due.isNotEmpty()) Log.i(TAG, "Deleted ${due.size} OTPs")
         }
 
-        /** Date of the oldest OTP that is still kept, or null when there is none. */
-        private fun oldestKeptOtpDate(context: Context, cutoff: Long): Long? {
+        /** Unstarred OTPs dated in (since, cutoff], as id to sender address. */
+        private fun dueOtps(context: Context, since: Long, cutoff: Long): Map<Long, String?> {
+            if (cutoff <= since) return emptyMap()
+            val starred = StarredMessages.ids(context)
+            val due = mutableMapOf<Long, String?>()
+            context.contentResolver.query(
+                Telephony.Sms.Inbox.CONTENT_URI,
+                arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS, Telephony.Sms.BODY),
+                "${Telephony.Sms.DATE} > ? AND ${Telephony.Sms.DATE} <= ?",
+                arrayOf(since.toString(), cutoff.toString()),
+                null,
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(0)
+                    val body = cursor.getString(2) ?: continue
+                    if (id !in starred && CategoryClassifier.extractHighPrecisionOtp(body) != null) {
+                        due[id] = cursor.getString(1)
+                    }
+                }
+            }
+            return due
+        }
+
+        /** Date of the oldest OTP dated after [from] that is still kept, or null when there is none. */
+        private fun oldestKeptOtpDate(context: Context, from: Long): Long? {
             val starred = StarredMessages.ids(context)
             context.contentResolver.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
                 arrayOf(Telephony.Sms._ID, Telephony.Sms.BODY, Telephony.Sms.DATE),
                 "${Telephony.Sms.DATE} > ?",
-                arrayOf(cutoff.toString()),
+                arrayOf(from.toString()),
                 "${Telephony.Sms.DATE} ASC",
             )?.use { cursor ->
                 while (cursor.moveToNext()) {

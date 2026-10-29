@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -37,6 +38,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -45,12 +48,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.Font
@@ -59,6 +64,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.praveenpuglia.cleansms.ui.theme.CleanSmsTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,7 +97,7 @@ private fun SettingsActivity.showSettingsContent() {
             mutableStateOf(AppSettings.getPromoNotificationsEnabled(this))
         }
         var showSenderLogos by remember { mutableStateOf(AppSettings.getShowSenderLogos(this)) }
-        var otpAutoDelete by remember { mutableStateOf(AppSettings.getOtpAutoDelete(this)) }
+        var otpAutoDeleteAfter by remember { mutableStateOf(AppSettings.getOtpAutoDeleteAfter(this)) }
 
         CleanSmsTheme {
             SettingsScreen(
@@ -96,7 +107,7 @@ private fun SettingsActivity.showSettingsContent() {
                 allTabEnabled = allTabEnabled,
                 promoNotificationsEnabled = promoNotificationsEnabled,
                 showSenderLogos = showSenderLogos,
-                otpAutoDelete = otpAutoDelete,
+                otpAutoDeleteAfter = otpAutoDeleteAfter,
                 versionName = BuildConfig.VERSION_NAME,
                 onBack = ::finish,
                 onThemeSelected = { selected ->
@@ -131,9 +142,17 @@ private fun SettingsActivity.showSettingsContent() {
                     showSenderLogos = enabled
                     AppSettings.setShowSenderLogos(this, enabled)
                 },
-                onOtpAutoDeleteSelected = { selected ->
-                    otpAutoDelete = selected
-                    AppSettings.setOtpAutoDelete(this, selected)
+                countOtpsDeletedNow = { after, includeExisting ->
+                    val on = AppSettings.getOtpAutoDeleteAfter(this).isPositive()
+                    when {
+                        on -> OtpCleanupReceiver.countDue(this, after, since = AppSettings.getOtpCleanupWatermark(this))
+                        includeExisting -> OtpCleanupReceiver.countDue(this, after, since = 0L)
+                        else -> 0
+                    }
+                },
+                onOtpAutoDeleteSaved = { after, includeExisting ->
+                    otpAutoDeleteAfter = after
+                    AppSettings.setOtpAutoDeleteAfter(this, after, includeExisting)
                     OtpCleanupReceiver.request(this)
                 },
                 onTermsClick = { openUrl("https://clean-sms.praveenpuglia.com/tnc") },
@@ -150,6 +169,8 @@ object SettingsTestTags {
     const val SENDER_LOGOS = "settings_sender_logos"
     const val OTP_AUTO_DELETE = "settings_otp_auto_delete"
     const val OTP_AUTO_DELETE_DIALOG = "settings_otp_auto_delete_dialog"
+    const val OTP_AUTO_DELETE_SLIDER = "settings_otp_auto_delete_slider"
+    const val OTP_AUTO_DELETE_EXISTING = "settings_otp_auto_delete_existing"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -161,7 +182,7 @@ private fun SettingsScreen(
     allTabEnabled: Boolean,
     promoNotificationsEnabled: Boolean,
     showSenderLogos: Boolean,
-    otpAutoDelete: AppSettings.OtpAutoDelete,
+    otpAutoDeleteAfter: Duration,
     versionName: String,
     onBack: () -> Unit,
     onThemeSelected: (Int) -> Unit,
@@ -170,7 +191,8 @@ private fun SettingsScreen(
     onAllTabChanged: (Boolean) -> Unit,
     onPromoNotificationsChanged: (Boolean) -> Unit,
     onShowSenderLogosChanged: (Boolean) -> Unit,
-    onOtpAutoDeleteSelected: (AppSettings.OtpAutoDelete) -> Unit,
+    countOtpsDeletedNow: (after: Duration, includeExisting: Boolean) -> Int,
+    onOtpAutoDeleteSaved: (after: Duration, includeExisting: Boolean) -> Unit,
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
 ) {
@@ -207,7 +229,7 @@ private fun SettingsScreen(
                 )
 
                 SettingsSectionTitle(stringResource(R.string.tab_otp), topPadding = 24.dp)
-                OtpAutoDeleteRow(otpAutoDelete, onOtpAutoDeleteSelected)
+                OtpAutoDeleteRow(otpAutoDeleteAfter, countOtpsDeletedNow, onOtpAutoDeleteSaved)
 
                 SettingsSectionTitle(stringResource(R.string.settings_notifications), topPadding = 24.dp)
                 SettingsSwitchRow(
@@ -381,32 +403,177 @@ private fun DefaultTabRow(
     )
 }
 
+/** Slider stops: short enough for one-off codes, long enough to look one up again. */
+private val OTP_KEEP_STOPS = listOf(1.hours, 2.hours, 3.hours, 6.hours, 12.hours, 1.days, 2.days, 3.days, 5.days, 7.days, 14.days, 30.days)
+
 @Composable
-private fun OtpAutoDeleteRow(selected: AppSettings.OtpAutoDelete, onSelected: (AppSettings.OtpAutoDelete) -> Unit) {
-    var confirming by remember { mutableStateOf<AppSettings.OtpAutoDelete?>(null) }
-    SettingsDropdownRow(
-        title = stringResource(R.string.settings_otp_auto_delete_title),
-        subtitle = stringResource(R.string.settings_otp_auto_delete_subtitle),
-        selectedLabel = selected.label(),
-        options = AppSettings.OtpAutoDelete.entries.map { it to it.label() },
-        testTag = SettingsTestTags.OTP_AUTO_DELETE,
-        // Turning it on or shortening it deletes messages right away, so ask first
-        onSelected = { choice -> if (choice == AppSettings.OtpAutoDelete.OFF) onSelected(choice) else if (choice != selected) confirming = choice },
-    )
-    confirming?.durationResource()?.let { duration ->
-        AlertDialog(
-            modifier = Modifier.testTag(SettingsTestTags.OTP_AUTO_DELETE_DIALOG),
-            onDismissRequest = { confirming = null },
-            title = { Text(stringResource(R.string.settings_otp_auto_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.settings_otp_auto_delete_confirm_message, stringResource(duration))) },
-            confirmButton = {
-                TextButton(onClick = { confirming?.let(onSelected); confirming = null }) {
-                    Text(stringResource(R.string.settings_otp_auto_delete_confirm))
-                }
-            },
-            dismissButton = { TextButton(onClick = { confirming = null }) { Text(stringResource(R.string.dialog_delete_negative)) } },
+private fun OtpAutoDeleteRow(
+    after: Duration,
+    countDeletedNow: (after: Duration, includeExisting: Boolean) -> Int,
+    onSave: (after: Duration, includeExisting: Boolean) -> Unit,
+) {
+    var editing by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(SettingsTestTags.OTP_AUTO_DELETE)
+            .clickable(role = Role.Button) { editing = true }
+            .padding(vertical = 8.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_otp_auto_delete_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = stringResource(R.string.settings_otp_auto_delete_subtitle),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        Text(
+            text = if (after.isPositive()) stringResource(R.string.settings_otp_auto_delete_after, durationLabel(after))
+            else stringResource(R.string.settings_otp_auto_delete_never),
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(start = 16.dp),
         )
     }
+    if (editing) {
+        OtpAutoDeleteDialog(
+            current = after,
+            countDeletedNow = countDeletedNow,
+            onSave = { newAfter, includeExisting -> onSave(newAfter, includeExisting); editing = false },
+            onDismiss = { editing = false },
+        )
+    }
+}
+
+@Composable
+private fun OtpAutoDeleteDialog(
+    current: Duration,
+    countDeletedNow: (after: Duration, includeExisting: Boolean) -> Int,
+    onSave: (after: Duration, includeExisting: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val isOn = current.isPositive()
+    var stop by remember {
+        mutableIntStateOf(if (isOn) OTP_KEEP_STOPS.indexOfFirst { it >= current }.takeIf { it >= 0 } ?: OTP_KEEP_STOPS.lastIndex
+        else OTP_KEEP_STOPS.indexOf(1.days))
+    }
+    // Turning it on asks whether OTPs already on the phone count too; changing it later keeps that choice.
+    var includeExisting by remember { mutableStateOf(false) }
+    val after = OTP_KEEP_STOPS[stop]
+    val deletedNow by produceState<Int?>(null, after, includeExisting) {
+        value = null
+        value = withContext(Dispatchers.IO) { countDeletedNow(after, includeExisting) }
+    }
+    val afterLabel = durationLabel(after)
+    AlertDialog(
+        modifier = Modifier.testTag(SettingsTestTags.OTP_AUTO_DELETE_DIALOG),
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_otp_auto_delete_title)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.settings_otp_auto_delete_after, afterLabel),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Slider(
+                    value = stop.toFloat(),
+                    onValueChange = { stop = it.roundToInt() },
+                    valueRange = 0f..OTP_KEEP_STOPS.lastIndex.toFloat(),
+                    steps = OTP_KEEP_STOPS.size - 2,
+                    modifier = Modifier.testTag(SettingsTestTags.OTP_AUTO_DELETE_SLIDER),
+                )
+                Row {
+                    Text(durationLabel(OTP_KEEP_STOPS.first()), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    Text(durationLabel(OTP_KEEP_STOPS.last()), style = MaterialTheme.typography.bodySmall)
+                }
+                if (!isOn) {
+                    Text(
+                        stringResource(R.string.settings_otp_auto_delete_scope),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                    )
+                    ScopeOption(
+                        selected = !includeExisting,
+                        title = stringResource(R.string.settings_otp_auto_delete_new_only),
+                        detail = stringResource(R.string.settings_otp_auto_delete_new_only_detail),
+                        onClick = { includeExisting = false },
+                    )
+                    ScopeOption(
+                        selected = includeExisting,
+                        title = stringResource(R.string.settings_otp_auto_delete_existing),
+                        detail = deletedNowText(deletedNow, afterLabel, explainNone = true),
+                        testTag = SettingsTestTags.OTP_AUTO_DELETE_EXISTING,
+                        onClick = { includeExisting = true },
+                    )
+                } else {
+                    deletedNow?.takeIf { it > 0 }?.let {
+                        Text(
+                            deletedNowText(it, afterLabel, explainNone = false),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                    }
+                }
+                Text(
+                    stringResource(R.string.settings_otp_auto_delete_subtitle),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(after, includeExisting) }) {
+                Text(stringResource(if (isOn) R.string.settings_otp_auto_delete_save else R.string.settings_otp_auto_delete_confirm))
+            }
+        },
+        dismissButton = {
+            Row {
+                if (isOn) {
+                    TextButton(onClick = { onSave(Duration.ZERO, false) }) { Text(stringResource(R.string.settings_otp_auto_delete_turn_off)) }
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_delete_negative)) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ScopeOption(selected: Boolean, title: String, detail: String, onClick: () -> Unit, testTag: String = "") {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 4.dp),
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun deletedNowText(count: Int?, afterLabel: String, explainNone: Boolean): String = when {
+    count == null -> stringResource(R.string.settings_otp_auto_delete_counting)
+    count == 0 && explainNone -> stringResource(R.string.settings_otp_auto_delete_none_now, afterLabel)
+    else -> pluralStringResource(R.plurals.settings_otp_auto_delete_deleted_now, count, count, afterLabel)
+}
+
+@Composable
+private fun durationLabel(duration: Duration): String {
+    val days = duration.inWholeDays.toInt()
+    val hours = duration.inWholeHours.toInt()
+    return if (days >= 1 && duration == days.days) pluralStringResource(R.plurals.duration_days, days, days)
+    else pluralStringResource(R.plurals.duration_hours, hours, hours)
 }
 
 @Composable
@@ -541,15 +708,3 @@ private fun AppSettings.DefaultTab.labelResource(): Int = when (this) {
     AppSettings.DefaultTab.GOVERNMENT -> R.string.category_government
 }
 
-@StringRes
-private fun AppSettings.OtpAutoDelete.durationResource(): Int? = when (this) {
-    AppSettings.OtpAutoDelete.OFF -> null
-    AppSettings.OtpAutoDelete.HOUR -> R.string.settings_otp_auto_delete_hour
-    AppSettings.OtpAutoDelete.DAY -> R.string.settings_otp_auto_delete_day
-    AppSettings.OtpAutoDelete.WEEK -> R.string.settings_otp_auto_delete_week
-}
-
-@Composable
-private fun AppSettings.OtpAutoDelete.label(): String = durationResource()
-    ?.let { stringResource(R.string.settings_otp_auto_delete_after, stringResource(it)) }
-    ?: stringResource(R.string.settings_otp_auto_delete_never)
