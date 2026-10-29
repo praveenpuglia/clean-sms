@@ -47,6 +47,16 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_organization">Organization</string>
     <string name="settings_default_tab">Default Tab</string>
+    <string name="settings_otp_auto_delete_title">Delete OTPs automatically</string>
+    <string name="settings_otp_auto_delete_subtitle">Starred OTPs are always kept</string>
+    <string name="settings_otp_auto_delete_never">Never</string>
+    <string name="settings_otp_auto_delete_after">After %1$s</string>
+    <string name="settings_otp_auto_delete_hour">1 hour</string>
+    <string name="settings_otp_auto_delete_day">1 day</string>
+    <string name="settings_otp_auto_delete_week">7 days</string>
+    <string name="settings_otp_auto_delete_confirm_title">Delete OTPs automatically?</string>
+    <string name="settings_otp_auto_delete_confirm_message">OTPs will be deleted %1$s after they arrive. OTPs already on your phone that are older than that are deleted now. Starred OTPs are kept. Deleted OTPs can\'t be recovered.</string>
+    <string name="settings_otp_auto_delete_confirm">Turn on</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_promo_notifications_title">Promotional notifications</string>
     <string name="settings_promo_notifications_subtitle">Show alerts for sales and offers</string>

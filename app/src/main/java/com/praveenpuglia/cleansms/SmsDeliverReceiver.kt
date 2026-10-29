@@ -86,6 +86,11 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Failed inserting SMS: ${e.javaClass.simpleName}")
             }
 
+            val otpCode = CategoryClassifier.extractHighPrecisionOtp(body)
+            // Set the auto-delete alarm for it, if the user opted in
+            if (otpCode != null && AppSettings.getOtpAutoDelete(context) != AppSettings.OtpAutoDelete.OFF) {
+                OtpCleanupReceiver.run(context)
+            }
             val enriched = ContactDirectory.enrich(context, address)
             val threadId = findOrCreateThreadId(context, address)
             postNotification(
@@ -99,7 +104,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                 photoUri = enriched?.photoUri,
                 lookupUri = enriched?.lookupUri,
                 category = CategoryStorage.getCategoryOrCompute(context, address, threadId),
-                otpCode = CategoryClassifier.extractHighPrecisionOtp(body),
+                otpCode = otpCode,
             )
         }
 

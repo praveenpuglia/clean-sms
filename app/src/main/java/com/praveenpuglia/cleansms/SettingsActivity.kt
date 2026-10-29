@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -85,6 +86,7 @@ private fun SettingsActivity.showSettingsContent() {
             mutableStateOf(AppSettings.getPromoNotificationsEnabled(this))
         }
         var showSenderLogos by remember { mutableStateOf(AppSettings.getShowSenderLogos(this)) }
+        var otpAutoDelete by remember { mutableStateOf(AppSettings.getOtpAutoDelete(this)) }
 
         CleanSmsTheme {
             SettingsScreen(
@@ -94,6 +96,7 @@ private fun SettingsActivity.showSettingsContent() {
                 allTabEnabled = allTabEnabled,
                 promoNotificationsEnabled = promoNotificationsEnabled,
                 showSenderLogos = showSenderLogos,
+                otpAutoDelete = otpAutoDelete,
                 versionName = BuildConfig.VERSION_NAME,
                 onBack = ::finish,
                 onThemeSelected = { selected ->
@@ -128,6 +131,11 @@ private fun SettingsActivity.showSettingsContent() {
                     showSenderLogos = enabled
                     AppSettings.setShowSenderLogos(this, enabled)
                 },
+                onOtpAutoDeleteSelected = { selected ->
+                    otpAutoDelete = selected
+                    AppSettings.setOtpAutoDelete(this, selected)
+                    OtpCleanupReceiver.request(this)
+                },
                 onTermsClick = { openUrl("https://clean-sms.praveenpuglia.com/tnc") },
                 onPrivacyClick = { openUrl("https://clean-sms.praveenpuglia.com/privacy-policy") },
             )
@@ -140,6 +148,8 @@ object SettingsTestTags {
     const val ALL_TAB = "settings_all_tab"
     const val PROMO_NOTIFICATIONS = "settings_promo_notifications"
     const val SENDER_LOGOS = "settings_sender_logos"
+    const val OTP_AUTO_DELETE = "settings_otp_auto_delete"
+    const val OTP_AUTO_DELETE_DIALOG = "settings_otp_auto_delete_dialog"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -151,6 +161,7 @@ private fun SettingsScreen(
     allTabEnabled: Boolean,
     promoNotificationsEnabled: Boolean,
     showSenderLogos: Boolean,
+    otpAutoDelete: AppSettings.OtpAutoDelete,
     versionName: String,
     onBack: () -> Unit,
     onThemeSelected: (Int) -> Unit,
@@ -159,6 +170,7 @@ private fun SettingsScreen(
     onAllTabChanged: (Boolean) -> Unit,
     onPromoNotificationsChanged: (Boolean) -> Unit,
     onShowSenderLogosChanged: (Boolean) -> Unit,
+    onOtpAutoDeleteSelected: (AppSettings.OtpAutoDelete) -> Unit,
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
 ) {
@@ -193,6 +205,9 @@ private fun SettingsScreen(
                     testTag = SettingsTestTags.ALL_TAB,
                     onCheckedChange = onAllTabChanged,
                 )
+
+                SettingsSectionTitle(stringResource(R.string.tab_otp), topPadding = 24.dp)
+                OtpAutoDeleteRow(otpAutoDelete, onOtpAutoDeleteSelected)
 
                 SettingsSectionTitle(stringResource(R.string.settings_notifications), topPadding = 24.dp)
                 SettingsSwitchRow(
@@ -349,11 +364,60 @@ private fun FontSelector(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun DefaultTabRow(
     selectedTab: AppSettings.DefaultTab,
     allTabEnabled: Boolean,
     onSelected: (AppSettings.DefaultTab) -> Unit,
+) {
+    SettingsDropdownRow(
+        title = stringResource(R.string.settings_default_tab),
+        subtitle = null,
+        selectedLabel = stringResource(selectedTab.labelResource()),
+        options = (listOf(AppSettings.DefaultTab.ALL) + AppSettings.DefaultTab.entries.filterNot { it == AppSettings.DefaultTab.ALL })
+            .filter { it != AppSettings.DefaultTab.ALL || allTabEnabled }
+            .map { it to stringResource(it.labelResource()) },
+        testTag = SettingsTestTags.DEFAULT_TAB,
+        onSelected = onSelected,
+    )
+}
+
+@Composable
+private fun OtpAutoDeleteRow(selected: AppSettings.OtpAutoDelete, onSelected: (AppSettings.OtpAutoDelete) -> Unit) {
+    var confirming by remember { mutableStateOf<AppSettings.OtpAutoDelete?>(null) }
+    SettingsDropdownRow(
+        title = stringResource(R.string.settings_otp_auto_delete_title),
+        subtitle = stringResource(R.string.settings_otp_auto_delete_subtitle),
+        selectedLabel = selected.label(),
+        options = AppSettings.OtpAutoDelete.entries.map { it to it.label() },
+        testTag = SettingsTestTags.OTP_AUTO_DELETE,
+        // Turning it on or shortening it deletes messages right away, so ask first
+        onSelected = { choice -> if (choice == AppSettings.OtpAutoDelete.OFF) onSelected(choice) else if (choice != selected) confirming = choice },
+    )
+    confirming?.durationResource()?.let { duration ->
+        AlertDialog(
+            modifier = Modifier.testTag(SettingsTestTags.OTP_AUTO_DELETE_DIALOG),
+            onDismissRequest = { confirming = null },
+            title = { Text(stringResource(R.string.settings_otp_auto_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_otp_auto_delete_confirm_message, stringResource(duration))) },
+            confirmButton = {
+                TextButton(onClick = { confirming?.let(onSelected); confirming = null }) {
+                    Text(stringResource(R.string.settings_otp_auto_delete_confirm))
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirming = null }) { Text(stringResource(R.string.dialog_delete_negative)) } },
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun <T> SettingsDropdownRow(
+    title: String,
+    subtitle: String?,
+    selectedLabel: String,
+    options: List<Pair<T, String>>,
+    testTag: String,
+    onSelected: (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Row(
@@ -362,11 +426,17 @@ private fun DefaultTabRow(
             .fillMaxWidth()
             .padding(vertical = 8.dp),
     ) {
-        Text(
-            text = stringResource(R.string.settings_default_tab),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         ExposedDropdownMenuBox(
             expanded = expanded,
             onExpandedChange = { expanded = it },
@@ -375,9 +445,9 @@ private fun DefaultTabRow(
                 onClick = { expanded = true },
                 modifier = Modifier
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                    .testTag(SettingsTestTags.DEFAULT_TAB),
+                    .testTag(testTag),
             ) {
-                Text(stringResource(selectedTab.labelResource()))
+                Text(selectedLabel)
                 Icon(
                     painter = painterResource(R.drawable.ic_arrow_drop_down),
                     contentDescription = null,
@@ -389,18 +459,15 @@ private fun DefaultTabRow(
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.width(168.dp),
             ) {
-                (listOf(AppSettings.DefaultTab.ALL) +
-                    AppSettings.DefaultTab.entries.filterNot { it == AppSettings.DefaultTab.ALL })
-                    .filter { it != AppSettings.DefaultTab.ALL || allTabEnabled }
-                    .forEach { tab ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(tab.labelResource())) },
-                            onClick = {
-                                onSelected(tab)
-                                expanded = false
-                            },
-                        )
-                    }
+                options.forEach { (value, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSelected(value)
+                            expanded = false
+                        },
+                    )
+                }
             }
         }
     }
@@ -473,3 +540,16 @@ private fun AppSettings.DefaultTab.labelResource(): Int = when (this) {
     AppSettings.DefaultTab.PROMOTIONAL -> R.string.category_promotions
     AppSettings.DefaultTab.GOVERNMENT -> R.string.category_government
 }
+
+@StringRes
+private fun AppSettings.OtpAutoDelete.durationResource(): Int? = when (this) {
+    AppSettings.OtpAutoDelete.OFF -> null
+    AppSettings.OtpAutoDelete.HOUR -> R.string.settings_otp_auto_delete_hour
+    AppSettings.OtpAutoDelete.DAY -> R.string.settings_otp_auto_delete_day
+    AppSettings.OtpAutoDelete.WEEK -> R.string.settings_otp_auto_delete_week
+}
+
+@Composable
+private fun AppSettings.OtpAutoDelete.label(): String = durationResource()
+    ?.let { stringResource(R.string.settings_otp_auto_delete_after, stringResource(it)) }
+    ?: stringResource(R.string.settings_otp_auto_delete_never)

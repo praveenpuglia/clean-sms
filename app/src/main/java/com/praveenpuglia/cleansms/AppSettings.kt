@@ -3,12 +3,18 @@ package com.praveenpuglia.cleansms
 import android.content.Context
 import androidx.core.content.edit
 import androidx.appcompat.app.AppCompatDelegate
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 /** User preferences stored in the shared "CleanSmsPrefs" file. Keys are stable across releases. */
 object AppSettings {
     enum class DefaultTab { OTP, PERSONAL, TRANSACTIONAL, SERVICE, PROMOTIONAL, GOVERNMENT, ALL }
 
     enum class FontFamily { SANS_SERIF, MONOSPACE, SYSTEM }
+
+    /** How long received OTPs are kept before they're deleted automatically. */
+    enum class OtpAutoDelete(val after: Duration) { OFF(Duration.ZERO), HOUR(1.hours), DAY(1.days), WEEK(7.days) }
 
     private const val PREFS_NAME = "CleanSmsPrefs"
     private const val KEY_THEME = "theme_mode"
@@ -17,6 +23,8 @@ object AppSettings {
     private const val KEY_ALL_TAB_ENABLED = "all_tab_enabled"
     private const val KEY_FONT_FAMILY = "font_family"
     private const val KEY_SHOW_SENDER_LOGOS = "show_sender_logos"
+    private const val KEY_OTP_AUTO_DELETE = "otp_auto_delete"
+    private const val KEY_OTP_CLEANUP_WATERMARK = "otp_cleanup_watermark"
     const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
     const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
     const val THEME_SYSTEM = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
@@ -75,6 +83,25 @@ object AppSettings {
 
     fun setShowSenderLogos(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putBoolean(KEY_SHOW_SENDER_LOGOS, enabled) }
+    }
+
+    fun getOtpAutoDelete(context: Context): OtpAutoDelete {
+        val name = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_OTP_AUTO_DELETE, null)
+        return OtpAutoDelete.entries.firstOrNull { it.name == name } ?: OtpAutoDelete.OFF
+    }
+
+    fun setOtpAutoDelete(context: Context, value: OtpAutoDelete) {
+        // Forget the watermark so the next cleanup checks every message once, old OTPs included
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit { putString(KEY_OTP_AUTO_DELETE, value.name).remove(KEY_OTP_CLEANUP_WATERMARK) }
+    }
+
+    /** Messages dated at or before this were already checked by the OTP cleanup. */
+    fun getOtpCleanupWatermark(context: Context): Long =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getLong(KEY_OTP_CLEANUP_WATERMARK, 0L)
+
+    fun setOtpCleanupWatermark(context: Context, date: Long) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putLong(KEY_OTP_CLEANUP_WATERMARK, date) }
     }
 
     fun getAllTabEnabled(context: Context): Boolean {
