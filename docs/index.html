@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clean SMS: a private SMS app for India</title>
+    <meta name="description" content="Clean SMS sorts your texts the moment they arrive, puts OTPs one tap away, and does it all on your phone. No internet permission, no ads, no trackers." />
+    <link rel="icon" href="assets/favicon.png" />
+    <meta property="og:title" content="Clean SMS" />
+    <meta property="og:description" content="OTPs up front. Inbox sorted. Nothing leaves your phone." />
+    <meta property="og:image" content="assets/light-otps.webp" />
+    <style>
+      @font-face {
+        font-family: "Google Sans Flex";
+        src: url("assets/google_sans_flex.ttf") format("truetype");
+        font-weight: 100 1000;
+        font-display: swap;
+      }
+      :root {
+        --ink: #17153a;
+        --muted: #55546e;
+        --accent: #5b45e6;
+        --accent-soft: #ece8ff;
+        --bg: #f7f5ff;
+        --bg-deep: #e9e4ff;
+        --card: #ffffff;
+        --line: rgba(23, 21, 58, 0.08);
+        --phone: #0e0d16;
+        --band: #17153a;
+        --band-ink: #f2f0ff;
+        --band-muted: #b5b2cf;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #f2f0ff;
+          --muted: #b5b2cf;
+          --accent: #a99bff;
+          --accent-soft: #2a2550;
+          --bg: #0f0e1d;
+          --bg-deep: #1a1733;
+          --card: #1b1932;
+          --line: rgba(242, 240, 255, 0.1);
+          --band: #241f4d;
+        }
+      }
+      * { box-sizing: border-box; margin: 0; }
+      html { scroll-behavior: smooth; }
+      body {
+        font-family: "Google Sans Flex", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: inherit; }
+      img { display: block; max-width: 100%; height: auto; }
+      .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+      em { font-style: normal; color: var(--accent); }
+
+      /* Nav */
+      nav { display: flex; align-items: center; gap: 24px; padding: 20px 0; }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; text-decoration: none; margin-right: auto; }
+      .brand img { width: 32px; height: 32px; border-radius: 9px; }
+      nav .link { text-decoration: none; color: var(--muted); font-size: 15px; }
+      nav .link:hover { color: var(--ink); }
+
+      /* Buttons */
+      .play {
+        display: inline-flex; align-items: center; gap: 10px;
+        padding: 14px 22px; border-radius: 999px;
+        background: var(--ink); color: var(--bg); text-decoration: none;
+        font-weight: 600; font-size: 16px;
+        transition: transform 0.15s ease;
+      }
+      .play:hover { transform: translateY(-1px); }
+      .play svg { width: 18px; height: 18px; }
+      .play.small { padding: 9px 16px; font-size: 14px; }
+      .ghost { color: var(--accent); font-weight: 600; text-decoration: none; }
+
+      /* Hero */
+      .hero {
+        background:
+          radial-gradient(800px 500px at 80% 30%, rgba(106, 61, 232, 0.18), transparent 70%),
+          linear-gradient(180deg, var(--bg), var(--bg-deep));
+        padding-bottom: 72px;
+      }
+      .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; padding-top: 40px; }
+      .eyebrow {
+        display: inline-block; padding: 6px 14px; border-radius: 999px;
+        background: var(--accent-soft); color: var(--accent);
+        font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+      }
+      h1 { font-size: clamp(40px, 6vw, 68px); line-height: 1.04; letter-spacing: -0.03em; font-weight: 720; margin: 20px 0; }
+      .lead { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 520px; }
+      .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin-top: 32px; }
+
+      /* Phones */
+      .phone {
+        padding: 10px; border-radius: 44px; background: var(--phone);
+        box-shadow: 0 40px 80px rgba(30, 20, 90, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+      }
+      /* Show the top of each screen, like a store listing, so phones don't tower over the copy */
+      .phone img { border-radius: 35px; width: 100%; aspect-ratio: 9 / 16; object-fit: cover; object-position: top; }
+      .hero-visual { position: relative; max-width: 340px; justify-self: center; width: 100%; }
+      .notif {
+        position: absolute; left: -72px; bottom: 56px; width: 300px;
+        border-radius: 26px; box-shadow: 0 24px 50px rgba(30, 20, 90, 0.3);
+      }
+
+      /* Trust strip */
+      .trust { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: -28px; position: relative; }
+      .trust div {
+        display: flex; align-items: center; gap: 12px;
+        background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+        padding: 16px 18px; font-weight: 600; font-size: 15px;
+        box-shadow: 0 10px 30px rgba(30, 20, 90, 0.06);
+      }
+      .trust svg { flex: none; width: 22px; height: 22px; color: var(--accent); }
+
+      /* Feature rows */
+      section.feature { padding: 96px 0 0; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+      .row.flip .text { order: 2; }
+      .row .phone { max-width: 300px; justify-self: center; width: 100%; }
+      .kicker { color: var(--accent); font-weight: 700; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+      h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; letter-spacing: -0.02em; font-weight: 700; margin: 12px 0 16px; }
+      .text p { color: var(--muted); font-size: 18px; max-width: 480px; }
+      .text ul { list-style: none; padding: 0; margin-top: 20px; }
+      .text li { position: relative; padding-left: 26px; margin-bottom: 10px; color: var(--muted); }
+      .text li::before { content: ""; position: absolute; left: 0; top: 9px; width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
+
+      /* Small cards */
+      .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 96px; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 24px; }
+      .card h3 { font-size: 18px; margin-bottom: 6px; }
+      .card p { color: var(--muted); font-size: 15px; }
+
+      /* Privacy band */
+      .band { background: var(--band); color: var(--band-ink); margin-top: 112px; padding: 96px 0; }
+      .band h2 { color: var(--band-ink); max-width: 720px; }
+      .band .lead { color: var(--band-muted); }
+      .band em { color: #a99bff; }
+      .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 48px; }
+      .pillars h3 { font-size: 19px; margin-bottom: 8px; }
+      .pillars p { color: var(--band-muted); }
+      .band .ghost { color: #a99bff; display: inline-block; margin-top: 40px; }
+
+      /* Closing + footer */
+      .closing { text-align: center; padding: 96px 0; }
+      .closing img { width: 72px; height: 72px; border-radius: 20px; margin: 0 auto 20px; }
+      .closing p { color: var(--muted); margin: 8px 0 28px; }
+      footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+      footer .wrap { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+      footer .links { display: flex; flex-wrap: wrap; gap: 20px; margin-left: auto; }
+      footer a { text-decoration: none; }
+      footer a:hover { color: var(--ink); }
+
+      @media (max-width: 860px) {
+        nav .link { display: none; }
+        .hero-grid, .row { grid-template-columns: 1fr; gap: 40px; }
+        .row.flip .text { order: 0; }
+        .hero-visual { max-width: 300px; }
+        .notif { left: -24px; width: 240px; bottom: 40px; }
+        .trust { grid-template-columns: 1fr 1fr; margin-top: 32px; }
+        .cards { grid-template-columns: 1fr 1fr; }
+        .pillars { grid-template-columns: 1fr; gap: 24px; }
+        section.feature { padding-top: 72px; }
+      }
+      @media (max-width: 480px) {
+        .cards { grid-template-columns: 1fr; }
+        .trust div { padding: 12px 14px; font-size: 14px; }
+        .notif { left: -8px; width: 210px; bottom: 32px; }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M6 3.5v17a1 1 0 0 0 1.5.86l14-8.5a1 1 0 0 0 0-1.72l-14-8.5A1 1 0 0 0 6 3.5Z" /></symbol>
+      <symbol id="i-nowifi" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5.1A15 15 0 0 1 22 8.8M5 12.6a10 10 0 0 1 4-2.3M14.8 10.4A10 10 0 0 1 19 12.6M8.5 16.1a5 5 0 0 1 7 0M12 20h.01M3 3l18 18" /></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6l8-3Z" /><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8.5 12l2.5 2.5 4.5-5" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2" /><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M11 18h2" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" /></symbol>
+    </svg>
+
+    <header class="hero">
+      <div class="wrap">
+        <nav>
+          <a class="brand" href="/"><img src="assets/icon.webp" alt="" />Clean SMS</a>
+          <a class="link" href="#features">Features</a>
+          <a class="link" href="#privacy">Privacy</a>
+          <a class="link" href="https://github.com/praveenpuglia/clean-sms">GitHub</a>
+          <a class="play small" href="https://play.google.com/store/apps/details?id=com.praveenpuglia.cleansms"><svg><use href="#i-play" /></svg>Get the app</a>
+        </nav>
+
+        <div class="hero-grid">
+          <div>
+            <span class="eyebrow">Built for SMS in India</span>
+            <h1>Your texts, sorted.<br /><em>Your OTPs, one tap away.</em></h1>
+            <p class="lead">
+              Clean SMS sorts every message the moment it arrives, keeps your OTPs up front, and does all of it on
+              your phone. No internet permission, no ads, no trackers.
+            </p>
+            <div class="cta">
+              <a class="play" href="https://play.google.com/store/apps/details?id=com.praveenpuglia.cleansms"><svg><use href="#i-play" /></svg>Get it on Google Play</a>
+              <a class="ghost" href="#privacy">How privacy works &rarr;</a>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <div class="phone"><img src="assets/light-otps.webp" alt="The OTPs tab in Clean SMS, listing recent codes with the code pulled out of each message" width="720" height="1616" /></div>
+            <img class="notif" src="assets/notification.webp" alt="An OTP notification showing the code in large type with a copy button" width="900" height="299" />
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="trust">
+        <div><svg><use href="#i-nowifi" /></svg>No internet permission</div>
+        <div><svg><use href="#i-shield" /></svg>No ads, no trackers</div>
+        <div><svg><use href="#i-phone" /></svg>Works fully offline</div>
+        <div><svg><use href="#i-heart" /></svg>Free</div>
+      </div>
+    </div>
+
+    <main id="features">
+      <section class="feature">
+        <div class="wrap row">
+          <div class="text">
+            <span class="kicker">Sorted</span>
+            <h2>Every message, in its place</h2>
+            <p>
+              Personal, Transactions, Services, Offers and Government each get their own tab. Clean SMS reads the
+              sender's registered TRAI header, so a sale never buries a message from your bank.
+            </p>
+            <ul>
+              <li>Sorted the moment a message arrives</li>
+              <li>Mute promotional notifications in one switch</li>
+              <li>An All tab when you want everything together</li>
+            </ul>
+          </div>
+          <div class="phone"><img src="assets/light-transactions.webp" alt="The Transactions tab with bank and payment messages" loading="lazy" width="720" height="1616" /></div>
+        </div>
+      </section>
+
+      <section class="feature">
+        <div class="wrap row flip">
+          <div class="text">
+            <span class="kicker">Recognisable</span>
+            <h2>Know who's texting at a glance</h2>
+            <p>
+              Verified business senders show their logo, matched on your phone against India's DLT sender
+              registry. Look-alike headers registered to someone else never get one.
+            </p>
+          </div>
+          <div class="phone"><img src="assets/light-services.webp" alt="The Services tab with sender logos next to each business" loading="lazy" width="720" height="1616" /></div>
+        </div>
+      </section>
+
+      <section class="feature">
+        <div class="wrap row">
+          <div class="text">
+            <span class="kicker">OTPs</span>
+            <h2>Codes that copy themselves, and clean up after</h2>
+            <p>
+              Every OTP lands in its own tab with the code pulled out. Tap to copy, or copy straight from the
+              notification.
+            </p>
+            <ul>
+              <li>Mark as read right from any notification</li>
+              <li>Optionally delete OTPs after an hour, a day, or whatever suits you</li>
+              <li>Starred OTPs are always kept</li>
+            </ul>
+          </div>
+          <div class="phone"><img src="assets/dark-otps.webp" alt="The OTPs tab in dark theme" loading="lazy" width="720" height="1616" /></div>
+        </div>
+      </section>
+
+      <section class="feature">
+        <div class="wrap row flip">
+          <div class="text">
+            <span class="kicker">Spam</span>
+            <h2>Fight spam the way TRAI asks</h2>
+            <p>
+              Messages your operator labels as spam are flagged. Report any unwanted message to TRAI's 1909 in a
+              couple of taps, written in the exact format TRAI expects and sent from the SIM that received it.
+            </p>
+          </div>
+          <div class="phone"><img src="assets/light-thread.webp" alt="A conversation in Clean SMS" loading="lazy" width="720" height="1616" /></div>
+        </div>
+      </section>
+
+      <div class="wrap cards">
+        <div class="card"><h3>Typo-proof search</h3><p>Typed "flihgt"? Your flight still shows up.</p></div>
+        <div class="card"><h3>Day or night</h3><p>A full dark theme, in colours that match your wallpaper.</p></div>
+        <div class="card"><h3>Dual SIM aware</h3><p>See which SIM got each message, and reply from the right one.</p></div>
+        <div class="card"><h3>Star what matters</h3><p>Keep important messages in their own Starred tab.</p></div>
+      </div>
+    </main>
+
+    <section class="band" id="privacy">
+      <div class="wrap">
+        <span class="kicker" style="color:#a99bff">Privacy</span>
+        <h2>Your messages <em>never leave</em> your phone.</h2>
+        <p class="lead">Not as a promise, but because the app simply can't send them anywhere.</p>
+        <div class="pillars">
+          <div>
+            <h3>No internet permission</h3>
+            <p>Clean SMS doesn't ask for internet access, so Android itself keeps it offline.</p>
+          </div>
+          <div>
+            <h3>Everything on-device</h3>
+            <p>Sorting, OTP detection, spam labels, search and sender logos all run on your phone.</p>
+          </div>
+          <div>
+            <h3>Nothing to sell</h3>
+            <p>No accounts, no analytics, no ads. There's no data to collect, so none is.</p>
+          </div>
+        </div>
+        <a class="ghost" href="/privacy-policy">Read the privacy policy &rarr;</a>
+      </div>
+    </section>
+
+    <section class="closing wrap">
+      <img src="assets/icon.webp" alt="" />
+      <h2>Give your inbox a clean start</h2>
+      <p>Free on Google Play, for Android 13 and later.</p>
+      <a class="play" href="https://play.google.com/store/apps/details?id=com.praveenpuglia.cleansms"><svg><use href="#i-play" /></svg>Get it on Google Play</a>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <span>&copy; 2026 Praveen Puglia</span>
+        <div class="links">
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/tnc">Terms &amp; Conditions</a>
+          <a href="https://github.com/praveenpuglia/clean-sms">GitHub</a>
+          <a href="mailto:praveenpuglia+playstore@gmail.com">Contact</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
