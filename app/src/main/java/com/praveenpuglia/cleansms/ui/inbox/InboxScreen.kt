@@ -15,7 +15,18 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.sin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.TooltipAnchorPosition
@@ -75,11 +86,13 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -561,112 +574,155 @@ private fun InboxTabs(
         order.forEachIndexed { index, page ->
             key(page) {
                 val isDragged = page == dragged
+                // Holding: 0 -> 1 over the long-press time as the pill rises out of the surface; sinks back if let go early
+                val press = remember { Animatable(0f) }
+                // Broken free: pops off the surface with an overshoot once the hold completes
                 val lift by animateFloatAsState(
                     targetValue = if (isDragged) 1f else 0f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
                     label = "tabLift",
                 )
                 val liftedColor = MaterialTheme.colorScheme.secondaryContainer
+                val reliefLight = MaterialTheme.colorScheme.surfaceBright
+                val reliefShade = MaterialTheme.colorScheme.onSurface
+                val surfaceColor = MaterialTheme.colorScheme.background
                 val unread = when (page) {
                     InboxPage.All -> threads.any(ThreadItem::hasUnread) || otpMessages.any(OtpMessageItem::isUnread)
                     InboxPage.Otp -> otpMessages.any(OtpMessageItem::isUnread)
                     InboxPage.Starred -> false
                     is InboxPage.CategoryPage -> threads.any { it.category == page.category && it.hasUnread }
                 }
-                Tab(
-                    selected = page == selectedPage,
-                    onClick = { onPageSelected(pages.indexOf(page)) },
-                    modifier = Modifier
-                        .height(48.dp)
-                        .testTag(MainInboxTestTags.tab(index))
-                        .onSizeChanged { widths[page] = it.width }
-                        .zIndex(if (isDragged || lift > 0.01f) 1f else 0f)
-                        .graphicsLayer {
-                            translationX = (if (isDragged) dragOffset else 0f) + (slides[page]?.value ?: 0f)
-                            scaleX = 1f + 0.1f * lift
-                            scaleY = 1f + 0.1f * lift
-                            rotationZ = if (isDragged) tilt.value else 0f
-                            shadowElevation = 6.dp.toPx() * lift.coerceAtLeast(0f)
-                            shape = LiftedTabShape
-                        }
-                        .drawBehind {
-                            if (lift > 0.01f) {
-                                drawOutline(LiftedTabShape.createOutline(size, layoutDirection, this), liftedColor.copy(alpha = lift.coerceIn(0f, 1f)))
+                fun onDrag(amount: Float) {
+                    dragOffset += amount
+                    scope.launch {
+                        tilt.animateTo((amount * 0.4f).coerceIn(-5f, 5f), spring(stiffness = Spring.StiffnessMedium))
+                        tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+                    }
+                    val at = order.indexOf(page)
+                    val next = order.getOrNull(at + 1)
+                    val previous = order.getOrNull(at - 1)
+                    // Swap once the tab is halfway over a neighbour, then shift the offset by that
+                    // neighbour's width so the tab stays under the finger.
+                    if (next != null && dragOffset > (widths[next] ?: 0) / 2f) {
+                        order = moved(at, at + 1)
+                        dragOffset -= widths[next] ?: 0
+                        slide(next, (widths[page] ?: 0).toFloat())
+                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    } else if (previous != null && dragOffset < -(widths[previous] ?: 0) / 2f) {
+                        order = moved(at, at - 1)
+                        dragOffset += widths[previous] ?: 0
+                        slide(previous, -(widths[page] ?: 0).toFloat())
+                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    }
+                }
+                fun onDrop(completed: Boolean) {
+                    slide(page, dragOffset)
+                    dragged = null
+                    dragOffset = 0f
+                    scope.launch { tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                    scope.launch { press.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+                    if (completed) {
+                        haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                        if (order != pages) onReorder(order)
+                    } else {
+                        order = pages
+                    }
+                }
+                // The rising relief is the press feedback; the standard ripple would flash a flat grey pill over it
+                CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                    Tab(
+                        selected = page == selectedPage,
+                        onClick = { onPageSelected(pages.indexOf(page)) },
+                        modifier = Modifier
+                            .height(48.dp)
+                            .testTag(MainInboxTestTags.tab(index))
+                            .onSizeChanged { widths[page] = it.width }
+                            .zIndex(if (isDragged || lift > 0.01f || press.value > 0.01f) 1f else 0f)
+                            .graphicsLayer {
+                                val rising = press.value
+                                // A faint shiver near the end of the hold, as if straining against the surface
+                                val strain = ((rising - 0.6f) / 0.4f).coerceIn(0f, 1f) * (1f - lift.coerceIn(0f, 1f))
+                                translationX = (if (isDragged) dragOffset else 0f) + (slides[page]?.value ?: 0f) +
+                                    sin(rising * 70f) * 0.8.dp.toPx() * strain
+                                val scale = 1f + 0.03f * rising + 0.07f * lift
+                                scaleX = scale
+                                scaleY = scale
+                                rotationZ = if (isDragged) tilt.value else 0f
+                                // A real shadow only once it has broken free: drawn under the whole shape, it would show
+                                // through the still-translucent rising pill as a flat grey blob.
+                                shadowElevation = 6.dp.toPx() * lift.coerceAtLeast(0f)
+                                shape = LiftedTabShape
                             }
-                        }
-                        .pointerInput(page) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = {
+                            .drawBehind {
+                                val rising = press.value
+                                val solid = lift.coerceIn(0f, 1f)
+                                if (rising > 0.01f || solid > 0.01f) {
+                                    val outline = LiftedTabShape.createOutline(size, layoutDirection, this)
+                                    // The relief: lit from above with a thin contact shadow peeking out below,
+                                    // giving way to the flat pill once it breaks free
+                                    val relief = rising * (1f - solid)
+                                    if (relief > 0.01f) {
+                                        translate(top = 1.5.dp.toPx() * relief) { drawOutline(outline, reliefShade.copy(alpha = 0.18f * relief)) }
+                                    }
+                                    drawOutline(outline, surfaceColor) // opaque, so no shadow shows through the tint
+                                    drawOutline(outline, liftedColor.copy(alpha = maxOf(0.45f * rising, solid)))
+                                    if (relief > 0.01f) {
+                                        drawOutline(outline, Brush.verticalGradient(listOf(reliefLight.copy(alpha = 0.55f * relief), reliefShade.copy(alpha = 0.10f * relief))))
+                                        drawOutline(outline, reliefLight.copy(alpha = 0.8f * relief), style = Stroke(1.dp.toPx()))
+                                    }
+                                }
+                            }
+                            .pointerInput(page) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    val rise = scope.launch {
+                                        press.animateTo(1f, tween(viewConfiguration.longPressTimeoutMillis.toInt(), easing = FastOutLinearInEasing))
+                                    }
+                                    val held = awaitLongPressOrCancellation(down.id)
+                                    if (held == null) {
+                                        // Let go (a tap) or moved away (a scroll) before breaking free
+                                        rise.cancel()
+                                        scope.launch { press.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) }
+                                        return@awaitEachGesture
+                                    }
                                     heldSelectedIndex = order.indexOf(selectedPage).coerceAtLeast(0)
                                     dragged = page
                                     dragOffset = 0f
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                },
-                                onDrag = { change, amount ->
-                                    change.consume()
-                                    dragOffset += amount.x
-                                    scope.launch {
-                                        tilt.animateTo((amount.x * 0.4f).coerceIn(-5f, 5f), spring(stiffness = Spring.StiffnessMedium))
-                                        tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+                                    val completed = drag(held.id) { change ->
+                                        onDrag(change.positionChange().x)
+                                        change.consume()
                                     }
-                                    val at = order.indexOf(page)
-                                    val next = order.getOrNull(at + 1)
-                                    val previous = order.getOrNull(at - 1)
-                                    // Swap once the tab is halfway over a neighbour, then shift the offset by that
-                                    // neighbour's width so the tab stays under the finger.
-                                    if (next != null && dragOffset > (widths[next] ?: 0) / 2f) {
-                                        order = moved(at, at + 1)
-                                        dragOffset -= widths[next] ?: 0
-                                        slide(next, (widths[page] ?: 0).toFloat())
-                                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                    } else if (previous != null && dragOffset < -(widths[previous] ?: 0) / 2f) {
-                                        order = moved(at, at - 1)
-                                        dragOffset += widths[previous] ?: 0
-                                        slide(previous, -(widths[page] ?: 0).toFloat())
-                                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                    }
-                                },
-                                onDragEnd = {
-                                    slide(page, dragOffset)
-                                    dragged = null
-                                    dragOffset = 0f
-                                    scope.launch { tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                                    haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
-                                    if (order != pages) onReorder(order)
-                                },
-                                onDragCancel = {
-                                    slide(page, dragOffset)
-                                    dragged = null
-                                    dragOffset = 0f
-                                    scope.launch { tilt.animateTo(0f) }
-                                    order = pages
-                                },
-                            )
-                        }
-                        // Dragging is hard with a screen reader, so offer the same moves as actions
-                        .semantics {
-                            customActions = buildList {
-                                if (index > 0) add(CustomAccessibilityAction(moveLeft) { onReorder(moved(index, index - 1)); true })
-                                if (index < order.lastIndex) add(CustomAccessibilityAction(moveRight) { onReorder(moved(index, index + 1)); true })
+                                    // Don't let the release also count as a tap on the tab
+                                    currentEvent.changes.forEach { if (it.changedToUp()) it.consume() }
+                                    onDrop(completed)
+                                }
+                            }
+                            // Dragging is hard with a screen reader, so offer the same moves as actions
+                            .semantics {
+                                customActions = buildList {
+                                    if (index > 0) add(CustomAccessibilityAction(moveLeft) { onReorder(moved(index, index - 1)); true })
+                                    if (index < order.lastIndex) add(CustomAccessibilityAction(moveRight) { onReorder(moved(index, index + 1)); true })
+                                }
+                            },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (promoMuted && page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_notifications_off),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(end = 6.dp).size(16.dp),
+                                    )
+                                }
+                                Box {
+                                    Text(pageLabel(page), modifier = Modifier.padding(end = 8.dp))
+                                    if (unread) Box(Modifier.align(Alignment.TopEnd).offset(y = (-2).dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
+                                }
                             }
                         },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (promoMuted && page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL) {
-                                Icon(
-                                    painterResource(R.drawable.ic_notifications_off),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(end = 6.dp).size(16.dp),
-                                )
-                            }
-                            Box {
-                                Text(pageLabel(page), modifier = Modifier.padding(end = 8.dp))
-                                if (unread) Box(Modifier.align(Alignment.TopEnd).offset(y = (-2).dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
-                            }
-                        }
-                    },
-                )
+                    )
+                }
             }
         }
     }
