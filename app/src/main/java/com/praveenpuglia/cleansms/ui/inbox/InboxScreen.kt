@@ -1,5 +1,12 @@
 package com.praveenpuglia.cleansms.ui.inbox
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -10,6 +17,7 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.zIndex
@@ -61,6 +69,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -92,6 +101,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.praveenpuglia.cleansms.AvatarColorResolver
@@ -492,13 +502,38 @@ private fun InboxTabs(
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val widths = remember { mutableStateMapOf<InboxPage, Int>() }
     val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    // Tabs that just changed slot start from where they were drawn and spring into place:
+    // neighbours sliding into the gap, and the dropped tab settling.
+    val slides = remember { mutableStateMapOf<InboxPage, Animatable<Float, AnimationVector1D>>() }
+    fun slide(page: InboxPage, from: Float) {
+        val offset = slides.getOrPut(page) { Animatable(0f) }
+        scope.launch {
+            offset.snapTo(offset.value + from)
+            offset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+        }
+    }
+    // The held tab leans into the direction it's moving and wobbles level when it stops
+    val tilt = remember { Animatable(0f) }
     val selectedPage = pages.getOrNull(selectedPageIndex)
     val moveLeft = stringResource(R.string.tab_move_left)
     val moveRight = stringResource(R.string.tab_move_right)
     fun moved(from: Int, to: Int) = order.toMutableList().apply { add(to, removeAt(from)) }
 
+    // The row scrolls to keep the selected tab's slot in view whenever that slot changes. Hold the slot
+    // still while dragging, or the row slides under the finger each time the held tab passes the selected one.
+    var heldSelectedIndex by remember { mutableIntStateOf(0) }
+    val selectedSlot = if (dragged != null) heldSelectedIndex else order.indexOf(selectedPage).coerceAtLeast(0)
+    // That held slot may belong to another tab mid-drag, so the underline fades out until the drop.
+    val indicatorAlpha by animateFloatAsState(if (dragged != null) 0f else 1f, label = "tabIndicator")
     PrimaryScrollableTabRow(
-        selectedTabIndex = order.indexOf(selectedPage).coerceAtLeast(0),
+        selectedTabIndex = selectedSlot,
+        indicator = {
+            TabRowDefaults.PrimaryIndicator(
+                Modifier.tabIndicatorOffset(selectedSlot, matchContentSize = true).alpha(indicatorAlpha),
+                width = Dp.Unspecified,
+            )
+        },
         edgePadding = 20.dp,
         containerColor = Color.Transparent,
         divider = {},
@@ -507,6 +542,12 @@ private fun InboxTabs(
         order.forEachIndexed { index, page ->
             key(page) {
                 val isDragged = page == dragged
+                val lift by animateFloatAsState(
+                    targetValue = if (isDragged) 1f else 0f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    label = "tabLift",
+                )
+                val liftedColor = MaterialTheme.colorScheme.secondaryContainer
                 val unread = when (page) {
                     InboxPage.All -> threads.any(ThreadItem::hasUnread) || otpMessages.any(OtpMessageItem::isUnread)
                     InboxPage.Otp -> otpMessages.any(OtpMessageItem::isUnread)
@@ -520,21 +561,22 @@ private fun InboxTabs(
                         .height(48.dp)
                         .testTag(MainInboxTestTags.tab(index))
                         .onSizeChanged { widths[page] = it.width }
-                        .zIndex(if (isDragged) 1f else 0f)
+                        .zIndex(if (isDragged || lift > 0.01f) 1f else 0f)
                         .graphicsLayer {
-                            if (isDragged) {
-                                translationX = dragOffset
-                                scaleX = 1.08f
-                                scaleY = 1.08f
-                            }
+                            translationX = (if (isDragged) dragOffset else 0f) + (slides[page]?.value ?: 0f)
+                            scaleX = 1f + 0.1f * lift
+                            scaleY = 1f + 0.1f * lift
+                            rotationZ = if (isDragged) tilt.value else 0f
+                            shadowElevation = 6.dp.toPx() * lift.coerceAtLeast(0f)
+                            shape = RoundedCornerShape(24.dp)
                         }
-                        .background(
-                            if (isDragged) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                            RoundedCornerShape(24.dp),
-                        )
+                        .drawBehind {
+                            if (lift > 0.01f) drawRoundRect(liftedColor.copy(alpha = lift.coerceIn(0f, 1f)), cornerRadius = CornerRadius(24.dp.toPx()))
+                        }
                         .pointerInput(page) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = {
+                                    heldSelectedIndex = order.indexOf(selectedPage).coerceAtLeast(0)
                                     dragged = page
                                     dragOffset = 0f
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -542,6 +584,10 @@ private fun InboxTabs(
                                 onDrag = { change, amount ->
                                     change.consume()
                                     dragOffset += amount.x
+                                    scope.launch {
+                                        tilt.animateTo((amount.x * 0.4f).coerceIn(-5f, 5f), spring(stiffness = Spring.StiffnessMedium))
+                                        tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+                                    }
                                     val at = order.indexOf(page)
                                     val next = order.getOrNull(at + 1)
                                     val previous = order.getOrNull(at - 1)
@@ -550,21 +596,28 @@ private fun InboxTabs(
                                     if (next != null && dragOffset > (widths[next] ?: 0) / 2f) {
                                         order = moved(at, at + 1)
                                         dragOffset -= widths[next] ?: 0
+                                        slide(next, (widths[page] ?: 0).toFloat())
                                         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     } else if (previous != null && dragOffset < -(widths[previous] ?: 0) / 2f) {
                                         order = moved(at, at - 1)
                                         dragOffset += widths[previous] ?: 0
+                                        slide(previous, -(widths[page] ?: 0).toFloat())
                                         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     }
                                 },
                                 onDragEnd = {
+                                    slide(page, dragOffset)
                                     dragged = null
                                     dragOffset = 0f
+                                    scope.launch { tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                                    haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                                     if (order != pages) onReorder(order)
                                 },
                                 onDragCancel = {
+                                    slide(page, dragOffset)
                                     dragged = null
                                     dragOffset = 0f
+                                    scope.launch { tilt.animateTo(0f) }
                                     order = pages
                                 },
                             )
