@@ -116,7 +116,12 @@ class ThreadDetailScreenTest {
                     contactAddress = "+919876543210",
                     contactPhotoUri = null,
                     category = MessageCategory.PERSONAL,
-                    messages = listOf(message(1, "Queued", type = 4), message(2, "Delivered", type = 2), message(3, "Bounced", type = 5)),
+                    messages = listOf(
+                        message(1, "Queued", type = 4),
+                        message(2, "Sent", type = 2),
+                        message(3, "Bounced", type = 5),
+                        message(4, "Arrived", type = 2, status = 0),
+                    ),
                     messageText = "",
                     showComposer = true,
                     selectedSimNumber = null,
@@ -137,14 +142,15 @@ class ThreadDetailScreenTest {
             }
         }
 
-        // Only the confirmed message gets a tick; the failed one says so; the queued one shows neither.
+        // Sent gets a tick, a delivery report a double tick; the failed one says so; the queued one shows neither.
         composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Delivered", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onAllNodesWithText("Not sent", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onNode(hasText("Not sent") and hasAnyAncestor(hasTestTag(ThreadDetailTestTags.message(3))), useUnmergedTree = true)
             .assertExists()
     }
 
-    private fun message(id: Long, body: String, type: Int) = Message(
+    private fun message(id: Long, body: String, type: Int, status: Int = -1) = Message(
         id = id,
         threadId = 10,
         address = "+919876543210",
@@ -152,6 +158,6 @@ class ThreadDetailScreenTest {
         date = System.currentTimeMillis(),
         type = type,
         simSlot = 1,
-        status = 0,
+        status = status,
     )
 }

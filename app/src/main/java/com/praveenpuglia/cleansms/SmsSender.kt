@@ -16,7 +16,8 @@ object SmsSender {
 
     /**
      * Records [body] in the Outbox, sends it (split into parts when needed) and lets
-     * [SmsSentReceiver] move it to Sent or Failed once the radio reports back. The default SMS app
+     * [SmsSentReceiver] move it to Sent or Failed once the radio reports back, and record the
+     * delivery report when the user turned those on. The default SMS app
      * must do this bookkeeping itself. Throws [SecurityException]/[IllegalArgumentException] when
      * the send can't even be queued; the row is marked Failed first. Blocking: call off the main
      * thread when possible.
@@ -27,11 +28,14 @@ object SmsSender {
         val manager = subscriptionId?.let(default::createForSubscriptionId) ?: default
         val parts = manager.divideMessage(body)
         val sentIntent = row?.let { sentIntent(context, it) }
+        val deliveryIntent = row?.takeIf { AppSettings.getDeliveryReportsEnabled(context) }?.let { deliveryIntent(context, it) }
         try {
             if (parts.size > 1) {
-                manager.sendMultipartTextMessage(address, null, parts, sentIntent?.let { pi -> ArrayList(parts.map { pi }) }, null)
+                // Only the last part asks for a report, so a half-arrived message never reads Delivered.
+                val deliveryIntents = deliveryIntent?.let { pi -> ArrayList(parts.indices.map { if (it == parts.lastIndex) pi else null }) }
+                manager.sendMultipartTextMessage(address, null, parts, sentIntent?.let { pi -> ArrayList(parts.map { pi }) }, deliveryIntents)
             } else {
-                manager.sendTextMessage(address, null, body, sentIntent, null)
+                manager.sendTextMessage(address, null, body, sentIntent, deliveryIntent)
             }
         } catch (e: RuntimeException) {
             row?.let { SmsSentReceiver.markFailed(context, it) }
@@ -45,6 +49,14 @@ object SmsSender {
         // The row URI as data keeps each message's PendingIntent distinct.
         Intent(SmsSentReceiver.ACTION_SMS_SENT, row, context, SmsSentReceiver::class.java),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    // Mutable so the radio can attach the status report PDU; explicit, so only our receiver gets it.
+    private fun deliveryIntent(context: Context, row: Uri): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        0,
+        Intent(SmsSentReceiver.ACTION_SMS_DELIVERED, row, context, SmsSentReceiver::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
     )
 
     /** Inserts the Outbox row; null when the provider refuses (sending still proceeds untracked). */

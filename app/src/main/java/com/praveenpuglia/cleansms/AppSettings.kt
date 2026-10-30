@@ -19,6 +19,7 @@ object AppSettings {
     private const val KEY_ALL_TAB_ENABLED = "all_tab_enabled"
     private const val KEY_FONT_FAMILY = "font_family"
     private const val KEY_SHOW_SENDER_LOGOS = "show_sender_logos"
+    private const val KEY_DELIVERY_REPORTS = "delivery_reports"
     private const val KEY_OTP_AUTO_DELETE_AFTER = "otp_auto_delete_after_ms"
     private const val KEY_TAB_ORDER = "tab_order"
     private const val KEY_TAB_REORDER_HINT_SEEN = "tab_reorder_hint_seen"
@@ -81,6 +82,14 @@ object AppSettings {
 
     fun setShowSenderLogos(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putBoolean(KEY_SHOW_SENDER_LOGOS, enabled) }
+    }
+
+    // Off by default: some carriers charge for delivery reports.
+    fun getDeliveryReportsEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_DELIVERY_REPORTS, false)
+
+    fun setDeliveryReportsEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putBoolean(KEY_DELIVERY_REPORTS, enabled) }
     }
 
     /** How long received OTPs are kept before they're deleted automatically; [Duration.ZERO] when off. */
