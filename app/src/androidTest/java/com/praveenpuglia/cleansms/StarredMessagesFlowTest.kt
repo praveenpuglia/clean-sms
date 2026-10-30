@@ -36,6 +36,7 @@ class StarredMessagesFlowTest {
     @Before
     fun setUp() {
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
         AppSettings.setOnboardingCompleted(context)
         messageId = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, ContentValues().apply {
             put(Telephony.Sms.ADDRESS, ADDRESS)
