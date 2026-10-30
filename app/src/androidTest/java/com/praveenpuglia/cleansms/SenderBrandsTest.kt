@@ -88,6 +88,12 @@ class SenderBrandsTest {
         assertNull("PPFASH is registered to an individual, not PPFAS", SenderBrands.brandFor(context, "VM-PPFASH-S"))
         assertEquals("central_bank", SenderBrands.brandFor(context, "VM-CENTBK-S"))
         assertNull("CBILTD is the staff co-op society, not the bank", SenderBrands.brandFor(context, "VM-CBILTD-S"))
+        // Operators register headers for others (campaigns, election and government notices); only their own get the logo
+        assertEquals("jio", SenderBrands.brandFor(context, "JM-JIOINF-S"))
+        assertNull("REGINF is registered to Jio but isn't a Jio service", SenderBrands.brandFor(context, "VM-REGINF-S"))
+        assertNull(SenderBrands.brandFor(context, "VM-AMSHAH-S"))
+        assertEquals("airtel", SenderBrands.brandFor(context, "VM-AIRSVC-S"))
+        assertNull("ECIGOV is the Election Commission, sent via Airtel", SenderBrands.brandFor(context, "VM-ECIGOV-G"))
         // Deliberately excluded: Aadhaar (UIDAI restricts its logo) and Qwikcilver's Amazon header.
         assertNull(SenderBrands.brandFor(context, "AD-ADHAAR-S"))
         assertNull(SenderBrands.brandFor(context, "AD-QCAMZN-S"))
