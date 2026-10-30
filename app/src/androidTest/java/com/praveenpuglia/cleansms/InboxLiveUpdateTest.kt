@@ -195,12 +195,14 @@ class InboxLiveUpdateTest {
             }
             composeRule.onNodeWithTag(MainInboxTestTags.message(id)).performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) { readFor(id) == 1 }
+            // Back only once the thread is on screen, or it closes search instead.
+            waitForTag(ThreadDetailTestTags.message(id))
             Espresso.pressBack()
 
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag(MainInboxTestTags.messageUnread(id), useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                composeRule.onAllNodesWithTag(MainInboxTestTags.message(id)).fetchSemanticsNodes().isNotEmpty() &&
+                    composeRule.onAllNodesWithTag(MainInboxTestTags.messageUnread(id), useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
             }
-            waitForTag(MainInboxTestTags.message(id))
         }
     }
 
