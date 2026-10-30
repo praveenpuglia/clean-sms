@@ -48,6 +48,8 @@ class InboxLiveUpdateTest {
             .putBoolean("onboarding_completed", true).commit()
         AppSettings.setAllTabEnabled(context, false)
         AppSettings.setDefaultTab(context, AppSettings.DefaultTab.OTP)
+        AppSettings.setTabOrder(context, emptyList())
+        AppSettings.setTabReorderHintSeen(context)
         cleanUp()
     }
 

@@ -42,6 +42,8 @@ class InboxRotationTest {
         AppSettings.setOnboardingCompleted(context)
         AppSettings.setAllTabEnabled(context, false)
         AppSettings.setDefaultTab(context, AppSettings.DefaultTab.OTP)
+        AppSettings.setTabOrder(context, emptyList())
+        AppSettings.setTabReorderHintSeen(context)
         cleanUp()
         context.contentResolver.insert(
             Telephony.Sms.Inbox.CONTENT_URI,

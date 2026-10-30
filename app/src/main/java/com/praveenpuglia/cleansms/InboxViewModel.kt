@@ -17,6 +17,8 @@ import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.praveenpuglia.cleansms.ui.inbox.InboxPage
+import com.praveenpuglia.cleansms.ui.inbox.key
+import com.praveenpuglia.cleansms.ui.inbox.orderPages
 import java.util.LinkedHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -493,6 +495,15 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         updatePagerContent()
     }
 
+    /** The user dragged tabs into [newOrder]: keep the same page selected and remember the order. */
+    fun reorderPages(newOrder: List<InboxPage>) {
+        if (newOrder.toSet() != pages.toSet()) return
+        val selected = pages.getOrNull(selectedPageIndex)
+        pages = newOrder
+        selectedPageIndex = newOrder.indexOf(selected).coerceAtLeast(0)
+        AppSettings.setTabOrder(app, newOrder.map { it.key })
+    }
+
     fun selectPage(index: Int) {
         if (index !in pages.indices) return
         if (selectedPageIndex == index) {
@@ -632,7 +643,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun buildPagerPages(allTabEnabled: Boolean): List<InboxPage> {
         val base = listOf(InboxPage.Otp) + categories.map { InboxPage.CategoryPage(it) } + InboxPage.Starred
-        return if (allTabEnabled) listOf(InboxPage.All) + base else base
+        return orderPages(if (allTabEnabled) listOf(InboxPage.All) + base else base, AppSettings.getTabOrder(app))
     }
 
     private fun selectionCount(): Int = selectedThreadIds.size + selectedMessageIds.size

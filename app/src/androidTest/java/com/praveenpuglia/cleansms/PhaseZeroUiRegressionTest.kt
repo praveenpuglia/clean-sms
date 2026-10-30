@@ -89,6 +89,8 @@ class PhaseZeroUiRegressionTest {
     fun settingsPersistAndDisablingAllRepairsTheDefaultTab() {
         AppSettings.setAllTabEnabled(context, true)
         AppSettings.setDefaultTab(context, AppSettings.DefaultTab.ALL)
+        AppSettings.setTabOrder(context, emptyList())
+        AppSettings.setTabReorderHintSeen(context)
         AppSettings.setPromoNotificationsEnabled(context, true)
 
         ActivityScenario.launch(SettingsActivity::class.java).use {
@@ -168,6 +170,8 @@ class PhaseZeroUiRegressionTest {
         prepareSeededInbox()
         AppSettings.setAllTabEnabled(context, true)
         AppSettings.setDefaultTab(context, AppSettings.DefaultTab.OTP)
+        AppSettings.setTabOrder(context, emptyList())
+        AppSettings.setTabReorderHintSeen(context)
         val momThreadId = threadIdFor("+919876543210")
         val googleMessageId = messageIdFor("VK-GOOGLE-T", "G-892341")
         val axisMessageId = messageIdFor("VK-AXISBK-T", "OTP for txn")

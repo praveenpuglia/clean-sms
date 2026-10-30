@@ -1,6 +1,60 @@
 package com.praveenpuglia.cleansms.ui.inbox
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import kotlin.math.sin
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.absoluteValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.RichTooltip
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
@@ -39,10 +93,13 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +128,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.praveenpuglia.cleansms.AvatarColorResolver
@@ -91,6 +149,28 @@ sealed interface InboxPage {
     data class CategoryPage(val category: MessageCategory) : InboxPage
 }
 
+/** Stable name for a page, used to save the user's tab order. */
+val InboxPage.key: String
+    get() = when (this) {
+        InboxPage.All -> "ALL"
+        InboxPage.Otp -> "OTP"
+        InboxPage.Starred -> "STARRED"
+        is InboxPage.CategoryPage -> category.name
+    }
+
+/**
+ * [defaults] in the user's saved order. A page the saved order doesn't know (say the All tab was turned
+ * on later) goes right after the page it follows by default, or first if it is first by default; saved
+ * keys for pages that no longer exist are dropped.
+ */
+fun orderPages(defaults: List<InboxPage>, savedKeys: List<String>): List<InboxPage> {
+    val ordered = savedKeys.mapNotNull { key -> defaults.firstOrNull { it.key == key } }.distinct().toMutableList()
+    defaults.forEachIndexed { index, page ->
+        if (page !in ordered) ordered.add(defaults.getOrNull(index - 1)?.let { ordered.indexOf(it) + 1 } ?: 0, page)
+    }
+    return ordered
+}
+
 object MainInboxTestTags {
     const val HEADER = "main_header"
     const val TABS = "main_tabs"
@@ -106,6 +186,7 @@ object MainInboxTestTags {
     const val DELETE_DIALOG = "main_delete_dialog"
     fun tab(index: Int) = "main_tab_$index"
     fun tabUnread(index: Int) = "main_tab_unread_$index"
+    const val TAB_REORDER_HINT = "main_tab_reorder_hint"
     fun thread(id: Long) = "main_thread_$id"
     fun unreadBadge(threadId: Long) = "main_unread_badge_$threadId"
     fun otp(id: Long) = "main_otp_$id"
@@ -152,6 +233,9 @@ fun InboxScreen(
     onDeleteRequest: () -> Unit,
     onDeleteConfirm: () -> Unit,
     onDeleteDismiss: () -> Unit,
+    onReorderPages: (List<InboxPage>) -> Unit = {},
+    showTabReorderHint: Boolean = false,
+    onTabReorderHintSeen: () -> Unit = {},
 ) {
     if (showDeleteDialog) {
         val count = selectedThreadIds.size + selectedMessageIds.size
@@ -188,7 +272,10 @@ fun InboxScreen(
                     selectionMode = selectionMode,
                     selectionCount = selectedThreadIds.size + selectedMessageIds.size,
                     promoMuted = promoMuted,
+                    showTabReorderHint = showTabReorderHint,
                     onPageSelected = onPageSelected,
+                    onReorderPages = onReorderPages,
+                    onTabReorderHintSeen = onTabReorderHintSeen,
                     onSearch = { onSearchModeChange(true) },
                     onUnreadOnlyChange = onUnreadOnlyChange,
                     onOpenStats = onOpenStats,
@@ -299,7 +386,10 @@ private fun InboxHeader(
     selectionMode: Boolean,
     selectionCount: Int,
     promoMuted: Boolean,
+    showTabReorderHint: Boolean,
     onPageSelected: (Int) -> Unit,
+    onReorderPages: (List<InboxPage>) -> Unit,
+    onTabReorderHintSeen: () -> Unit,
     onSearch: () -> Unit,
     onUnreadOnlyChange: (Boolean) -> Unit,
     onOpenStats: () -> Unit,
@@ -382,9 +472,55 @@ private fun InboxHeader(
                     modifier = Modifier.padding(start = 28.dp, top = 6.dp).height(32.dp).testTag(MainInboxTestTags.UNREAD_CHIP),
                 )
             }
-            InboxTabs(pages, selectedPageIndex, allThreads, otpMessages, promoMuted, onPageSelected)
+            TabReorderHint(show = showTabReorderHint && !selectionMode, onSeen = onTabReorderHintSeen) {
+                InboxTabs(pages, selectedPageIndex, allThreads, otpMessages, promoMuted, onPageSelected) { newOrder ->
+                    onReorderPages(newOrder)
+                    onTabReorderHintSeen()
+                }
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
+    }
+}
+
+/** One-time tip, anchored under the tabs, that they can be rearranged. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TabReorderHint(show: Boolean, onSeen: () -> Unit, content: @Composable () -> Unit) {
+    val state = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(show) {
+        if (!show) return@LaunchedEffect
+        delay(800) // let the inbox settle first
+        try {
+            state.show()
+        } finally {
+            onSeen() // dismissing ends show() by cancelling it, so this can't follow it normally
+        }
+    }
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+        tooltip = {
+            RichTooltip(
+                modifier = Modifier.testTag(MainInboxTestTags.TAB_REORDER_HINT),
+                title = { Text(stringResource(R.string.tab_reorder_hint_title)) },
+                action = { TextButton(onClick = { scope.launch { state.dismiss() } }) { Text(stringResource(R.string.tab_reorder_hint_ok)) } },
+            ) { Text(stringResource(R.string.tab_reorder_hint_body)) }
+        },
+        state = state,
+        enableUserInput = false,
+    ) { content() }
+}
+
+/**
+ * The held tab's pill: shorter than the 48dp tab and centred, so it stays inside the tab row (which clips)
+ * even when scaled up and casting a shadow.
+ */
+private val LiftedTabShape = object : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val height = with(density) { 36.dp.toPx() }.coerceAtMost(size.height)
+        val top = (size.height - height) / 2
+        return Outline.Rounded(RoundRect(0f, top, size.width, top + height, CornerRadius(height / 2)))
     }
 }
 
@@ -396,43 +532,260 @@ private fun InboxTabs(
     otpMessages: List<OtpMessageItem>,
     promoMuted: Boolean,
     onPageSelected: (Int) -> Unit,
+    onReorder: (List<InboxPage>) -> Unit,
 ) {
+    // Tabs move in this local order while one is dragged; the new order is handed over on release,
+    // so the pages and lists don't reshuffle under the finger.
+    var order by remember(pages) { mutableStateOf(pages) }
+    var dragged by remember { mutableStateOf<InboxPage?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragTravel by remember { mutableFloatStateOf(0f) } // how far the finger has moved since pickup
+    val widths = remember { mutableStateMapOf<InboxPage, Int>() }
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    // Tabs that just changed slot start from where they were drawn and spring into place:
+    // neighbours sliding into the gap, and the dropped tab settling.
+    val slides = remember { mutableStateMapOf<InboxPage, Animatable<Float, AnimationVector1D>>() }
+    fun slide(page: InboxPage, from: Float) {
+        val offset = slides.getOrPut(page) { Animatable(0f) }
+        scope.launch {
+            offset.snapTo(offset.value + from)
+            offset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+        }
+    }
+    // The held tab leans into the direction it's moving and wobbles level when it stops
+    val tilt = remember { Animatable(0f) }
+    val selectedPage = pages.getOrNull(selectedPageIndex)
+    val moveLeft = stringResource(R.string.tab_move_left)
+    val moveRight = stringResource(R.string.tab_move_right)
+    fun moved(from: Int, to: Int) = order.toMutableList().apply { add(to, removeAt(from)) }
+
+    // Swap once the held tab is halfway over a neighbour, then shift its offset by that neighbour's
+    // width so it stays under the finger.
+    fun swapIfPast(page: InboxPage) {
+        val at = order.indexOf(page)
+        val next = order.getOrNull(at + 1)
+        val previous = order.getOrNull(at - 1)
+        if (next != null && dragOffset > (widths[next] ?: 0) / 2f) {
+            order = moved(at, at + 1)
+            dragOffset -= widths[next] ?: 0
+            slide(next, (widths[page] ?: 0).toFloat())
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        } else if (previous != null && dragOffset < -(widths[previous] ?: 0) / 2f) {
+            order = moved(at, at - 1)
+            dragOffset += widths[previous] ?: 0
+            slide(previous, -(widths[page] ?: 0).toFloat())
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        }
+    }
+
+    // Holding a tab near either edge scrolls the row, faster the closer it is, so off-screen slots are reachable.
+    // The held tab rides along with the scroll (staying under the finger) and keeps swapping as tabs pass under it.
+    val rowScroll = rememberScrollState()
+    var rowWidth by remember { mutableIntStateOf(0) }
+    val tabX = remember { mutableStateMapOf<InboxPage, Float>() }
+    val density = LocalDensity.current
+    LaunchedEffect(dragged) {
+        val page = dragged ?: return@LaunchedEffect
+        val edge = with(density) { 56.dp.toPx() }
+        val fastest = with(density) { 14.dp.toPx() } // per frame, right at the edge
+        val travelBeforeScroll = with(density) { 24.dp.toPx() }
+        while (true) {
+            withFrameNanos { }
+            val left = (tabX[page] ?: continue) + dragOffset - rowScroll.value
+            val right = left + (widths[page] ?: 0)
+            val push = when {
+                left < edge -> -((edge - left) / edge).coerceIn(0f, 1f)
+                right > rowWidth - edge -> ((right - (rowWidth - edge)) / edge).coerceIn(0f, 1f)
+                else -> 0f
+            }
+            // Only once the finger has moved: a tab picked up near an edge shouldn't send the row off on its own
+            if (push == 0f || dragTravel < travelBeforeScroll) continue
+            dragOffset += rowScroll.scrollBy(push * push.absoluteValue * fastest)
+            swapIfPast(page)
+        }
+    }
+
+    // The row scrolls to keep the selected tab's slot in view whenever that slot changes. Hold the slot
+    // still while dragging, or the row slides under the finger each time the held tab passes the selected one.
+    var heldSelectedIndex by remember { mutableIntStateOf(0) }
+    val selectedSlot = if (dragged != null) heldSelectedIndex else order.indexOf(selectedPage).coerceAtLeast(0)
+    // That held slot may belong to another tab mid-drag, so the underline fades out until the drop.
+    val indicatorAlpha by animateFloatAsState(if (dragged != null) 0f else 1f, label = "tabIndicator")
     PrimaryScrollableTabRow(
-        selectedTabIndex = selectedPageIndex,
+        selectedTabIndex = selectedSlot,
+        scrollState = rowScroll,
+        indicator = {
+            TabRowDefaults.PrimaryIndicator(
+                Modifier.tabIndicatorOffset(selectedSlot, matchContentSize = true).alpha(indicatorAlpha),
+                width = Dp.Unspecified,
+            )
+        },
         edgePadding = 20.dp,
         containerColor = Color.Transparent,
         divider = {},
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag(MainInboxTestTags.TABS),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).onSizeChanged { rowWidth = it.width }.testTag(MainInboxTestTags.TABS),
     ) {
-        pages.forEachIndexed { index, page ->
-            val selected = index == selectedPageIndex
-            val unread = when (page) {
-                InboxPage.All -> threads.any(ThreadItem::hasUnread) || otpMessages.any(OtpMessageItem::isUnread)
-                InboxPage.Otp -> otpMessages.any(OtpMessageItem::isUnread)
-                InboxPage.Starred -> false
-                is InboxPage.CategoryPage -> threads.any { it.category == page.category && it.hasUnread }
-            }
-            Tab(
-                selected = selected,
-                onClick = { onPageSelected(index) },
-                modifier = Modifier.height(48.dp).testTag(MainInboxTestTags.tab(index)),
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (promoMuted && page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL) {
-                            Icon(
-                                painterResource(R.drawable.ic_notifications_off),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(end = 6.dp).size(16.dp),
-                            )
-                        }
-                        Box {
-                            Text(pageLabel(page), modifier = Modifier.padding(end = 8.dp))
-                            if (unread) Box(Modifier.align(Alignment.TopEnd).offset(y = (-2).dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
-                        }
+        order.forEachIndexed { index, page ->
+            key(page) {
+                val isDragged = page == dragged
+                // Holding: 0 -> 1 over the long-press time as the pill rises out of the surface; sinks back if let go early
+                val press = remember { Animatable(0f) }
+                var tabCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                fun windowX(change: PointerInputChange) = tabCoords?.localToWindow(change.position)?.x ?: change.position.x
+                // Broken free: pops off the surface with an overshoot once the hold completes
+                val lift by animateFloatAsState(
+                    targetValue = if (isDragged) 1f else 0f,
+                    // Pops up with an overshoot; settles without one (bouncing past zero shrank the tab and blinked the pill)
+                    animationSpec = if (isDragged) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)
+                    else spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+                    label = "tabLift",
+                )
+                val liftedColor = MaterialTheme.colorScheme.secondaryContainer
+                val reliefLight = MaterialTheme.colorScheme.surfaceBright
+                val reliefShade = MaterialTheme.colorScheme.onSurface
+                val surfaceColor = MaterialTheme.colorScheme.background
+                val unread = when (page) {
+                    InboxPage.All -> threads.any(ThreadItem::hasUnread) || otpMessages.any(OtpMessageItem::isUnread)
+                    InboxPage.Otp -> otpMessages.any(OtpMessageItem::isUnread)
+                    InboxPage.Starred -> false
+                    is InboxPage.CategoryPage -> threads.any { it.category == page.category && it.hasUnread }
+                }
+                fun onDrag(amount: Float) {
+                    dragOffset += amount
+                    dragTravel += amount.absoluteValue
+                    scope.launch {
+                        tilt.animateTo((amount * 0.4f).coerceIn(-5f, 5f), spring(stiffness = Spring.StiffnessMedium))
+                        tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
                     }
-                },
-            )
+                    swapIfPast(page)
+                }
+                fun onDrop(completed: Boolean) {
+                    slide(page, dragOffset)
+                    dragged = null
+                    dragOffset = 0f
+                    scope.launch { tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                    // Clear the rise at once so the relief (the larger of rise and lift) fades out with the lift alone
+                    scope.launch { press.snapTo(0f) }
+                    if (completed) {
+                        haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                        if (order != pages) onReorder(order)
+                        // The tab you just moved is the one you're working with
+                        if (page != selectedPage) onPageSelected(order.indexOf(page))
+                    } else {
+                        order = pages
+                    }
+                }
+                // The rising relief is the press feedback; the standard ripple would flash a flat grey pill over it
+                CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                    Tab(
+                        selected = page == selectedPage,
+                        onClick = { onPageSelected(pages.indexOf(page)) },
+                        modifier = Modifier
+                            .height(48.dp)
+                            .testTag(MainInboxTestTags.tab(index))
+                            .onSizeChanged { widths[page] = it.width }
+                            .onPlaced { tabX[page] = it.positionInParent().x }
+                            // Before the graphicsLayer, and measured in window coordinates: the tab itself moves under the
+                            // finger (following it, sliding when it swaps, riding the row's scroll), so its own local
+                            // coordinates would count that motion as finger movement.
+                            .onGloballyPositioned { tabCoords = it }
+                            // Restarted (between gestures) when these change, so the handler never works on a stale
+                            // order, page list or selection; with just `page`, every drag after the first one would.
+                            .pointerInput(page, pages, selectedPage) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    val rise = scope.launch {
+                                        press.animateTo(1f, tween(viewConfiguration.longPressTimeoutMillis.toInt(), easing = FastOutLinearInEasing))
+                                    }
+                                    val held = awaitLongPressOrCancellation(down.id)
+                                    if (held == null) {
+                                        // Let go (a tap) or moved away (a scroll) before breaking free
+                                        rise.cancel()
+                                        scope.launch { press.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) }
+                                        return@awaitEachGesture
+                                    }
+                                    heldSelectedIndex = order.indexOf(selectedPage).coerceAtLeast(0)
+                                    dragged = page
+                                    dragOffset = 0f
+                                    dragTravel = 0f
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    var lastX = windowX(held)
+                                    // Follow the finger until it lifts. Not drag(): that gives up as soon as anything else
+                                    // has handled the event, which the row's own scrolling can when it moves under the finger.
+                                    var completed = false
+                                    while (true) {
+                                        val change = awaitPointerEvent().changes.firstOrNull { it.id == held.id } ?: break
+                                        if (!change.pressed) {
+                                            completed = true
+                                            change.consume() // the release shouldn't also count as a tap on the tab
+                                            break
+                                        }
+                                        val x = windowX(change)
+                                        onDrag(x - lastX)
+                                        lastX = x
+                                        change.consume()
+                                    }
+                                    onDrop(completed)
+                                }
+                            }
+                            .zIndex(if (isDragged || lift > 0.01f || press.value > 0.01f) 1f else 0f)
+                            .graphicsLayer {
+                                val rising = press.value
+                                // A faint shiver near the end of the hold, as if straining against the surface
+                                val strain = ((rising - 0.6f) / 0.4f).coerceIn(0f, 1f) * (1f - lift.coerceIn(0f, 1f))
+                                translationX = (if (isDragged) dragOffset else 0f) + (slides[page]?.value ?: 0f) +
+                                    sin(rising * 70f) * 0.8.dp.toPx() * strain
+                                val scale = 1f + 0.03f * rising + 0.07f * lift
+                                scaleX = scale
+                                scaleY = scale
+                                rotationZ = if (isDragged) tilt.value else 0f
+                                // A soft real shadow only once it has broken free (the rising relief has its drawn contact shadow)
+                                shadowElevation = 4.dp.toPx() * lift.coerceAtLeast(0f)
+                                shape = LiftedTabShape
+                            }
+                            .drawBehind {
+                                val solid = lift.coerceIn(0f, 1f)
+                                // One raised relief from the first touch to the drop: it rises while held, then keeps the
+                                // same lit face once it breaks free, just lifted higher with a deeper contact shadow.
+                                val relief = maxOf(press.value, solid)
+                                if (relief > 0.01f) {
+                                    val outline = LiftedTabShape.createOutline(size, layoutDirection, this)
+                                    translate(top = (1.5f + 1.5f * solid).dp.toPx()) {
+                                        drawOutline(outline, reliefShade.copy(alpha = (0.18f + 0.06f * solid) * relief))
+                                    }
+                                    drawOutline(outline, surfaceColor) // opaque, so no shadow shows through the tint
+                                    drawOutline(outline, liftedColor.copy(alpha = 0.45f * relief))
+                                    drawOutline(outline, Brush.verticalGradient(listOf(reliefLight.copy(alpha = 0.55f * relief), reliefShade.copy(alpha = 0.10f * relief))))
+                                    drawOutline(outline, reliefLight.copy(alpha = 0.8f * relief), style = Stroke(1.dp.toPx()))
+                                }
+                            }
+                            // Dragging is hard with a screen reader, so offer the same moves as actions
+                            .semantics {
+                                customActions = buildList {
+                                    if (index > 0) add(CustomAccessibilityAction(moveLeft) { onReorder(moved(index, index - 1)); true })
+                                    if (index < order.lastIndex) add(CustomAccessibilityAction(moveRight) { onReorder(moved(index, index + 1)); true })
+                                }
+                            },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (promoMuted && page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_notifications_off),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(end = 6.dp).size(16.dp),
+                                    )
+                                }
+                                Box {
+                                    Text(pageLabel(page), modifier = Modifier.padding(end = 8.dp))
+                                    if (unread) Box(Modifier.align(Alignment.TopEnd).offset(y = (-2).dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
+                                }
+                            }
+                        },
+                    )
+                }
+            }
         }
     }
 }
@@ -478,7 +831,7 @@ private fun InboxPager(
     modifier: Modifier,
 ) {
     val pagerState = rememberPagerState(initialPage = selectedPageIndex, pageCount = { pages.size })
-    val listStates = pages.map { rememberLazyListState() }
+    val listStates = pages.map { page -> key(page) { rememberLazyListState() } } // follow the page when tabs move
     LaunchedEffect(selectedPageIndex, pages.size) {
         if (selectedPageIndex in pages.indices && pagerState.currentPage != selectedPageIndex) pagerState.scrollToPage(selectedPageIndex)
     }

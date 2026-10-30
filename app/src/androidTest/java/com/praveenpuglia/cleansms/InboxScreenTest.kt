@@ -3,6 +3,11 @@ package com.praveenpuglia.cleansms
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
@@ -111,5 +116,99 @@ class InboxScreenTest {
         composeRule.onNodeWithTag(MainInboxTestTags.MORE).performClick()
         composeRule.onNodeWithTag(MainInboxTestTags.STATS).performClick()
         composeRule.runOnIdle { assertTrue(openedStats) }
+    }
+
+    private val otpPage = InboxPage.Otp
+    private val personalPage = InboxPage.CategoryPage(MessageCategory.PERSONAL)
+    private val transactionsPage = InboxPage.CategoryPage(MessageCategory.TRANSACTIONAL)
+
+    private fun showTabs(
+        onReorder: (List<InboxPage>) -> Unit = {},
+        onPageSelected: (Int) -> Unit = {},
+        showHint: Boolean = false,
+        onHintSeen: () -> Unit = {},
+    ) {
+        composeRule.setContent {
+            CleanSmsTheme {
+                InboxScreen(
+                    pages = listOf(otpPage, personalPage, transactionsPage),
+                    selectedPageIndex = 0, scrollToTopRequest = 0,
+                    allThreads = emptyList(), otpMessages = emptyList(), allItems = emptyList(), starredItems = emptyList(),
+                    searchResults = emptyList(), searchMode = false, searchQuery = "", unreadOnly = false,
+                    selectionMode = false, selectedThreadIds = emptySet(), selectedMessageIds = emptySet(),
+                    promoMuted = false, permissionRequired = false, showDeleteDialog = false,
+                    onPageSelected = onPageSelected, onSearchModeChange = {}, onSearchQueryChange = {}, onUnreadOnlyChange = {},
+                    onOpenStats = {}, onOpenSettings = {}, onNewMessage = {}, onThreadClick = {}, onThreadAvatarClick = {},
+                    onThreadLongClick = {}, onOtpClick = {}, onOtpAvatarClick = {}, onOtpLongClick = {}, onCopyOtp = {},
+                    onMessageClick = {}, onSelectAll = {}, onMarkAsRead = {}, onDeleteRequest = {}, onDeleteConfirm = {},
+                    onDeleteDismiss = {},
+                    onReorderPages = onReorder,
+                    showTabReorderHint = showHint,
+                    onTabReorderHintSeen = onHintSeen,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun holdingATabAndDraggingItPastItsNeighbourMovesIt() {
+        var reordered: List<InboxPage>? = null
+        showTabs(onReorder = { reordered = it })
+        val neighbourWidth = composeRule.onNodeWithTag(MainInboxTestTags.tab(1)).getBoundsInRoot().let { it.right - it.left }
+
+        composeRule.onNodeWithTag(MainInboxTestTags.tab(0)).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            // Past half of the neighbour, short of the one after it
+            val step = neighbourWidth.toPx() * 0.75f / 10
+            repeat(10) { moveBy(Offset(step, 0f)) }
+            up()
+        }
+
+        composeRule.runOnIdle { assertEquals(listOf(personalPage, otpPage, transactionsPage), reordered) }
+    }
+
+    @Test
+    fun theTabYouMoveBecomesTheActiveTab() {
+        var reordered: List<InboxPage>? = null
+        var selected = 0
+        showTabs(onReorder = { reordered = it }, onPageSelected = { selected = it })
+        val neighbourWidth = composeRule.onNodeWithTag(MainInboxTestTags.tab(2)).getBoundsInRoot().let { it.right - it.left }
+
+        // OTPs (tab 0) is active; move Personal (tab 1) past Transactions
+        composeRule.onNodeWithTag(MainInboxTestTags.tab(1)).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            val step = neighbourWidth.toPx() * 0.75f / 10
+            repeat(10) { moveBy(Offset(step, 0f)) }
+            up()
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(listOf(otpPage, transactionsPage, personalPage), reordered)
+            assertEquals("Personal, now third, is selected", 2, selected)
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun screenReaderUsersCanMoveATabWithAnAction() {
+        var reordered: List<InboxPage>? = null
+        showTabs(onReorder = { reordered = it })
+
+        composeRule.onNodeWithTag(MainInboxTestTags.tab(1)).performCustomAccessibilityActionWithLabel("Move right")
+
+        composeRule.runOnIdle { assertEquals(listOf(otpPage, transactionsPage, personalPage), reordered) }
+    }
+
+    @Test
+    fun theReorderTipShowsOnceAndReportsItselfSeen() {
+        var seen = false
+        showTabs(showHint = true, onHintSeen = { seen = true })
+
+        composeRule.waitUntil(5_000) { composeRule.onAllNodesWithTag(MainInboxTestTags.TAB_REORDER_HINT).fetchSemanticsNodes().isNotEmpty() }
+        composeRule.onNodeWithText("Got it").performClick()
+
+        composeRule.waitUntil(5_000) { seen }
     }
 }

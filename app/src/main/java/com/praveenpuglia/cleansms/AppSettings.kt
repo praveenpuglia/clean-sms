@@ -20,6 +20,8 @@ object AppSettings {
     private const val KEY_FONT_FAMILY = "font_family"
     private const val KEY_SHOW_SENDER_LOGOS = "show_sender_logos"
     private const val KEY_OTP_AUTO_DELETE_AFTER = "otp_auto_delete_after_ms"
+    private const val KEY_TAB_ORDER = "tab_order"
+    private const val KEY_TAB_REORDER_HINT_SEEN = "tab_reorder_hint_seen"
     private const val KEY_OTP_CLEANUP_WATERMARK = "otp_cleanup_watermark"
     const val THEME_LIGHT = AppCompatDelegate.MODE_NIGHT_NO
     const val THEME_DARK = AppCompatDelegate.MODE_NIGHT_YES
@@ -104,6 +106,23 @@ object AppSettings {
 
     fun setOtpCleanupWatermark(context: Context, date: Long) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putLong(KEY_OTP_CLEANUP_WATERMARK, date) }
+    }
+
+    /** Inbox tabs in the order the user arranged them, as page keys; empty until they move one. */
+    fun getTabOrder(context: Context): List<String> =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_TAB_ORDER, null)
+            ?.split(',')?.filter(String::isNotBlank).orEmpty()
+
+    fun setTabOrder(context: Context, keys: List<String>) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putString(KEY_TAB_ORDER, keys.joinToString(",")) }
+    }
+
+    /** Whether the "press and hold a tab to move it" tip was shown. */
+    fun getTabReorderHintSeen(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TAB_REORDER_HINT_SEEN, false)
+
+    fun setTabReorderHintSeen(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { putBoolean(KEY_TAB_REORDER_HINT_SEEN, true) }
     }
 
     fun getAllTabEnabled(context: Context): Boolean {
