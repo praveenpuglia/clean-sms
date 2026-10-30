@@ -124,6 +124,7 @@ class InboxScreenTest {
 
     private fun showTabs(
         onReorder: (List<InboxPage>) -> Unit = {},
+        onPageSelected: (Int) -> Unit = {},
         showHint: Boolean = false,
         onHintSeen: () -> Unit = {},
     ) {
@@ -136,7 +137,7 @@ class InboxScreenTest {
                     searchResults = emptyList(), searchMode = false, searchQuery = "", unreadOnly = false,
                     selectionMode = false, selectedThreadIds = emptySet(), selectedMessageIds = emptySet(),
                     promoMuted = false, permissionRequired = false, showDeleteDialog = false,
-                    onPageSelected = {}, onSearchModeChange = {}, onSearchQueryChange = {}, onUnreadOnlyChange = {},
+                    onPageSelected = onPageSelected, onSearchModeChange = {}, onSearchQueryChange = {}, onUnreadOnlyChange = {},
                     onOpenStats = {}, onOpenSettings = {}, onNewMessage = {}, onThreadClick = {}, onThreadAvatarClick = {},
                     onThreadLongClick = {}, onOtpClick = {}, onOtpAvatarClick = {}, onOtpLongClick = {}, onCopyOtp = {},
                     onMessageClick = {}, onSelectAll = {}, onMarkAsRead = {}, onDeleteRequest = {}, onDeleteConfirm = {},
@@ -165,6 +166,28 @@ class InboxScreenTest {
         }
 
         composeRule.runOnIdle { assertEquals(listOf(personalPage, otpPage, transactionsPage), reordered) }
+    }
+
+    @Test
+    fun theTabYouMoveBecomesTheActiveTab() {
+        var reordered: List<InboxPage>? = null
+        var selected = 0
+        showTabs(onReorder = { reordered = it }, onPageSelected = { selected = it })
+        val neighbourWidth = composeRule.onNodeWithTag(MainInboxTestTags.tab(2)).getBoundsInRoot().let { it.right - it.left }
+
+        // OTPs (tab 0) is active; move Personal (tab 1) past Transactions
+        composeRule.onNodeWithTag(MainInboxTestTags.tab(1)).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            val step = neighbourWidth.toPx() * 0.75f / 10
+            repeat(10) { moveBy(Offset(step, 0f)) }
+            up()
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(listOf(otpPage, transactionsPage, personalPage), reordered)
+            assertEquals("Personal, now third, is selected", 2, selected)
+        }
     }
 
     @OptIn(ExperimentalTestApi::class)

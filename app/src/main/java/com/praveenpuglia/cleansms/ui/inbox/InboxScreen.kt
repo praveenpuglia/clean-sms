@@ -636,7 +636,9 @@ private fun InboxTabs(
                 // Broken free: pops off the surface with an overshoot once the hold completes
                 val lift by animateFloatAsState(
                     targetValue = if (isDragged) 1f else 0f,
-                    animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
+                    // Pops up with an overshoot; settles without one (bouncing past zero shrank the tab and blinked the pill)
+                    animationSpec = if (isDragged) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)
+                    else spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
                     label = "tabLift",
                 )
                 val liftedColor = MaterialTheme.colorScheme.secondaryContainer
@@ -663,10 +665,14 @@ private fun InboxTabs(
                     dragged = null
                     dragOffset = 0f
                     scope.launch { tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                    scope.launch { press.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+                    // Clear the rise at once: the relief is drawn from rise x (1 - lift), so easing it out while the
+                    // lift drops would flash the embossed relief back during the settle.
+                    scope.launch { press.snapTo(0f) }
                     if (completed) {
                         haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                         if (order != pages) onReorder(order)
+                        // The tab you just moved is the one you're working with
+                        if (page != selectedPage) onPageSelected(order.indexOf(page))
                     } else {
                         order = pages
                     }
