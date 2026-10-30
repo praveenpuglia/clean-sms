@@ -98,6 +98,7 @@ import java.util.Calendar
 import java.util.Locale
 
 object ThreadDetailTestTags {
+    const val BACK = "thread_back"
     const val CONTACT_NAME = "thread_contact_name"
     const val MESSAGE_LIST = "thread_message_list"
     const val COMPOSER = "thread_composer"
@@ -257,7 +258,7 @@ private fun ThreadHeader(
                     .padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(onClick = onBack, modifier = Modifier.testTag(ThreadDetailTestTags.BACK)) {
                     Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.settings_back))
                 }
                 val avatarDescription = stringResource(R.string.thread_contact_avatar)

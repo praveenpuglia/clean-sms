@@ -189,7 +189,9 @@ class MainActivity : AppCompatActivity() {
         
         Log.d("DefaultSmsUI", "isDefault=$isDefault pkg=${packageName} batteryIgnored=$isBatteryOptimizationIgnored hasCompletedOnboarding=$hasCompletedOnboarding")
         
-        if (!isDefault || !hasCompletedOnboarding) {
+        // Check the live state, not just the flag: Auto Backup restores the flag after a reinstall,
+        // but the SMS role and the battery exemption don't come back with it.
+        if (!isDefault || !isBatteryOptimizationIgnored || !hasCompletedOnboarding) {
             showOnboarding = true
             permissionRequired = false
         } else {

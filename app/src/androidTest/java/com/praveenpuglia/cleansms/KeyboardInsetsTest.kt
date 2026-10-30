@@ -53,6 +53,7 @@ class KeyboardInsetsTest {
         shell("settings put secure show_ime_with_hard_keyboard 1")
         shell("cmd statusbar collapse") // a shade left open by an earlier test keeps window focus
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
         AppSettings.setOnboardingCompleted(context)
     }
 

@@ -57,7 +57,7 @@ class PhaseZeroUiRegressionTest {
 
     @After
     fun restoreStableDeviceState() {
-        ensureSmsRole()
+        ensureSetUpAsDefault()
         prefs.edit().putBoolean("onboarding_completed", true).commit()
         AppSettings.setThemeMode(context, AppSettings.THEME_DARK)
         AppSettings.setFontFamily(context, AppSettings.FontFamily.SANS_SERIF)
@@ -65,7 +65,7 @@ class PhaseZeroUiRegressionTest {
 
     @Test
     fun onboardingRequiresBothSetupStepsToContinue() {
-        ensureSmsRole()
+        ensureSetUpAsDefault()
         shell("dumpsys deviceidle whitelist -$packageName")
         prefs.edit().putBoolean("onboarding_completed", false).commit()
 
@@ -83,6 +83,19 @@ class PhaseZeroUiRegressionTest {
             }
         } finally {
             shell("dumpsys deviceidle whitelist -$packageName")
+        }
+    }
+
+    @Test
+    fun aRestoredOnboardingFlagDoesNotSkipTheBackgroundStep() {
+        // After a reinstall, Auto Backup brings the flag back but not the battery exemption.
+        ensureSetUpAsDefault()
+        shell("dumpsys deviceidle whitelist -$packageName")
+        prefs.edit().putBoolean("onboarding_completed", true).commit()
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            composeRule.onNodeWithText("Welcome to Clean SMS").assertIsDisplayed()
+            composeRule.onNodeWithTag(OnboardingTestTags.CONTINUE).assertIsNotEnabled()
         }
     }
 
@@ -332,7 +345,7 @@ class PhaseZeroUiRegressionTest {
 
     @Test
     fun performanceSeedHonorsMessageAndThreadCounts() {
-        ensureSmsRole()
+        ensureSetUpAsDefault()
         shell(
             "am broadcast -n $packageName/.DebugSeedReceiver " +
                 "-a com.praveenpuglia.cleansms.DEBUG_SEED --ei count 120"
@@ -353,7 +366,7 @@ class PhaseZeroUiRegressionTest {
     }
 
     private fun prepareSeededInbox() {
-        ensureSmsRole()
+        ensureSetUpAsDefault()
         prefs.edit().putBoolean("onboarding_completed", true).commit()
         shell("pm grant $packageName android.permission.WRITE_CONTACTS")
         shell(
@@ -409,8 +422,9 @@ class PhaseZeroUiRegressionTest {
         null,
     )?.use { cursor -> cursor.moveToFirst() } == true
 
-    private fun ensureSmsRole() {
+    private fun ensureSetUpAsDefault() {
         shell("cmd role add-role-holder android.app.role.SMS $packageName 0")
+        shell("dumpsys deviceidle whitelist +$packageName")
     }
 
     private fun shell(command: String) {

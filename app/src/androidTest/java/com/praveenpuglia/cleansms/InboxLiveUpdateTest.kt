@@ -20,7 +20,6 @@ import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollToKey
 import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
@@ -45,6 +44,7 @@ class InboxLiveUpdateTest {
     @Before
     fun setUp() {
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
         context.getSharedPreferences("CleanSmsPrefs", Context.MODE_PRIVATE).edit()
             .putBoolean("onboarding_completed", true).commit()
         AppSettings.setAllTabEnabled(context, false)
@@ -195,9 +195,9 @@ class InboxLiveUpdateTest {
             }
             composeRule.onNodeWithTag(MainInboxTestTags.message(id)).performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) { readFor(id) == 1 }
-            // Back only once the thread is on screen, or it closes search instead.
-            waitForTag(ThreadDetailTestTags.message(id))
-            Espresso.pressBack()
+            // The thread's own Back: a system back can reach the inbox mid-transition and close search.
+            waitForTag(ThreadDetailTestTags.BACK)
+            composeRule.onNodeWithTag(ThreadDetailTestTags.BACK).performClick()
 
             composeRule.waitUntil(timeoutMillis = 10_000) {
                 composeRule.onAllNodesWithTag(MainInboxTestTags.message(id)).fetchSemanticsNodes().isNotEmpty() &&

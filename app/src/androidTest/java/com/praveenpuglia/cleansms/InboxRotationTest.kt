@@ -39,6 +39,7 @@ class InboxRotationTest {
     @Before
     fun setUp() {
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
         AppSettings.setOnboardingCompleted(context)
         AppSettings.setAllTabEnabled(context, false)
         AppSettings.setDefaultTab(context, AppSettings.DefaultTab.OTP)
