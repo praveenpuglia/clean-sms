@@ -7,6 +7,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -485,6 +492,18 @@ private fun TabReorderHint(show: Boolean, onSeen: () -> Unit, content: @Composab
     ) { content() }
 }
 
+/**
+ * The held tab's pill: shorter than the 48dp tab and centred, so it stays inside the tab row (which clips)
+ * even when scaled up and casting a shadow.
+ */
+private val LiftedTabShape = object : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val height = with(density) { 36.dp.toPx() }.coerceAtMost(size.height)
+        val top = (size.height - height) / 2
+        return Outline.Rounded(RoundRect(0f, top, size.width, top + height, CornerRadius(height / 2)))
+    }
+}
+
 @Composable
 private fun InboxTabs(
     pages: List<InboxPage>,
@@ -568,10 +587,12 @@ private fun InboxTabs(
                             scaleY = 1f + 0.1f * lift
                             rotationZ = if (isDragged) tilt.value else 0f
                             shadowElevation = 6.dp.toPx() * lift.coerceAtLeast(0f)
-                            shape = RoundedCornerShape(24.dp)
+                            shape = LiftedTabShape
                         }
                         .drawBehind {
-                            if (lift > 0.01f) drawRoundRect(liftedColor.copy(alpha = lift.coerceIn(0f, 1f)), cornerRadius = CornerRadius(24.dp.toPx()))
+                            if (lift > 0.01f) {
+                                drawOutline(LiftedTabShape.createOutline(size, layoutDirection, this), liftedColor.copy(alpha = lift.coerceIn(0f, 1f)))
+                            }
                         }
                         .pointerInput(page) {
                             detectDragGesturesAfterLongPress(
