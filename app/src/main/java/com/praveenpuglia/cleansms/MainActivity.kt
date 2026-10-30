@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
     private var permissionRequired by mutableStateOf(false)
     private var showOnboarding by mutableStateOf(true)
     private var promoMuted by mutableStateOf(false)
+    private var showTabReorderHint by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         FontThemeHelper.apply(this)
@@ -127,6 +128,12 @@ class MainActivity : AppCompatActivity() {
                         onDeleteRequest = inbox::confirmDeleteSelection,
                         onDeleteConfirm = inbox::performDeletion,
                         onDeleteDismiss = { inbox.showDeleteDialog = false },
+                        onReorderPages = inbox::reorderPages,
+                        showTabReorderHint = showTabReorderHint,
+                        onTabReorderHintSeen = {
+                            showTabReorderHint = false
+                            AppSettings.setTabReorderHintSeen(this)
+                        },
                     )
                 }
             }
@@ -163,6 +170,7 @@ class MainActivity : AppCompatActivity() {
             inbox.reload()
         }
         promoMuted = !AppSettings.getPromoNotificationsEnabled(this)
+        showTabReorderHint = !AppSettings.getTabReorderHintSeen(this)
     }
 
     override fun onPause() {

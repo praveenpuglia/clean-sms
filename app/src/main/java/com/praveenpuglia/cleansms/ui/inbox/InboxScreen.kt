@@ -1,6 +1,27 @@
 package com.praveenpuglia.cleansms.ui.inbox
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.RichTooltip
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
@@ -91,6 +112,28 @@ sealed interface InboxPage {
     data class CategoryPage(val category: MessageCategory) : InboxPage
 }
 
+/** Stable name for a page, used to save the user's tab order. */
+val InboxPage.key: String
+    get() = when (this) {
+        InboxPage.All -> "ALL"
+        InboxPage.Otp -> "OTP"
+        InboxPage.Starred -> "STARRED"
+        is InboxPage.CategoryPage -> category.name
+    }
+
+/**
+ * [defaults] in the user's saved order. A page the saved order doesn't know (say the All tab was turned
+ * on later) goes right after the page it follows by default, or first if it is first by default; saved
+ * keys for pages that no longer exist are dropped.
+ */
+fun orderPages(defaults: List<InboxPage>, savedKeys: List<String>): List<InboxPage> {
+    val ordered = savedKeys.mapNotNull { key -> defaults.firstOrNull { it.key == key } }.distinct().toMutableList()
+    defaults.forEachIndexed { index, page ->
+        if (page !in ordered) ordered.add(defaults.getOrNull(index - 1)?.let { ordered.indexOf(it) + 1 } ?: 0, page)
+    }
+    return ordered
+}
+
 object MainInboxTestTags {
     const val HEADER = "main_header"
     const val TABS = "main_tabs"
@@ -106,6 +149,7 @@ object MainInboxTestTags {
     const val DELETE_DIALOG = "main_delete_dialog"
     fun tab(index: Int) = "main_tab_$index"
     fun tabUnread(index: Int) = "main_tab_unread_$index"
+    const val TAB_REORDER_HINT = "main_tab_reorder_hint"
     fun thread(id: Long) = "main_thread_$id"
     fun unreadBadge(threadId: Long) = "main_unread_badge_$threadId"
     fun otp(id: Long) = "main_otp_$id"
@@ -152,6 +196,9 @@ fun InboxScreen(
     onDeleteRequest: () -> Unit,
     onDeleteConfirm: () -> Unit,
     onDeleteDismiss: () -> Unit,
+    onReorderPages: (List<InboxPage>) -> Unit = {},
+    showTabReorderHint: Boolean = false,
+    onTabReorderHintSeen: () -> Unit = {},
 ) {
     if (showDeleteDialog) {
         val count = selectedThreadIds.size + selectedMessageIds.size
@@ -188,7 +235,10 @@ fun InboxScreen(
                     selectionMode = selectionMode,
                     selectionCount = selectedThreadIds.size + selectedMessageIds.size,
                     promoMuted = promoMuted,
+                    showTabReorderHint = showTabReorderHint,
                     onPageSelected = onPageSelected,
+                    onReorderPages = onReorderPages,
+                    onTabReorderHintSeen = onTabReorderHintSeen,
                     onSearch = { onSearchModeChange(true) },
                     onUnreadOnlyChange = onUnreadOnlyChange,
                     onOpenStats = onOpenStats,
@@ -299,7 +349,10 @@ private fun InboxHeader(
     selectionMode: Boolean,
     selectionCount: Int,
     promoMuted: Boolean,
+    showTabReorderHint: Boolean,
     onPageSelected: (Int) -> Unit,
+    onReorderPages: (List<InboxPage>) -> Unit,
+    onTabReorderHintSeen: () -> Unit,
     onSearch: () -> Unit,
     onUnreadOnlyChange: (Boolean) -> Unit,
     onOpenStats: () -> Unit,
@@ -382,10 +435,44 @@ private fun InboxHeader(
                     modifier = Modifier.padding(start = 28.dp, top = 6.dp).height(32.dp).testTag(MainInboxTestTags.UNREAD_CHIP),
                 )
             }
-            InboxTabs(pages, selectedPageIndex, allThreads, otpMessages, promoMuted, onPageSelected)
+            TabReorderHint(show = showTabReorderHint && !selectionMode, onSeen = onTabReorderHintSeen) {
+                InboxTabs(pages, selectedPageIndex, allThreads, otpMessages, promoMuted, onPageSelected) { newOrder ->
+                    onReorderPages(newOrder)
+                    onTabReorderHintSeen()
+                }
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
+}
+
+/** One-time tip, anchored under the tabs, that they can be rearranged. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TabReorderHint(show: Boolean, onSeen: () -> Unit, content: @Composable () -> Unit) {
+    val state = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(show) {
+        if (!show) return@LaunchedEffect
+        delay(800) // let the inbox settle first
+        try {
+            state.show()
+        } finally {
+            onSeen() // dismissing ends show() by cancelling it, so this can't follow it normally
+        }
+    }
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+        tooltip = {
+            RichTooltip(
+                modifier = Modifier.testTag(MainInboxTestTags.TAB_REORDER_HINT),
+                title = { Text(stringResource(R.string.tab_reorder_hint_title)) },
+                action = { TextButton(onClick = { scope.launch { state.dismiss() } }) { Text(stringResource(R.string.tab_reorder_hint_ok)) } },
+            ) { Text(stringResource(R.string.tab_reorder_hint_body)) }
+        },
+        state = state,
+        enableUserInput = false,
+    ) { content() }
 }
 
 @Composable
@@ -396,43 +483,117 @@ private fun InboxTabs(
     otpMessages: List<OtpMessageItem>,
     promoMuted: Boolean,
     onPageSelected: (Int) -> Unit,
+    onReorder: (List<InboxPage>) -> Unit,
 ) {
+    // Tabs move in this local order while one is dragged; the new order is handed over on release,
+    // so the pages and lists don't reshuffle under the finger.
+    var order by remember(pages) { mutableStateOf(pages) }
+    var dragged by remember { mutableStateOf<InboxPage?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val widths = remember { mutableStateMapOf<InboxPage, Int>() }
+    val haptics = LocalHapticFeedback.current
+    val selectedPage = pages.getOrNull(selectedPageIndex)
+    val moveLeft = stringResource(R.string.tab_move_left)
+    val moveRight = stringResource(R.string.tab_move_right)
+    fun moved(from: Int, to: Int) = order.toMutableList().apply { add(to, removeAt(from)) }
+
     PrimaryScrollableTabRow(
-        selectedTabIndex = selectedPageIndex,
+        selectedTabIndex = order.indexOf(selectedPage).coerceAtLeast(0),
         edgePadding = 20.dp,
         containerColor = Color.Transparent,
         divider = {},
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag(MainInboxTestTags.TABS),
     ) {
-        pages.forEachIndexed { index, page ->
-            val selected = index == selectedPageIndex
-            val unread = when (page) {
-                InboxPage.All -> threads.any(ThreadItem::hasUnread) || otpMessages.any(OtpMessageItem::isUnread)
-                InboxPage.Otp -> otpMessages.any(OtpMessageItem::isUnread)
-                InboxPage.Starred -> false
-                is InboxPage.CategoryPage -> threads.any { it.category == page.category && it.hasUnread }
-            }
-            Tab(
-                selected = selected,
-                onClick = { onPageSelected(index) },
-                modifier = Modifier.height(48.dp).testTag(MainInboxTestTags.tab(index)),
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (promoMuted && page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL) {
-                            Icon(
-                                painterResource(R.drawable.ic_notifications_off),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(end = 6.dp).size(16.dp),
+        order.forEachIndexed { index, page ->
+            key(page) {
+                val isDragged = page == dragged
+                val unread = when (page) {
+                    InboxPage.All -> threads.any(ThreadItem::hasUnread) || otpMessages.any(OtpMessageItem::isUnread)
+                    InboxPage.Otp -> otpMessages.any(OtpMessageItem::isUnread)
+                    InboxPage.Starred -> false
+                    is InboxPage.CategoryPage -> threads.any { it.category == page.category && it.hasUnread }
+                }
+                Tab(
+                    selected = page == selectedPage,
+                    onClick = { onPageSelected(pages.indexOf(page)) },
+                    modifier = Modifier
+                        .height(48.dp)
+                        .testTag(MainInboxTestTags.tab(index))
+                        .onSizeChanged { widths[page] = it.width }
+                        .zIndex(if (isDragged) 1f else 0f)
+                        .graphicsLayer {
+                            if (isDragged) {
+                                translationX = dragOffset
+                                scaleX = 1.08f
+                                scaleY = 1.08f
+                            }
+                        }
+                        .background(
+                            if (isDragged) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                            RoundedCornerShape(24.dp),
+                        )
+                        .pointerInput(page) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    dragged = page
+                                    dragOffset = 0f
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount.x
+                                    val at = order.indexOf(page)
+                                    val next = order.getOrNull(at + 1)
+                                    val previous = order.getOrNull(at - 1)
+                                    // Swap once the tab is halfway over a neighbour, then shift the offset by that
+                                    // neighbour's width so the tab stays under the finger.
+                                    if (next != null && dragOffset > (widths[next] ?: 0) / 2f) {
+                                        order = moved(at, at + 1)
+                                        dragOffset -= widths[next] ?: 0
+                                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                    } else if (previous != null && dragOffset < -(widths[previous] ?: 0) / 2f) {
+                                        order = moved(at, at - 1)
+                                        dragOffset += widths[previous] ?: 0
+                                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                    }
+                                },
+                                onDragEnd = {
+                                    dragged = null
+                                    dragOffset = 0f
+                                    if (order != pages) onReorder(order)
+                                },
+                                onDragCancel = {
+                                    dragged = null
+                                    dragOffset = 0f
+                                    order = pages
+                                },
                             )
                         }
-                        Box {
-                            Text(pageLabel(page), modifier = Modifier.padding(end = 8.dp))
-                            if (unread) Box(Modifier.align(Alignment.TopEnd).offset(y = (-2).dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
+                        // Dragging is hard with a screen reader, so offer the same moves as actions
+                        .semantics {
+                            customActions = buildList {
+                                if (index > 0) add(CustomAccessibilityAction(moveLeft) { onReorder(moved(index, index - 1)); true })
+                                if (index < order.lastIndex) add(CustomAccessibilityAction(moveRight) { onReorder(moved(index, index + 1)); true })
+                            }
+                        },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (promoMuted && page is InboxPage.CategoryPage && page.category == MessageCategory.PROMOTIONAL) {
+                                Icon(
+                                    painterResource(R.drawable.ic_notifications_off),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 6.dp).size(16.dp),
+                                )
+                            }
+                            Box {
+                                Text(pageLabel(page), modifier = Modifier.padding(end = 8.dp))
+                                if (unread) Box(Modifier.align(Alignment.TopEnd).offset(y = (-2).dp).size(6.dp).background(MaterialTheme.colorScheme.error, CircleShape).testTag(MainInboxTestTags.tabUnread(index)))
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         }
     }
 }
@@ -478,7 +639,7 @@ private fun InboxPager(
     modifier: Modifier,
 ) {
     val pagerState = rememberPagerState(initialPage = selectedPageIndex, pageCount = { pages.size })
-    val listStates = pages.map { rememberLazyListState() }
+    val listStates = pages.map { page -> key(page) { rememberLazyListState() } } // follow the page when tabs move
     LaunchedEffect(selectedPageIndex, pages.size) {
         if (selectedPageIndex in pages.indices && pagerState.currentPage != selectedPageIndex) pagerState.scrollToPage(selectedPageIndex)
     }

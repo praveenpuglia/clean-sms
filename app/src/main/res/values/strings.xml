@@ -31,6 +31,11 @@
     <string name="category_government">Government</string>
     <string name="category_unknown">Unknown</string>
     <string name="tab_otp">OTPs</string>
+    <string name="tab_reorder_hint_title">Arrange your tabs</string>
+    <string name="tab_reorder_hint_body">Press and hold a tab, then drag it to where you want it.</string>
+    <string name="tab_reorder_hint_ok">Got it</string>
+    <string name="tab_move_left">Move left</string>
+    <string name="tab_move_right">Move right</string>
     <string name="tab_all">All</string>
     <string name="tab_starred">Starred</string>
     <string name="starred_empty">Star a message from its ⋮ menu to keep it here</string>
