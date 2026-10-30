@@ -70,6 +70,31 @@ class SendingTest {
     }
 
     @Test
+    fun deliveryReportIsRecordedWhenTurnedOn() {
+        AppSettings.setDeliveryReportsEnabled(context, true)
+        try {
+            SmsSender.send(context, DELIVERY_TO, "Tell me when it lands")
+            // Long messages ask for a report on their last part only.
+            SmsSender.send(context, LONG_DELIVERY_TO, "Long reply ".repeat(40).trim())
+            for (address in listOf(DELIVERY_TO, LONG_DELIVERY_TO)) {
+                val deadline = SystemClock.uptimeMillis() + 15_000
+                var status = statusOf(address)
+                while (status != Telephony.Sms.STATUS_COMPLETE && SystemClock.uptimeMillis() < deadline) {
+                    SystemClock.sleep(200)
+                    status = statusOf(address)
+                }
+                assertEquals(address, Telephony.Sms.STATUS_COMPLETE, status)
+            }
+        } finally {
+            AppSettings.setDeliveryReportsEnabled(context, false)
+        }
+    }
+
+    private fun statusOf(address: String): Int? =
+        context.contentResolver.query(Telephony.Sms.CONTENT_URI, arrayOf(Telephony.Sms.STATUS), "${Telephony.Sms.ADDRESS} = ?", arrayOf(address), null)!!
+            .use { if (it.moveToFirst()) it.getInt(0) else null }
+
+    @Test
     fun sendWithTheRadioOffIsMarkedFailed() {
         shell("cmd connectivity airplane-mode enable")
         try {
@@ -119,6 +144,8 @@ class SendingTest {
         const val LONG_TO = "+15550100012"
         const val QUICK_REPLY_TO = "+15550100013"
         const val FAILED_TO = "+15550100014"
-        val RECIPIENTS = listOf(SHORT_TO, LONG_TO, QUICK_REPLY_TO, FAILED_TO)
+        const val DELIVERY_TO = "+15550100015"
+        const val LONG_DELIVERY_TO = "+15550100016"
+        val RECIPIENTS = listOf(SHORT_TO, LONG_TO, QUICK_REPLY_TO, FAILED_TO, DELIVERY_TO, LONG_DELIVERY_TO)
     }
 }

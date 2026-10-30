@@ -97,6 +97,7 @@ private fun SettingsActivity.showSettingsContent() {
             mutableStateOf(AppSettings.getPromoNotificationsEnabled(this))
         }
         var showSenderLogos by remember { mutableStateOf(AppSettings.getShowSenderLogos(this)) }
+        var deliveryReports by remember { mutableStateOf(AppSettings.getDeliveryReportsEnabled(this)) }
         var otpAutoDeleteAfter by remember { mutableStateOf(AppSettings.getOtpAutoDeleteAfter(this)) }
 
         CleanSmsTheme {
@@ -107,6 +108,7 @@ private fun SettingsActivity.showSettingsContent() {
                 allTabEnabled = allTabEnabled,
                 promoNotificationsEnabled = promoNotificationsEnabled,
                 showSenderLogos = showSenderLogos,
+                deliveryReports = deliveryReports,
                 otpAutoDeleteAfter = otpAutoDeleteAfter,
                 versionName = BuildConfig.VERSION_NAME,
                 onBack = ::finish,
@@ -142,6 +144,10 @@ private fun SettingsActivity.showSettingsContent() {
                     showSenderLogos = enabled
                     AppSettings.setShowSenderLogos(this, enabled)
                 },
+                onDeliveryReportsChanged = { enabled ->
+                    deliveryReports = enabled
+                    AppSettings.setDeliveryReportsEnabled(this, enabled)
+                },
                 countOtpsDeletedNow = { after, includeExisting ->
                     val on = AppSettings.getOtpAutoDeleteAfter(this).isPositive()
                     when {
@@ -167,6 +173,7 @@ object SettingsTestTags {
     const val ALL_TAB = "settings_all_tab"
     const val PROMO_NOTIFICATIONS = "settings_promo_notifications"
     const val SENDER_LOGOS = "settings_sender_logos"
+    const val DELIVERY_REPORTS = "settings_delivery_reports"
     const val OTP_AUTO_DELETE = "settings_otp_auto_delete"
     const val OTP_AUTO_DELETE_DIALOG = "settings_otp_auto_delete_dialog"
     const val OTP_AUTO_DELETE_SLIDER = "settings_otp_auto_delete_slider"
@@ -182,6 +189,7 @@ private fun SettingsScreen(
     allTabEnabled: Boolean,
     promoNotificationsEnabled: Boolean,
     showSenderLogos: Boolean,
+    deliveryReports: Boolean,
     otpAutoDeleteAfter: Duration,
     versionName: String,
     onBack: () -> Unit,
@@ -191,6 +199,7 @@ private fun SettingsScreen(
     onAllTabChanged: (Boolean) -> Unit,
     onPromoNotificationsChanged: (Boolean) -> Unit,
     onShowSenderLogosChanged: (Boolean) -> Unit,
+    onDeliveryReportsChanged: (Boolean) -> Unit,
     countOtpsDeletedNow: (after: Duration, includeExisting: Boolean) -> Int,
     onOtpAutoDeleteSaved: (after: Duration, includeExisting: Boolean) -> Unit,
     onTermsClick: () -> Unit,
@@ -230,6 +239,15 @@ private fun SettingsScreen(
 
                 SettingsSectionTitle(stringResource(R.string.tab_otp), topPadding = 24.dp)
                 OtpAutoDeleteRow(otpAutoDeleteAfter, countOtpsDeletedNow, onOtpAutoDeleteSaved)
+
+                SettingsSectionTitle(stringResource(R.string.settings_sending), topPadding = 24.dp)
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_delivery_reports_title),
+                    subtitle = stringResource(R.string.settings_delivery_reports_subtitle),
+                    checked = deliveryReports,
+                    testTag = SettingsTestTags.DELIVERY_REPORTS,
+                    onCheckedChange = onDeliveryReportsChanged,
+                )
 
                 SettingsSectionTitle(stringResource(R.string.settings_notifications), topPadding = 24.dp)
                 SettingsSwitchRow(

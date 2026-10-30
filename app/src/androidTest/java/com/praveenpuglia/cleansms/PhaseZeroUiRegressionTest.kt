@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
@@ -96,9 +97,9 @@ class PhaseZeroUiRegressionTest {
         ActivityScenario.launch(SettingsActivity::class.java).use {
             composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).assertIsOn()
             composeRule.onNodeWithTag(SettingsTestTags.DEFAULT_TAB).assertTextContains("All")
-            composeRule.onNodeWithTag(SettingsTestTags.PROMO_NOTIFICATIONS).performClick()
+            composeRule.onNodeWithTag(SettingsTestTags.PROMO_NOTIFICATIONS).performScrollTo().performClick()
             composeRule.onNodeWithTag(SettingsTestTags.PROMO_NOTIFICATIONS).assertIsOff()
-            composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).performClick()
+            composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).performScrollTo().performClick()
             composeRule.onNodeWithTag(SettingsTestTags.ALL_TAB).assertIsOff()
             composeRule.onNodeWithTag(SettingsTestTags.DEFAULT_TAB).assertTextContains("OTPs")
             composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
@@ -107,6 +108,22 @@ class PhaseZeroUiRegressionTest {
         assertFalse(AppSettings.getAllTabEnabled(context))
         assertFalse(AppSettings.getPromoNotificationsEnabled(context))
         assertEquals(AppSettings.DefaultTab.OTP, AppSettings.getDefaultTab(context))
+    }
+
+    @Test
+    fun deliveryReportsAreOffUntilTurnedOn() {
+        context.getSharedPreferences("CleanSmsPrefs", Context.MODE_PRIVATE).edit().remove("delivery_reports").commit()
+        assertFalse(AppSettings.getDeliveryReportsEnabled(context))
+
+        try {
+            ActivityScenario.launch(SettingsActivity::class.java).use {
+                composeRule.onNodeWithTag(SettingsTestTags.DELIVERY_REPORTS).performScrollTo().assertIsOff().performClick()
+                composeRule.onNodeWithTag(SettingsTestTags.DELIVERY_REPORTS).assertIsOn()
+            }
+            assertTrue(AppSettings.getDeliveryReportsEnabled(context))
+        } finally {
+            AppSettings.setDeliveryReportsEnabled(context, false)
+        }
     }
 
     @Test

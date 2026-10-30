@@ -77,6 +77,9 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
+    <string name="settings_sending">Sending</string>
+    <string name="settings_delivery_reports_title">Delivery reports</string>
+    <string name="settings_delivery_reports_subtitle">Show when your message reaches the recipient. Some carriers charge for these, especially when roaming. Check your plan if unsure.</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_promo_notifications_title">Promotional notifications</string>
     <string name="settings_promo_notifications_subtitle">Show alerts for sales and offers</string>
@@ -159,6 +162,8 @@
     <string name="thread_call">Call</string>
     <string name="thread_sent_status">Sent</string>
     <string name="thread_failed_status">Not sent</string>
+    <string name="thread_delivered_status">Delivered</string>
+    <string name="thread_not_delivered_status">Not delivered</string>
     <string name="thread_spam_warning">Spam warning</string>
     <string name="thread_spam">SPAM</string>
     <string name="thread_message_hint">Message</string>

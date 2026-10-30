@@ -395,8 +395,13 @@ private fun MessageBubble(
                             }
                             // Status before the time, so the SIM (or the time) always ends the row under the menu.
                             // Outbox/queued messages show no mark until the radio reports back.
-                            val failed = message.type == TelephonyMessageType.FAILED || message.status == STATUS_FAILED
-                            if (failed) {
+                            val sent = message.type == TelephonyMessageType.SENT
+                            val failedText = when {
+                                message.type == TelephonyMessageType.FAILED -> R.string.thread_failed_status
+                                sent && message.status == STATUS_FAILED -> R.string.thread_not_delivered_status
+                                else -> null
+                            }
+                            if (failedText != null) {
                                 Icon(
                                     painterResource(R.drawable.ic_warning),
                                     contentDescription = null,
@@ -404,15 +409,16 @@ private fun MessageBubble(
                                     modifier = Modifier.size(12.dp),
                                 )
                                 Text(
-                                    stringResource(R.string.thread_failed_status),
+                                    stringResource(failedText),
                                     color = MaterialTheme.colorScheme.error,
                                     fontSize = 11.sp,
                                     modifier = Modifier.padding(start = 2.dp, end = 4.dp),
                                 )
-                            } else if (message.type == TelephonyMessageType.SENT) {
+                            } else if (sent) {
+                                val delivered = message.status == STATUS_COMPLETE
                                 Icon(
-                                    painterResource(R.drawable.ic_tick_single),
-                                    contentDescription = stringResource(R.string.thread_sent_status),
+                                    painterResource(if (delivered) R.drawable.ic_tick_double else R.drawable.ic_tick_single),
+                                    contentDescription = stringResource(if (delivered) R.string.thread_delivered_status else R.string.thread_sent_status),
                                     tint = contentColor,
                                     modifier = Modifier
                                         .padding(end = 4.dp)
@@ -730,6 +736,7 @@ private object TelephonyMessageType {
     const val FAILED = 5
 }
 
+private const val STATUS_COMPLETE = 0
 private const val STATUS_FAILED = 64
 private val MESSAGE_FONT_SIZE = 15.sp
 private val MESSAGE_LINE_HEIGHT = 17.sp
