@@ -20,6 +20,7 @@ import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollToKey
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.praveenpuglia.cleansms.ui.inbox.MainInboxTestTags
@@ -182,6 +183,30 @@ class InboxLiveUpdateTest {
             assertEquals(1, composeRule.onAllNodesWithText("1 selected").fetchSemanticsNodes().size)
         }
     }
+
+    @Test
+    fun openingAnUnreadSearchResultShowsItReadOnReturn() {
+        insertInbox(LIVE_SENDER, "Unread from search", read = 0)
+        val id = idFor(LIVE_SENDER)
+        ActivityScenario.launch(MainActivity::class.java).use {
+            composeRule.onNodeWithTag(MainInboxTestTags.SEARCH).performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag(MainInboxTestTags.messageUnread(id), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag(MainInboxTestTags.message(id)).performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) { readFor(id) == 1 }
+            Espresso.pressBack()
+
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag(MainInboxTestTags.messageUnread(id), useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
+            }
+            waitForTag(MainInboxTestTags.message(id))
+        }
+    }
+
+    private fun readFor(id: Long): Int =
+        context.contentResolver.query(Telephony.Sms.CONTENT_URI, arrayOf(Telephony.Sms.READ), "${Telephony.Sms._ID} = ?", arrayOf(id.toString()), null)!!
+            .use { if (it.moveToFirst()) it.getInt(0) else -1 }
 
     private fun threadIntent(threadId: Long) = ThreadDetailActivity.intent(
         context, threadId, THREAD_SENDER, null, null, null, MessageCategory.PERSONAL,

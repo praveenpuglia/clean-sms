@@ -192,6 +192,7 @@ object MainInboxTestTags {
     fun otp(id: Long) = "main_otp_$id"
     fun otpCode(id: Long) = "main_otp_code_$id"
     fun message(id: Long) = "main_message_$id"
+    fun messageUnread(id: Long) = "main_message_unread_$id"
 }
 
 @Composable
@@ -1153,7 +1154,10 @@ private fun SearchAvatar(item: SearchResultItem) {
     val (background, foreground) = remember(label) { AvatarColorResolver.resolve(context, label) }
     Box(Modifier.padding(end = 12.dp).size(48.dp)) {
         ContactAvatar(label, item.contactPhotoUri, 48.dp, Color(background), Color(foreground))
-        if (item.isUnread) Box(Modifier.align(Alignment.TopEnd).padding(2.dp).size(10.dp).background(MaterialTheme.colorScheme.error, CircleShape))
+        if (item.isUnread) Box(
+            Modifier.align(Alignment.TopEnd).padding(2.dp).size(10.dp).background(MaterialTheme.colorScheme.error, CircleShape)
+                .testTag(MainInboxTestTags.messageUnread(item.messageId)),
+        )
     }
 }
 

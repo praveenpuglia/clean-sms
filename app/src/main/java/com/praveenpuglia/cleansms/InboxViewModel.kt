@@ -560,8 +560,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         searchLoad = viewModelScope.launch {
             val messages = withContext(Dispatchers.IO) { queryAllMessagesForSearch(threadsById) }
             allMessagesForSearch = messages
-            // Show all messages initially in chronological order
-            updateSearchResults(messages.sortedByDescending { it.date })
+            performSearch(searchQuery)
         }
     }
 
@@ -602,6 +601,8 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
     private fun updatePagerContent() {
         pruneSelection()
         if (pages.any { it is InboxPage.All }) loadAllItemsForAllTab()
+        // Search keeps its own snapshot; refresh it so read state and new messages show on return.
+        if (searchMode) loadAllMessagesForSearch()
         updateSelectionUi()
     }
 
