@@ -32,8 +32,12 @@ class BackButtonPlacementTest {
 
     @Before
     fun setUp() {
-        val descriptor = instrumentation.uiAutomation.executeShellCommand("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
-        ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        listOf(
+            "cmd role add-role-holder android.app.role.SMS ${context.packageName} 0",
+            "dumpsys deviceidle whitelist +${context.packageName}",
+        ).forEach { command ->
+            ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
+        }
         AppSettings.setOnboardingCompleted(context)
     }
 

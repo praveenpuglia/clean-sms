@@ -25,6 +25,7 @@ class SeededInboxLogosTest {
     @Before
     fun seed() {
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
         AppSettings.setOnboardingCompleted(context)
         AppSettings.setShowSenderLogos(context, true)
         shell("am broadcast -n ${context.packageName}/.DebugSeedReceiver -a com.praveenpuglia.cleansms.DEBUG_SEED")

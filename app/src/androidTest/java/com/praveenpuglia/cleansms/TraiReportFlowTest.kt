@@ -38,6 +38,7 @@ class TraiReportFlowTest {
     @Before
     fun setUp() {
         shell("cmd role add-role-holder android.app.role.SMS ${context.packageName} 0")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
         shell("pm grant ${context.packageName} android.permission.SEND_SMS")
         AppSettings.setOnboardingCompleted(context)
         cleanUp()
