@@ -20,13 +20,20 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlin.math.sin
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.absoluteValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.TooltipAnchorPosition
@@ -532,6 +539,7 @@ private fun InboxTabs(
     var order by remember(pages) { mutableStateOf(pages) }
     var dragged by remember { mutableStateOf<InboxPage?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragTravel by remember { mutableFloatStateOf(0f) } // how far the finger has moved since pickup
     val widths = remember { mutableStateMapOf<InboxPage, Int>() }
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -552,6 +560,52 @@ private fun InboxTabs(
     val moveRight = stringResource(R.string.tab_move_right)
     fun moved(from: Int, to: Int) = order.toMutableList().apply { add(to, removeAt(from)) }
 
+    // Swap once the held tab is halfway over a neighbour, then shift its offset by that neighbour's
+    // width so it stays under the finger.
+    fun swapIfPast(page: InboxPage) {
+        val at = order.indexOf(page)
+        val next = order.getOrNull(at + 1)
+        val previous = order.getOrNull(at - 1)
+        if (next != null && dragOffset > (widths[next] ?: 0) / 2f) {
+            order = moved(at, at + 1)
+            dragOffset -= widths[next] ?: 0
+            slide(next, (widths[page] ?: 0).toFloat())
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        } else if (previous != null && dragOffset < -(widths[previous] ?: 0) / 2f) {
+            order = moved(at, at - 1)
+            dragOffset += widths[previous] ?: 0
+            slide(previous, -(widths[page] ?: 0).toFloat())
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        }
+    }
+
+    // Holding a tab near either edge scrolls the row, faster the closer it is, so off-screen slots are reachable.
+    // The held tab rides along with the scroll (staying under the finger) and keeps swapping as tabs pass under it.
+    val rowScroll = rememberScrollState()
+    var rowWidth by remember { mutableIntStateOf(0) }
+    val tabX = remember { mutableStateMapOf<InboxPage, Float>() }
+    val density = LocalDensity.current
+    LaunchedEffect(dragged) {
+        val page = dragged ?: return@LaunchedEffect
+        val edge = with(density) { 56.dp.toPx() }
+        val fastest = with(density) { 14.dp.toPx() } // per frame, right at the edge
+        val travelBeforeScroll = with(density) { 24.dp.toPx() }
+        while (true) {
+            withFrameNanos { }
+            val left = (tabX[page] ?: continue) + dragOffset - rowScroll.value
+            val right = left + (widths[page] ?: 0)
+            val push = when {
+                left < edge -> -((edge - left) / edge).coerceIn(0f, 1f)
+                right > rowWidth - edge -> ((right - (rowWidth - edge)) / edge).coerceIn(0f, 1f)
+                else -> 0f
+            }
+            // Only once the finger has moved: a tab picked up near an edge shouldn't send the row off on its own
+            if (push == 0f || dragTravel < travelBeforeScroll) continue
+            dragOffset += rowScroll.scrollBy(push * push.absoluteValue * fastest)
+            swapIfPast(page)
+        }
+    }
+
     // The row scrolls to keep the selected tab's slot in view whenever that slot changes. Hold the slot
     // still while dragging, or the row slides under the finger each time the held tab passes the selected one.
     var heldSelectedIndex by remember { mutableIntStateOf(0) }
@@ -560,6 +614,7 @@ private fun InboxTabs(
     val indicatorAlpha by animateFloatAsState(if (dragged != null) 0f else 1f, label = "tabIndicator")
     PrimaryScrollableTabRow(
         selectedTabIndex = selectedSlot,
+        scrollState = rowScroll,
         indicator = {
             TabRowDefaults.PrimaryIndicator(
                 Modifier.tabIndicatorOffset(selectedSlot, matchContentSize = true).alpha(indicatorAlpha),
@@ -569,13 +624,15 @@ private fun InboxTabs(
         edgePadding = 20.dp,
         containerColor = Color.Transparent,
         divider = {},
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag(MainInboxTestTags.TABS),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).onSizeChanged { rowWidth = it.width }.testTag(MainInboxTestTags.TABS),
     ) {
         order.forEachIndexed { index, page ->
             key(page) {
                 val isDragged = page == dragged
                 // Holding: 0 -> 1 over the long-press time as the pill rises out of the surface; sinks back if let go early
                 val press = remember { Animatable(0f) }
+                var tabCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                fun windowX(change: PointerInputChange) = tabCoords?.localToWindow(change.position)?.x ?: change.position.x
                 // Broken free: pops off the surface with an overshoot once the hold completes
                 val lift by animateFloatAsState(
                     targetValue = if (isDragged) 1f else 0f,
@@ -594,26 +651,12 @@ private fun InboxTabs(
                 }
                 fun onDrag(amount: Float) {
                     dragOffset += amount
+                    dragTravel += amount.absoluteValue
                     scope.launch {
                         tilt.animateTo((amount * 0.4f).coerceIn(-5f, 5f), spring(stiffness = Spring.StiffnessMedium))
                         tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
                     }
-                    val at = order.indexOf(page)
-                    val next = order.getOrNull(at + 1)
-                    val previous = order.getOrNull(at - 1)
-                    // Swap once the tab is halfway over a neighbour, then shift the offset by that
-                    // neighbour's width so the tab stays under the finger.
-                    if (next != null && dragOffset > (widths[next] ?: 0) / 2f) {
-                        order = moved(at, at + 1)
-                        dragOffset -= widths[next] ?: 0
-                        slide(next, (widths[page] ?: 0).toFloat())
-                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    } else if (previous != null && dragOffset < -(widths[previous] ?: 0) / 2f) {
-                        order = moved(at, at - 1)
-                        dragOffset += widths[previous] ?: 0
-                        slide(previous, -(widths[page] ?: 0).toFloat())
-                        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    }
+                    swapIfPast(page)
                 }
                 fun onDrop(completed: Boolean) {
                     slide(page, dragOffset)
@@ -637,6 +680,50 @@ private fun InboxTabs(
                             .height(48.dp)
                             .testTag(MainInboxTestTags.tab(index))
                             .onSizeChanged { widths[page] = it.width }
+                            .onPlaced { tabX[page] = it.positionInParent().x }
+                            // Before the graphicsLayer, and measured in window coordinates: the tab itself moves under the
+                            // finger (following it, sliding when it swaps, riding the row's scroll), so its own local
+                            // coordinates would count that motion as finger movement.
+                            .onGloballyPositioned { tabCoords = it }
+                            // Restarted (between gestures) when these change, so the handler never works on a stale
+                            // order, page list or selection; with just `page`, every drag after the first one would.
+                            .pointerInput(page, pages, selectedPage) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    val rise = scope.launch {
+                                        press.animateTo(1f, tween(viewConfiguration.longPressTimeoutMillis.toInt(), easing = FastOutLinearInEasing))
+                                    }
+                                    val held = awaitLongPressOrCancellation(down.id)
+                                    if (held == null) {
+                                        // Let go (a tap) or moved away (a scroll) before breaking free
+                                        rise.cancel()
+                                        scope.launch { press.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) }
+                                        return@awaitEachGesture
+                                    }
+                                    heldSelectedIndex = order.indexOf(selectedPage).coerceAtLeast(0)
+                                    dragged = page
+                                    dragOffset = 0f
+                                    dragTravel = 0f
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    var lastX = windowX(held)
+                                    // Follow the finger until it lifts. Not drag(): that gives up as soon as anything else
+                                    // has handled the event, which the row's own scrolling can when it moves under the finger.
+                                    var completed = false
+                                    while (true) {
+                                        val change = awaitPointerEvent().changes.firstOrNull { it.id == held.id } ?: break
+                                        if (!change.pressed) {
+                                            completed = true
+                                            change.consume() // the release shouldn't also count as a tap on the tab
+                                            break
+                                        }
+                                        val x = windowX(change)
+                                        onDrag(x - lastX)
+                                        lastX = x
+                                        change.consume()
+                                    }
+                                    onDrop(completed)
+                                }
+                            }
                             .zIndex(if (isDragged || lift > 0.01f || press.value > 0.01f) 1f else 0f)
                             .graphicsLayer {
                                 val rising = press.value
@@ -670,32 +757,6 @@ private fun InboxTabs(
                                         drawOutline(outline, Brush.verticalGradient(listOf(reliefLight.copy(alpha = 0.55f * relief), reliefShade.copy(alpha = 0.10f * relief))))
                                         drawOutline(outline, reliefLight.copy(alpha = 0.8f * relief), style = Stroke(1.dp.toPx()))
                                     }
-                                }
-                            }
-                            .pointerInput(page) {
-                                awaitEachGesture {
-                                    val down = awaitFirstDown(requireUnconsumed = false)
-                                    val rise = scope.launch {
-                                        press.animateTo(1f, tween(viewConfiguration.longPressTimeoutMillis.toInt(), easing = FastOutLinearInEasing))
-                                    }
-                                    val held = awaitLongPressOrCancellation(down.id)
-                                    if (held == null) {
-                                        // Let go (a tap) or moved away (a scroll) before breaking free
-                                        rise.cancel()
-                                        scope.launch { press.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) }
-                                        return@awaitEachGesture
-                                    }
-                                    heldSelectedIndex = order.indexOf(selectedPage).coerceAtLeast(0)
-                                    dragged = page
-                                    dragOffset = 0f
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    val completed = drag(held.id) { change ->
-                                        onDrag(change.positionChange().x)
-                                        change.consume()
-                                    }
-                                    // Don't let the release also count as a tap on the tab
-                                    currentEvent.changes.forEach { if (it.changedToUp()) it.consume() }
-                                    onDrop(completed)
                                 }
                             }
                             // Dragging is hard with a screen reader, so offer the same moves as actions
