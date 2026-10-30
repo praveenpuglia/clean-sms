@@ -665,8 +665,7 @@ private fun InboxTabs(
                     dragged = null
                     dragOffset = 0f
                     scope.launch { tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                    // Clear the rise at once: the relief is drawn from rise x (1 - lift), so easing it out while the
-                    // lift drops would flash the embossed relief back during the settle.
+                    // Clear the rise at once so the relief (the larger of rise and lift) fades out with the lift alone
                     scope.launch { press.snapTo(0f) }
                     if (completed) {
                         haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
@@ -741,28 +740,24 @@ private fun InboxTabs(
                                 scaleX = scale
                                 scaleY = scale
                                 rotationZ = if (isDragged) tilt.value else 0f
-                                // A real shadow only once it has broken free: drawn under the whole shape, it would show
-                                // through the still-translucent rising pill as a flat grey blob.
-                                shadowElevation = 6.dp.toPx() * lift.coerceAtLeast(0f)
+                                // A soft real shadow only once it has broken free (the rising relief has its drawn contact shadow)
+                                shadowElevation = 4.dp.toPx() * lift.coerceAtLeast(0f)
                                 shape = LiftedTabShape
                             }
                             .drawBehind {
-                                val rising = press.value
                                 val solid = lift.coerceIn(0f, 1f)
-                                if (rising > 0.01f || solid > 0.01f) {
+                                // One raised relief from the first touch to the drop: it rises while held, then keeps the
+                                // same lit face once it breaks free, just lifted higher with a deeper contact shadow.
+                                val relief = maxOf(press.value, solid)
+                                if (relief > 0.01f) {
                                     val outline = LiftedTabShape.createOutline(size, layoutDirection, this)
-                                    // The relief: lit from above with a thin contact shadow peeking out below,
-                                    // giving way to the flat pill once it breaks free
-                                    val relief = rising * (1f - solid)
-                                    if (relief > 0.01f) {
-                                        translate(top = 1.5.dp.toPx() * relief) { drawOutline(outline, reliefShade.copy(alpha = 0.18f * relief)) }
+                                    translate(top = (1.5f + 1.5f * solid).dp.toPx()) {
+                                        drawOutline(outline, reliefShade.copy(alpha = (0.18f + 0.06f * solid) * relief))
                                     }
                                     drawOutline(outline, surfaceColor) // opaque, so no shadow shows through the tint
-                                    drawOutline(outline, liftedColor.copy(alpha = maxOf(0.45f * rising, solid)))
-                                    if (relief > 0.01f) {
-                                        drawOutline(outline, Brush.verticalGradient(listOf(reliefLight.copy(alpha = 0.55f * relief), reliefShade.copy(alpha = 0.10f * relief))))
-                                        drawOutline(outline, reliefLight.copy(alpha = 0.8f * relief), style = Stroke(1.dp.toPx()))
-                                    }
+                                    drawOutline(outline, liftedColor.copy(alpha = 0.45f * relief))
+                                    drawOutline(outline, Brush.verticalGradient(listOf(reliefLight.copy(alpha = 0.55f * relief), reliefShade.copy(alpha = 0.10f * relief))))
+                                    drawOutline(outline, reliefLight.copy(alpha = 0.8f * relief), style = Stroke(1.dp.toPx()))
                                 }
                             }
                             // Dragging is hard with a screen reader, so offer the same moves as actions
