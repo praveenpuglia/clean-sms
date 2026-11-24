@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms
 
 import android.Manifest
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Telephony
+import android.util.Log
 import android.telephony.SubscriptionInfo
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -117,6 +119,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     },
                     onToggleStar = { starredIds = StarredMessages.toggle(this, it.id) },
                     onReportSpam = ::reportSpam,
+                    onDelete = ::deleteMessage,
                 )
             }
         }
@@ -224,6 +227,33 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
+    /** Needs the default SMS role; without it the provider deletes nothing and we say so. */
+    private fun deleteMessage(message: Message) {
+        lifecycleScope.launch {
+            val deleted = withContext(Dispatchers.IO) {
+                try {
+                    contentResolver.delete(ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, message.id), null, null) > 0
+                } catch (error: SecurityException) {
+                    Log.w(TAG, "Failed to delete message: ${error.javaClass.simpleName}")
+                    false
+                } catch (error: IllegalArgumentException) {
+                    Log.w(TAG, "Failed to delete message: ${error.javaClass.simpleName}")
+                    false
+                }
+            }
+            Toast.makeText(
+                this@ThreadDetailActivity,
+                if (deleted) R.string.toast_messages_deleted else R.string.toast_messages_delete_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+            if (deleted) {
+                StarredMessages.remove(this@ThreadDetailActivity, listOf(message.id))
+                starredIds = starredIds - message.id
+                loadMessages() // closes the screen if that was the last message
+            }
+        }
+    }
+
     private fun setupSimSelector() {
         availableSims = SimSlots.activeSims(this)
         selectedSimIndex = SimSlots.defaultIndex(availableSims)
@@ -259,6 +289,12 @@ class ThreadDetailActivity : AppCompatActivity() {
         loadJob = lifecycleScope.launch {
             val loaded = withContext(Dispatchers.IO) {
                 queryMessagesForThread(threadId).also { MarkReadReceiver.markThreadRead(this@ThreadDetailActivity, threadId) }
+            }
+            // The provider drops a thread with its last SMS. If this thread just lost its last one
+            // (deleted here, or elsewhere while open), there's nothing left to show.
+            if (loaded.isEmpty() && messages.isNotEmpty()) {
+                finish()
+                return@launch
             }
             messages = loaded
             val target = targetMessageId
@@ -326,6 +362,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             .putExtra(EXTRA_CATEGORY, category.name)
             .apply { targetMessageId?.let { putExtra(EXTRA_TARGET_MESSAGE_ID, it) } }
 
+        private const val TAG = "ThreadDetail"
         private const val OBSERVER_DEBOUNCE_MS = 300L
         private const val STATE_MESSAGE = "message"
         private const val EXTRA_THREAD_ID = "THREAD_ID"

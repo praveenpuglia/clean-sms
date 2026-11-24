@@ -108,6 +108,9 @@ object ThreadDetailTestTags {
     const val REPORT_SPAM = "thread_report_spam"
     const val REPORT_DIALOG = "thread_report_dialog"
     const val REPORT_CONFIRM = "thread_report_confirm"
+    const val DELETE = "thread_delete"
+    const val DELETE_DIALOG = "thread_delete_dialog"
+    const val DELETE_CONFIRM = "thread_delete_confirm"
     fun messageMenu(id: Long) = "thread_message_menu_$id"
     fun starred(id: Long) = "thread_starred_$id"
     fun message(id: Long) = "thread_message_$id"
@@ -137,6 +140,7 @@ fun ThreadDetailScreen(
     onHighlightFinished: () -> Unit,
     onToggleStar: (Message) -> Unit,
     onReportSpam: (Message) -> Unit,
+    onDelete: (Message) -> Unit,
 ) {
     val listItems = remember(messages) { createMessageListItems(messages) }
     // TRAI takes complaints for 7 days, from the number that got the message (see TraiReport)
@@ -152,6 +156,24 @@ fun ThreadDetailScreen(
                 onReportSpam(message)
             },
             onDismiss = { pendingReport = null },
+        )
+    }
+    var pendingDelete by remember { mutableStateOf<Message?>(null) }
+    pendingDelete?.let { message ->
+        AlertDialog(
+            modifier = Modifier.testTag(ThreadDetailTestTags.DELETE_DIALOG),
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.thread_delete_title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        onDelete(message)
+                    },
+                    modifier = Modifier.testTag(ThreadDetailTestTags.DELETE_CONFIRM),
+                ) { Text(stringResource(R.string.dialog_delete_positive)) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.dialog_delete_negative)) } },
         )
     }
     val listState = rememberLazyListState()
@@ -218,6 +240,7 @@ fun ThreadDetailScreen(
                                 firstLineMiddle = firstLineMiddle,
                                 onToggleStar = { onToggleStar(item.message) },
                                 onReport = { pendingReport = item.message },
+                                onDelete = { pendingDelete = item.message },
                             )
                         }
                     }
@@ -316,6 +339,7 @@ private fun MessageBubble(
     firstLineMiddle: Dp,
     onToggleStar: () -> Unit,
     onReport: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val incoming = message.type == TelephonyMessageType.INCOMING
     val spam = incoming && SpamDetector.isSpam(message.body)
@@ -348,6 +372,7 @@ private fun MessageBubble(
             iconEnd = iconEnd,
             onToggleStar = onToggleStar,
             onReport = onReport,
+            onDelete = onDelete,
             modifier = modifier,
         )
     }
@@ -468,6 +493,7 @@ private fun MessageMenu(
     iconEnd: Dp,
     onToggleStar: () -> Unit,
     onReport: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -522,6 +548,15 @@ private fun MessageMenu(
                     modifier = Modifier.testTag(ThreadDetailTestTags.REPORT_SPAM),
                 )
             }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.thread_delete)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+                modifier = Modifier.testTag(ThreadDetailTestTags.DELETE),
+            )
         }
     }
 }
