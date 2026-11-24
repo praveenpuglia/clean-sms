@@ -112,10 +112,12 @@ fun NewMessageScreen(
     onSend: () -> Unit,
 ) {
     val bodyFocus = androidx.compose.runtime.remember { FocusRequester() }
+    val recipientFocus = androidx.compose.runtime.remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
-        bodyFocus.requestFocus()
+        // A forwarded or shared message arrives with its text but nobody to send it to: start there
+        if (message.isNotEmpty() && recipients.isEmpty()) recipientFocus.requestFocus() else bodyFocus.requestFocus()
         keyboard?.show()
     }
 
@@ -192,6 +194,7 @@ fun NewMessageScreen(
                     selectedSimNumber = selectedSimNumber,
                     showSimSelector = showSimSelector,
                     sendEnabled = message.isNotBlank() && recipients.isNotEmpty(),
+                    recipientFocus = recipientFocus,
                     onRecipientQueryChange = onRecipientQueryChange,
                     onRecipientRemoved = onRecipientRemoved,
                     onRemoveLastRecipient = onRemoveLastRecipient,
@@ -232,6 +235,7 @@ private fun RecipientBar(
     selectedSimNumber: Int?,
     showSimSelector: Boolean,
     sendEnabled: Boolean,
+    recipientFocus: FocusRequester,
     onRecipientQueryChange: (String) -> Unit,
     onRecipientRemoved: (ContactSuggestion) -> Unit,
     onRemoveLastRecipient: () -> Boolean,
@@ -298,6 +302,7 @@ private fun RecipientBar(
                 modifier = Modifier
                     .width(112.dp)
                     .height(40.dp)
+                    .focusRequester(recipientFocus)
                     .onPreviewKeyEvent {
                         it.type == KeyEventType.KeyDown &&
                             it.key == Key.Backspace &&

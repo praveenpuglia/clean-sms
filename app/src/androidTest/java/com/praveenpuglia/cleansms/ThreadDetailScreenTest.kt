@@ -54,6 +54,8 @@ class ThreadDetailScreenTest {
                     onToggleStar = {},
                     onReportSpam = {},
                     onDelete = {},
+                    onForward = {},
+                    onCopy = {},
                 )
             }
         }
@@ -99,6 +101,8 @@ class ThreadDetailScreenTest {
                     onToggleStar = {},
                     onReportSpam = {},
                     onDelete = {},
+                    onForward = {},
+                    onCopy = {},
                 )
             }
         }
@@ -141,6 +145,8 @@ class ThreadDetailScreenTest {
                     onToggleStar = {},
                     onReportSpam = {},
                     onDelete = {},
+                    onForward = {},
+                    onCopy = {},
                 )
             }
         }

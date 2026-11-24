@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms.ui.thread
 
 import android.text.style.URLSpan
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -53,6 +54,13 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -109,6 +117,8 @@ object ThreadDetailTestTags {
     const val REPORT_DIALOG = "thread_report_dialog"
     const val REPORT_CONFIRM = "thread_report_confirm"
     const val DELETE = "thread_delete"
+    const val FORWARD = "thread_forward"
+    const val COPY = "thread_copy"
     const val DELETE_DIALOG = "thread_delete_dialog"
     const val DELETE_CONFIRM = "thread_delete_confirm"
     fun messageMenu(id: Long) = "thread_message_menu_$id"
@@ -141,6 +151,8 @@ fun ThreadDetailScreen(
     onToggleStar: (Message) -> Unit,
     onReportSpam: (Message) -> Unit,
     onDelete: (Message) -> Unit,
+    onForward: (Message) -> Unit,
+    onCopy: (Message) -> Unit,
 ) {
     val listItems = remember(messages) { createMessageListItems(messages) }
     // TRAI takes complaints for 7 days, from the number that got the message (see TraiReport)
@@ -241,6 +253,8 @@ fun ThreadDetailScreen(
                                 onToggleStar = { onToggleStar(item.message) },
                                 onReport = { pendingReport = item.message },
                                 onDelete = { pendingDelete = item.message },
+                                onForward = { onForward(item.message) },
+                                onCopy = { onCopy(item.message) },
                             )
                         }
                     }
@@ -340,6 +354,8 @@ private fun MessageBubble(
     onToggleStar: () -> Unit,
     onReport: () -> Unit,
     onDelete: () -> Unit,
+    onForward: () -> Unit,
+    onCopy: () -> Unit,
 ) {
     val incoming = message.type == TelephonyMessageType.INCOMING
     val spam = incoming && SpamDetector.isSpam(message.body)
@@ -373,6 +389,8 @@ private fun MessageBubble(
             onToggleStar = onToggleStar,
             onReport = onReport,
             onDelete = onDelete,
+            onForward = onForward,
+            onCopy = onCopy,
             modifier = modifier,
         )
     }
@@ -494,6 +512,8 @@ private fun MessageMenu(
     onToggleStar: () -> Unit,
     onReport: () -> Unit,
     onDelete: () -> Unit,
+    onForward: () -> Unit,
+    onCopy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -517,15 +537,6 @@ private fun MessageMenu(
                 .indication(interaction, ripple(bounded = false, radius = 16.dp)),
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(if (starred) R.string.thread_unstar else R.string.thread_star)) },
-                leadingIcon = { Icon(painterResource(if (starred) R.drawable.ic_star else R.drawable.ic_star_outline), contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onToggleStar()
-                },
-                modifier = Modifier.testTag(ThreadDetailTestTags.STAR),
-            )
             if (report != ReportOption.Hidden) {
                 DropdownMenuItem(
                     text = {
@@ -548,15 +559,46 @@ private fun MessageMenu(
                     modifier = Modifier.testTag(ThreadDetailTestTags.REPORT_SPAM),
                 )
             }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.thread_delete)) },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onDelete()
-                },
-                modifier = Modifier.testTag(ThreadDetailTestTags.DELETE),
-            )
+            // Common, well-understood actions sit in one row of icons to keep the menu short. Long-press
+            // shows each one's name; screen readers read it.
+            Row(Modifier.padding(horizontal = 4.dp)) {
+                val act = { action: () -> Unit -> { expanded = false; action() } }
+                MenuAction(
+                    icon = if (starred) R.drawable.ic_star else R.drawable.ic_star_outline,
+                    label = stringResource(if (starred) R.string.thread_unstar else R.string.thread_star),
+                    testTag = ThreadDetailTestTags.STAR,
+                    onClick = act(onToggleStar),
+                )
+                MenuAction(R.drawable.ic_forward, stringResource(R.string.thread_forward), ThreadDetailTestTags.FORWARD, onClick = act(onForward))
+                MenuAction(R.drawable.ic_copy, stringResource(R.string.thread_copy), ThreadDetailTestTags.COPY, onClick = act(onCopy))
+                MenuAction(
+                    icon = R.drawable.ic_delete,
+                    label = stringResource(R.string.thread_delete),
+                    testTag = ThreadDetailTestTags.DELETE,
+                    tint = MaterialTheme.colorScheme.error,
+                    onClick = act(onDelete),
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MenuAction(
+    @DrawableRes icon: Int,
+    label: String,
+    testTag: String,
+    tint: Color = LocalContentColor.current,
+    onClick: () -> Unit,
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.testTag(testTag)) {
+            Icon(painterResource(icon), contentDescription = label, tint = tint)
         }
     }
 }
