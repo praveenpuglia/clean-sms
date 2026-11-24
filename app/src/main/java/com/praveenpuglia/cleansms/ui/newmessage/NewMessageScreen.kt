@@ -27,6 +27,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -226,10 +228,13 @@ private fun RowScope.RecipientField(
         modifier = Modifier.padding(end = 4.dp),
     )
     val scroll = rememberScrollState()
-    LaunchedEffect(recipients.size) { scroll.animateScrollTo(scroll.maxValue) }
+    // Show the newest chip: follow the row's end whenever its width changes. (Keying on the chip count
+    // read maxValue before the new chip was laid out and stopped short.)
+    LaunchedEffect(scroll) { snapshotFlow { scroll.maxValue }.collectLatest { scroll.animateScrollTo(it) } }
+    // Only the chips scroll; the input after them is always in view, however many recipients there are
     Row(
         modifier = Modifier
-            .weight(1f)
+            .weight(1f, fill = false)
             .horizontalScroll(scroll)
             .testTag(NewMessageTestTags.RECIPIENTS),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -261,38 +266,38 @@ private fun RowScope.RecipientField(
                 },
             )
         }
-        BasicTextField(
-            value = recipientQuery,
-            onValueChange = onRecipientQueryChange,
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            modifier = Modifier
-                .width(112.dp)
-                .height(40.dp)
-                .focusRequester(recipientFocus)
-                .onPreviewKeyEvent {
-                    it.type == KeyEventType.KeyDown &&
-                        it.key == Key.Backspace &&
-                        onRemoveLastRecipient()
-                }
-                .testTag(NewMessageTestTags.RECIPIENT_INPUT),
-            decorationBox = { input ->
-                Box(contentAlignment = Alignment.CenterStart) {
-                    if (recipientQuery.isEmpty()) {
-                        Text(
-                            stringResource(R.string.new_message_add_recipient),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                        )
-                    }
-                    input()
-                }
-            },
-        )
     }
+    BasicTextField(
+        value = recipientQuery,
+        onValueChange = onRecipientQueryChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        modifier = Modifier
+            .width(112.dp)
+            .height(40.dp)
+            .focusRequester(recipientFocus)
+            .onPreviewKeyEvent {
+                it.type == KeyEventType.KeyDown &&
+                    it.key == Key.Backspace &&
+                    onRemoveLastRecipient()
+            }
+            .testTag(NewMessageTestTags.RECIPIENT_INPUT),
+        decorationBox = { input ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (recipientQuery.isEmpty()) {
+                    Text(
+                        stringResource(R.string.new_message_add_recipient),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                    )
+                }
+                input()
+            }
+        },
+    )
 }
 
 @Composable
