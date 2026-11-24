@@ -167,7 +167,7 @@
     <string name="thread_spam_warning">Spam warning</string>
     <string name="thread_spam">SPAM</string>
     <string name="thread_message_hint">Message</string>
-    <string name="thread_report_spam">Report spam to TRAI</string>
+    <string name="thread_report_spam">Report spam</string>
     <string name="thread_report_spam_expired">Only within 7 days of receiving it</string>
     <string name="thread_message_options">Message options</string>
     <string name="thread_star">Star</string>
