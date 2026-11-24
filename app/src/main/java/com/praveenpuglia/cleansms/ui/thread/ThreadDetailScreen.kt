@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import com.praveenpuglia.cleansms.ui.newmessage.smsCounter
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,11 +97,12 @@ import com.praveenpuglia.cleansms.MessageCategory
 import com.praveenpuglia.cleansms.MessageListItem
 import com.praveenpuglia.cleansms.R
 import com.praveenpuglia.cleansms.SpamDetector
-import com.praveenpuglia.cleansms.ui.ComposerTopShadow
 import com.praveenpuglia.cleansms.ui.ContactAvatar
 import com.praveenpuglia.cleansms.ui.SimIndicator
 import com.praveenpuglia.cleansms.ui.SimIndicatorEndInset
-import com.praveenpuglia.cleansms.ui.SimSelectorButton
+import com.praveenpuglia.cleansms.ui.SimSwitch
+import com.praveenpuglia.cleansms.ui.ComposerSurface
+import com.praveenpuglia.cleansms.ui.SmsCounterLabel
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import java.util.Locale
@@ -115,6 +115,7 @@ object ThreadDetailTestTags {
     const val COMPOSER_INPUT = "thread_composer_input"
     const val SEND = "thread_send"
     const val COMPOSER_COUNTER = "thread_composer_counter"
+    const val COMPOSER_PARTS = "thread_composer_parts"
     const val STAR = "thread_star"
     const val REPORT_SPAM = "thread_report_spam"
     const val REPORT_DIALOG = "thread_report_dialog"
@@ -748,85 +749,65 @@ private fun MessageComposer(
     onSimToggle: () -> Unit,
     onSend: () -> Unit,
 ) {
-    Column {
-        ComposerTopShadow()
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
-        ) {
-            // Bottom-aligned, so Send stays by the last line (and the thumb) as the text grows
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 60.dp)
-                    .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                BasicTextField(
-                    value = message,
-                    onValueChange = onMessageChange,
-                    maxLines = 4,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .padding(vertical = 2.dp)
-                        .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
-                    decorationBox = { input ->
-                        Box(contentAlignment = Alignment.CenterStart) {
-                            if (message.isEmpty()) {
-                                Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            input()
-                        }
-                    },
-                )
-                Column(horizontalAlignment = Alignment.End) {
-                    // Quiet for short replies; shown once the text nears one SMS or needs more than one
-                    val counter = smsCounter(message)
-                    if (counter.nearLimit || counter.partsText != null) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .padding(bottom = 4.dp)
-                                .width(40.dp)
-                                .wrapContentWidth(unbounded = true)
-                                .testTag(ThreadDetailTestTags.COMPOSER_COUNTER),
-                        ) {
-                            counter.partsText?.let {
-                                Text(it, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
-                            }
-                            Text(
-                                counter.counterText,
-                                color = if (counter.nearLimit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (showSimSelector && selectedSimNumber != null) {
-                            SimSelectorButton(
-                                slot = selectedSimNumber,
-                                onClick = onSimToggle,
-                                description = stringResource(R.string.new_message_sim, selectedSimNumber),
-                            )
-                        }
-                        FilledIconButton(
-                            onClick = onSend,
-                            modifier = Modifier
-                                .padding(start = 4.dp)
-                                .size(40.dp)
-                                .testTag(ThreadDetailTestTags.SEND),
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_send),
-                                contentDescription = stringResource(R.string.new_message_send),
-                            )
-                        }
-                    }
+    // The lip shows only when there's something in it: a SIM to pick, or a message nearing or past one SMS
+    val counter = smsCounter(message)
+    val showCounter = counter.nearLimit || counter.partsText != null
+    val showSim = showSimSelector && selectedSimNumber != null
+    ComposerSurface(
+        lip = if (!showCounter && !showSim) null else {
+            {
+                if (showCounter) SmsCounterLabel(counter, ThreadDetailTestTags.COMPOSER_COUNTER, ThreadDetailTestTags.COMPOSER_PARTS)
+                if (showSim && selectedSimNumber != null) {
+                    SimSwitch(
+                        slot = selectedSimNumber,
+                        onClick = onSimToggle,
+                        description = stringResource(R.string.new_message_sim, selectedSimNumber),
+                    )
                 }
+            }
+        },
+        modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
+    ) {
+        // Bottom-aligned, so Send stays by the last line (and the thumb) as the text grows
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 60.dp)
+                .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            BasicTextField(
+                value = message,
+                onValueChange = onMessageChange,
+                maxLines = 4,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 44.dp)
+                    .padding(vertical = 2.dp)
+                    .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
+                decorationBox = { input ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (message.isEmpty()) {
+                            Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        input()
+                    }
+                },
+            )
+            FilledIconButton(
+                onClick = onSend,
+                modifier = Modifier
+                    .padding(start = 8.dp, bottom = 2.dp)
+                    .size(40.dp)
+                    .testTag(ThreadDetailTestTags.SEND),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_send),
+                    contentDescription = stringResource(R.string.new_message_send),
+                )
             }
         }
     }

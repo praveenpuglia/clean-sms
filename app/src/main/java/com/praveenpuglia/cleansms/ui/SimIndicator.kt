@@ -3,11 +3,22 @@ package com.praveenpuglia.cleansms.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,33 +63,58 @@ fun SimIndicator(
     )
 }
 
+/**
+ * The SIM to send from, as a small tonal pill in the composer's lip; tap to switch. The touch target
+ * is the lip's full 48dp height, while the pill sits centred in the visible part.
+ */
 @Composable
-fun SimSelectorButton(
+fun SimSwitch(
     slot: Int,
     onClick: () -> Unit,
     description: String,
     modifier: Modifier = Modifier,
 ) {
-    FilledTonalIconButton(
-        onClick = onClick,
-        modifier = modifier.semantics { contentDescription = description },
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        contentAlignment = Alignment.BottomCenter,
+        modifier = modifier
+            .fillMaxHeight()
+            .widthIn(min = 48.dp)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
     ) {
-        Crossfade(
-            targetState = slot,
-            animationSpec = tween(160),
-            label = "sim_slot_switch",
-        ) { currentSlot ->
-            SimGlyph(
-                slot = currentSlot,
-                color = LocalContentColor.current,
-                width = 32.dp,
-                height = 32.dp,
-                fontSize = 10.sp,
-                topPadding = 3.dp,
-            )
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = CircleShape,
+            modifier = Modifier
+                .padding(bottom = (LIP_HEIGHT - SIM_PILL_HEIGHT) / 2)
+                .height(SIM_PILL_HEIGHT)
+                .clip(CircleShape)
+                .indication(interaction, ripple()),
+        ) {
+            Crossfade(
+                targetState = slot,
+                animationSpec = tween(160),
+                label = "sim_slot_switch",
+                modifier = Modifier.padding(horizontal = 12.dp),
+            ) { currentSlot ->
+                Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
+                    SimGlyph(
+                        slot = currentSlot,
+                        color = LocalContentColor.current,
+                        width = 18.dp,
+                        height = 18.dp,
+                        fontSize = 9.sp,
+                        topPadding = 1.5.dp,
+                    )
+                }
+            }
         }
     }
 }
+
+private val SIM_PILL_HEIGHT = 28.dp
 
 @Composable
 private fun SimGlyph(

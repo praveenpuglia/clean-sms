@@ -51,9 +51,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.praveenpuglia.cleansms.ContactSuggestion
 import com.praveenpuglia.cleansms.R
-import com.praveenpuglia.cleansms.ui.ComposerTopShadow
 import com.praveenpuglia.cleansms.ui.ContactAvatar
-import com.praveenpuglia.cleansms.ui.SimSelectorButton
+import com.praveenpuglia.cleansms.ui.SimSwitch
+import com.praveenpuglia.cleansms.ui.ComposerSurface
+import com.praveenpuglia.cleansms.ui.SmsCounterLabel
 
 object NewMessageTestTags {
     const val BODY = "new_message_body"
@@ -188,20 +189,26 @@ fun NewMessageScreen(
                 }
             }
 
-            CounterRow(counter)
-            ComposerTopShadow()
-            Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
+            ComposerSurface(
+                lip = {
+                    SmsCounterLabel(counter, NewMessageTestTags.COUNTER, NewMessageTestTags.PARTS)
+                    if (showSimSelector && selectedSimNumber != null) {
+                        SimSwitch(
+                            slot = selectedSimNumber,
+                            onClick = onSimToggle,
+                            description = stringResource(R.string.new_message_sim, selectedSimNumber),
+                        )
+                    }
+                },
+            ) {
                 RecipientBar(
                     recipients = recipients,
                     recipientQuery = recipientQuery,
-                    selectedSimNumber = selectedSimNumber,
-                    showSimSelector = showSimSelector,
                     sendEnabled = message.isNotBlank() && recipients.isNotEmpty(),
                     recipientFocus = recipientFocus,
                     onRecipientQueryChange = onRecipientQueryChange,
                     onRecipientRemoved = onRecipientRemoved,
                     onRemoveLastRecipient = onRemoveLastRecipient,
-                    onSimToggle = onSimToggle,
                     onSend = onSend,
                 )
             }
@@ -210,39 +217,14 @@ fun NewMessageScreen(
 }
 
 @Composable
-private fun CounterRow(counter: SmsCounter) {
-    val color = when {
-        counter.partsText != null -> MaterialTheme.colorScheme.tertiary
-        counter.nearLimit -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        counter.partsText?.let {
-            Text(it, color = color, fontSize = 12.sp, modifier = Modifier.testTag(NewMessageTestTags.PARTS))
-            Spacer(Modifier.width(8.dp))
-        }
-        Text(counter.counterText, color = color, fontSize = 12.sp, modifier = Modifier.testTag(NewMessageTestTags.COUNTER))
-    }
-}
-
-@Composable
 private fun RecipientBar(
     recipients: List<ContactSuggestion>,
     recipientQuery: String,
-    selectedSimNumber: Int?,
-    showSimSelector: Boolean,
     sendEnabled: Boolean,
     recipientFocus: FocusRequester,
     onRecipientQueryChange: (String) -> Unit,
     onRecipientRemoved: (ContactSuggestion) -> Unit,
     onRemoveLastRecipient: () -> Boolean,
-    onSimToggle: () -> Unit,
     onSend: () -> Unit,
 ) {
     Row(
@@ -328,13 +310,6 @@ private fun RecipientBar(
             )
         }
 
-        if (showSimSelector && selectedSimNumber != null) {
-            SimSelectorButton(
-                slot = selectedSimNumber,
-                onClick = onSimToggle,
-                description = stringResource(R.string.new_message_sim, selectedSimNumber),
-            )
-        }
         FilledIconButton(
             onClick = onSend,
             enabled = sendEnabled,
