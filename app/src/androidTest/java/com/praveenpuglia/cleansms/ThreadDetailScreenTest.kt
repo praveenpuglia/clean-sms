@@ -1,5 +1,8 @@
 package com.praveenpuglia.cleansms
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -25,6 +28,7 @@ class ThreadDetailScreenTest {
     @Test
     fun personalThreadRendersBothDirectionsComposerAndTargetHighlight() {
         var highlightFinished = false
+        var draft by mutableStateOf("Reply")
         val messages = listOf(
             message(1, "Hello", type = 1),
             message(2, "On my way", type = 2),
@@ -37,7 +41,7 @@ class ThreadDetailScreenTest {
                     contactPhotoUri = null,
                     category = MessageCategory.PERSONAL,
                     messages = messages,
-                    messageText = "Reply",
+                    messageText = draft,
                     showComposer = true,
                     selectedSimNumber = 2,
                     showSimSelector = true,
@@ -67,6 +71,10 @@ class ThreadDetailScreenTest {
         composeRule.onNodeWithTag(ThreadDetailTestTags.message(1)).assertIsDisplayed()
         composeRule.onNodeWithTag(ThreadDetailTestTags.message(2)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Sent").assertIsDisplayed()
+        // The SMS counter stays out of the way for short replies and shows the SMS count for long ones
+        composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER_COUNTER).assertDoesNotExist()
+        draft = "a".repeat(200)
+        composeRule.onNode(hasText("2 SMS") and hasAnyAncestor(hasTestTag(ThreadDetailTestTags.COMPOSER_COUNTER))).assertIsDisplayed()
         // Highlight is ~800ms of animation on the test clock; advance it instead of waiting on wall time.
         composeRule.mainClock.advanceTimeBy(2_000)
         composeRule.waitForIdle()

@@ -74,16 +74,19 @@ fun smsCounter(text: String): SmsCounter {
     val unicode = text.any { it !in GSM_BASIC && it !in GSM_EXTENDED }
     val singleLimit = if (unicode) 70 else 160
     val multipartLimit = if (unicode) 67 else 153
+    // GSM extended characters (€, [, ], {, }, ...) take two of the 160 slots: an escape plus the character.
+    // ponytail: ignores that the pair is never split across parts, which can make the last part one slot off.
+    val units = if (unicode) text.length else text.length + text.count { it in GSM_EXTENDED }
     if (text.isEmpty()) return SmsCounter("0 / $singleLimit")
-    if (text.length <= singleLimit) {
+    if (units <= singleLimit) {
         return SmsCounter(
-            counterText = "${text.length} / $singleLimit",
-            nearLimit = text.length > singleLimit * 0.9,
+            counterText = "$units / $singleLimit",
+            nearLimit = units > singleLimit * 0.9,
         )
     }
 
-    val parts = ((text.length - 1) / multipartLimit) + 1
-    val usedInCurrentPart = ((text.length - 1) % multipartLimit) + 1
+    val parts = ((units - 1) / multipartLimit) + 1
+    val usedInCurrentPart = ((units - 1) % multipartLimit) + 1
     return SmsCounter(
         counterText = (multipartLimit - usedInCurrentPart).toString(),
         partsText = "$parts SMS",

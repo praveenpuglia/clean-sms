@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import com.praveenpuglia.cleansms.ui.newmessage.smsCounter
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -112,6 +114,7 @@ object ThreadDetailTestTags {
     const val COMPOSER = "thread_composer"
     const val COMPOSER_INPUT = "thread_composer_input"
     const val SEND = "thread_send"
+    const val COMPOSER_COUNTER = "thread_composer_counter"
     const val STAR = "thread_star"
     const val REPORT_SPAM = "thread_report_spam"
     const val REPORT_DIALOG = "thread_report_dialog"
@@ -751,12 +754,13 @@ private fun MessageComposer(
             color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
         ) {
+            // Bottom-aligned, so Send stays by the last line (and the thumb) as the text grows
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 60.dp)
                     .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Bottom,
             ) {
                 BasicTextField(
                     value = message,
@@ -768,6 +772,7 @@ private fun MessageComposer(
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
+                        .padding(vertical = 2.dp)
                         .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
                     decorationBox = { input ->
                         Box(contentAlignment = Alignment.CenterStart) {
@@ -778,25 +783,49 @@ private fun MessageComposer(
                         }
                     },
                 )
-                Text(message.length.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                if (showSimSelector && selectedSimNumber != null) {
-                    SimSelectorButton(
-                        slot = selectedSimNumber,
-                        onClick = onSimToggle,
-                        description = stringResource(R.string.new_message_sim, selectedSimNumber),
-                    )
-                }
-                FilledIconButton(
-                    onClick = onSend,
-                    modifier = Modifier
-                        .padding(start = 4.dp)
-                        .size(40.dp)
-                        .testTag(ThreadDetailTestTags.SEND),
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_send),
-                        contentDescription = stringResource(R.string.new_message_send),
-                    )
+                Column(horizontalAlignment = Alignment.End) {
+                    // Quiet for short replies; shown once the text nears one SMS or needs more than one
+                    val counter = smsCounter(message)
+                    if (counter.nearLimit || counter.partsText != null) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .padding(bottom = 4.dp)
+                                .width(40.dp)
+                                .wrapContentWidth(unbounded = true)
+                                .testTag(ThreadDetailTestTags.COMPOSER_COUNTER),
+                        ) {
+                            counter.partsText?.let {
+                                Text(it, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
+                            }
+                            Text(
+                                counter.counterText,
+                                color = if (counter.nearLimit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (showSimSelector && selectedSimNumber != null) {
+                            SimSelectorButton(
+                                slot = selectedSimNumber,
+                                onClick = onSimToggle,
+                                description = stringResource(R.string.new_message_sim, selectedSimNumber),
+                            )
+                        }
+                        FilledIconButton(
+                            onClick = onSend,
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .size(40.dp)
+                                .testTag(ThreadDetailTestTags.SEND),
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_send),
+                                contentDescription = stringResource(R.string.new_message_send),
+                            )
+                        }
+                    }
                 }
             }
         }
