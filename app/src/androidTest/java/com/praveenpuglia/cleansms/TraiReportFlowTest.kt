@@ -1,11 +1,13 @@
 package com.praveenpuglia.cleansms
 
 import android.app.Activity
+import android.content.ContentUris
 import android.content.ContentValues
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Telephony
+import androidx.lifecycle.Lifecycle
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
@@ -13,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.core.net.toUri
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -21,6 +24,8 @@ import com.praveenpuglia.cleansms.ui.thread.ThreadDetailTestTags
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -49,9 +54,10 @@ class TraiReportFlowTest {
 
     @After
     fun cleanUp() {
-        listOf(SPAMMER, OLD_SPAMMER, TraiReport.SHORT_CODE).forEach {
+        listOf(SPAMMER, OLD_SPAMMER, LONE_SENDER, TraiReport.SHORT_CODE).forEach {
             context.contentResolver.delete(Telephony.Sms.CONTENT_URI, "${Telephony.Sms.ADDRESS} = ?", arrayOf(it))
         }
+        StarredMessages.prune(context)
     }
 
     @Test
@@ -93,18 +99,52 @@ class TraiReportFlowTest {
     }
 
     @Test
-    fun deleteFromTheMessageMenuRemovesOnlyThatMessageAfterConfirming() {
+    fun deleteFromTheMessageMenuRemovesOnlyThatMessageAndItsStar() {
         val keep = insert(SPAMMER, "Keep me", System.currentTimeMillis() - 1_000)
         val gone = insert(SPAMMER, "Delete me", System.currentTimeMillis())
+        StarredMessages.toggle(context, gone)
         launch(SPAMMER).use {
-            openMenu(gone)
-            composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE).performClick()
-            composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE_DIALOG).assertIsDisplayed()
-            composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE_CONFIRM).performClick()
+            delete(gone)
             composeRule.waitUntil(5_000) { composeRule.onAllNodesWithTag(ThreadDetailTestTags.message(gone)).fetchSemanticsNodes().isEmpty() }
             composeRule.onNodeWithTag(ThreadDetailTestTags.message(keep)).assertIsDisplayed()
             assertEquals(listOf("Keep me"), awaitBodies(SPAMMER))
+            assertFalse(gone in StarredMessages.ids(context))
         }
+    }
+
+    @Test
+    fun deletingTheLastMessageDeletesTheThreadAndClosesTheScreen() {
+        val only = insert(LONE_SENDER, "Only message", System.currentTimeMillis())
+        val threadId = Telephony.Threads.getOrCreateThreadId(context, setOf(LONE_SENDER))
+        launch(LONE_SENDER).use { scenario ->
+            delete(only)
+            composeRule.waitUntil(5_000) { scenario.state == Lifecycle.State.DESTROYED }
+        }
+        val threadLeft = context.contentResolver.query(
+            "content://mms-sms/conversations?simple=true".toUri(), arrayOf("_id"), "_id = ?", arrayOf(threadId.toString()), null,
+        )?.use { it.count > 0 }
+        assertEquals(false, threadLeft)
+    }
+
+    @Test
+    fun starsOfMessagesDeletedElsewhereArePruned() {
+        val kept = insert(SPAMMER, "Still here", System.currentTimeMillis())
+        val goneElsewhere = insert(SPAMMER, "Deleted from the inbox", System.currentTimeMillis())
+        StarredMessages.toggle(context, kept)
+        StarredMessages.toggle(context, goneElsewhere)
+        context.contentResolver.delete(ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, goneElsewhere), null, null)
+
+        StarredMessages.prune(context)
+
+        assertTrue(kept in StarredMessages.ids(context))
+        assertFalse(goneElsewhere in StarredMessages.ids(context))
+    }
+
+    private fun delete(messageId: Long) {
+        openMenu(messageId)
+        composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE).performClick()
+        composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE_DIALOG).assertIsDisplayed()
+        composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE_CONFIRM).performClick()
     }
 
     private fun openMenu(messageId: Long) {
@@ -146,5 +186,6 @@ class TraiReportFlowTest {
     private companion object {
         const val SPAMMER = "+919000011122"
         const val OLD_SPAMMER = "+919000011133"
+        const val LONE_SENDER = "+919000011144"
     }
 }

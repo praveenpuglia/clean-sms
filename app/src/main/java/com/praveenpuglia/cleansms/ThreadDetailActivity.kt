@@ -246,7 +246,11 @@ class ThreadDetailActivity : AppCompatActivity() {
                 if (deleted) R.string.toast_messages_deleted else R.string.toast_messages_delete_failed,
                 Toast.LENGTH_SHORT,
             ).show()
-            if (deleted) loadMessages()
+            if (deleted) {
+                StarredMessages.remove(this@ThreadDetailActivity, listOf(message.id))
+                starredIds = starredIds - message.id
+                loadMessages() // closes the screen if that was the last message
+            }
         }
     }
 
@@ -285,6 +289,12 @@ class ThreadDetailActivity : AppCompatActivity() {
         loadJob = lifecycleScope.launch {
             val loaded = withContext(Dispatchers.IO) {
                 queryMessagesForThread(threadId).also { MarkReadReceiver.markThreadRead(this@ThreadDetailActivity, threadId) }
+            }
+            // The provider drops a thread with its last SMS. If this thread just lost its last one
+            // (deleted here, or elsewhere while open), there's nothing left to show.
+            if (loaded.isEmpty() && messages.isNotEmpty()) {
+                finish()
+                return@launch
             }
             messages = loaded
             val target = targetMessageId

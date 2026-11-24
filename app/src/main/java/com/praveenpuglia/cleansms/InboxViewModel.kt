@@ -549,6 +549,7 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Newest first; ids are numbers from our own storage, so they go straight into the selection. */
     private fun loadStarred(threads: List<ThreadItem>): List<SearchResultItem> {
+        StarredMessages.prune(app)
         val ids = StarredMessages.ids(app)
         if (ids.isEmpty()) return emptyList()
         return queryAllMessagesForSearch(threads.associateBy { it.threadId }, "_id IN (${ids.joinToString(",")})")
