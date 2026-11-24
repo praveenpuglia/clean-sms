@@ -173,6 +173,7 @@ class DebugSeedReceiver : BroadcastReceiver() {
         val ageMinutes: Long,
         val read: Boolean = false,
         val type: Int = Telephony.Sms.MESSAGE_TYPE_INBOX,
+        val status: Int? = null, // delivery report for sent messages
     )
 
     private fun Seed.toContentValues(now: Long) = ContentValues().apply {
@@ -183,6 +184,7 @@ class DebugSeedReceiver : BroadcastReceiver() {
         put(Telephony.Sms.READ, if (read) 1 else 0)
         put(Telephony.Sms.SEEN, if (read) 1 else 0)
         put(Telephony.Sms.TYPE, type)
+        status?.let { put(Telephony.Sms.STATUS, it) }
         put(Telephony.Sms.SERVICE_CENTER, SEED_TAG)
     }
 
@@ -465,9 +467,16 @@ class DebugSeedReceiver : BroadcastReceiver() {
             Seed("+918765432109",
                 "Hey, are we still on for lunch tomorrow at 1pm at Indian Coffee House?",
                 ageMinutes = 200),
+            // Every outgoing state: sent, delivered, not sent
             Seed("+918765432109",
                 "Yes! See you there.",
                 ageMinutes = 195, type = Telephony.Sms.MESSAGE_TYPE_SENT, read = true),
+            Seed("+918765432109",
+                "Booked a table for two.",
+                ageMinutes = 190, type = Telephony.Sms.MESSAGE_TYPE_SENT, read = true, status = Telephony.Sms.STATUS_COMPLETE),
+            Seed("+918765432109",
+                "Running 10 minutes late!",
+                ageMinutes = 185, type = Telephony.Sms.MESSAGE_TYPE_FAILED, read = true),
             Seed("+917654321098",
                 "Just landed at the airport. Coming home in 30 mins.",
                 ageMinutes = 800, read = true),

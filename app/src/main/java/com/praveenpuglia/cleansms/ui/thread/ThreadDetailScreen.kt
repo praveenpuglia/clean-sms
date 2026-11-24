@@ -432,7 +432,7 @@ private fun MessageBubble(
                                     tint = contentColor,
                                     modifier = Modifier
                                         .padding(end = 4.dp)
-                                        .size(12.dp)
+                                        .size(METADATA_ICON_SIZE)
                                         .testTag(ThreadDetailTestTags.starred(message.id)),
                                 )
                             }
@@ -449,7 +449,7 @@ private fun MessageBubble(
                                     painterResource(R.drawable.ic_warning),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(12.dp),
+                                    modifier = Modifier.size(METADATA_ICON_SIZE),
                                 )
                                 Text(
                                     stringResource(failedText),
@@ -465,7 +465,7 @@ private fun MessageBubble(
                                     tint = contentColor,
                                     modifier = Modifier
                                         .padding(end = 4.dp)
-                                        .size(11.dp),
+                                        .size(METADATA_ICON_SIZE),
                                 )
                             }
                             Text(formatMessageTime(message.date), color = contentColor, fontSize = 11.sp)
@@ -818,6 +818,7 @@ private const val STATUS_FAILED = 64
 private val MESSAGE_FONT_SIZE = 15.sp
 private val MESSAGE_LINE_HEIGHT = 17.sp
 private val MENU_ICON_SIZE = 18.dp
+private val METADATA_ICON_SIZE = 16.dp // M3 inline metadata icons (star, delivery state, warning)
 private val MENU_DOTS_END_INSET = 7.5.dp // ic_more_vert dots end at x=14 of 24
 private val SIM_GLYPH_END_INSET = 3.dp // ic_sim_outline card ends at x=800 of 960, drawn in an 18dp-wide box
 
