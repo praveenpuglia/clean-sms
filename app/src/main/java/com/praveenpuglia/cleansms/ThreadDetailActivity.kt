@@ -109,7 +109,10 @@ class ThreadDetailActivity : AppCompatActivity() {
                     onAvatarClick = ::openContactFromHeader,
                     onCall = ::openDialer,
                     onMessageChange = { messageText = it },
-                    onSimToggle = { selectedSimIndex = (selectedSimIndex + 1) % availableSims.size },
+                    onSimToggle = {
+                        selectedSimIndex = (selectedSimIndex + 1) % availableSims.size
+                        availableSims.getOrNull(selectedSimIndex)?.let { SimSlots.announceSwitch(this, it) }
+                    },
                     onSend = {
                         val address = contactAddress
                         val body = messageText.trim()

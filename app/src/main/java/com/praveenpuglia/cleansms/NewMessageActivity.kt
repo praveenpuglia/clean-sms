@@ -65,6 +65,7 @@ class NewMessageActivity : AppCompatActivity() {
                     onMessageChange = { messageText = it },
                     onSimToggle = {
                         selectedSimIndex = (selectedSimIndex + 1) % availableSims.size
+                        availableSims.getOrNull(selectedSimIndex)?.let { SimSlots.announceSwitch(this, it) }
                     },
                     onSend = ::sendMessage,
                 )
