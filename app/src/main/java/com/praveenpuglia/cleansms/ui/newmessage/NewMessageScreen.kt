@@ -342,7 +342,6 @@ private fun RecipientBar(
             Icon(
                 painter = painterResource(R.drawable.ic_send),
                 contentDescription = stringResource(R.string.new_message_send),
-                modifier = Modifier.size(20.dp),
             )
         }
     }

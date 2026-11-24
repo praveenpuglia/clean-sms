@@ -55,7 +55,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -461,7 +460,7 @@ private fun MessageBubble(
                             } else if (sent) {
                                 val delivered = message.status == STATUS_COMPLETE
                                 Icon(
-                                    painterResource(if (delivered) R.drawable.ic_tick_double else R.drawable.ic_tick_single),
+                                    painterResource(if (delivered) R.drawable.ic_done_all else R.drawable.ic_check),
                                     contentDescription = stringResource(if (delivered) R.string.thread_delivered_status else R.string.thread_sent_status),
                                     tint = contentColor,
                                     modifier = Modifier
@@ -589,7 +588,8 @@ private fun MenuAction(
     @DrawableRes icon: Int,
     label: String,
     testTag: String,
-    tint: Color = LocalContentColor.current,
+    // M3 menus and standard icon buttons draw icons in onSurfaceVariant, like the Report item's icon
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onClick: () -> Unit,
 ) {
     TooltipBox(
@@ -795,7 +795,6 @@ private fun MessageComposer(
                     Icon(
                         painterResource(R.drawable.ic_send),
                         contentDescription = stringResource(R.string.new_message_send),
-                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -820,7 +819,7 @@ private val MESSAGE_FONT_SIZE = 15.sp
 private val MESSAGE_LINE_HEIGHT = 17.sp
 private val MENU_ICON_SIZE = 18.dp
 private val MENU_DOTS_END_INSET = 7.5.dp // ic_more_vert dots end at x=14 of 24
-private val SIM_GLYPH_END_INSET = 4.5.dp // ic_sim_outline ends at x≈18.3 of 24, drawn 17dp wide in an 18dp box
+private val SIM_GLYPH_END_INSET = 3.dp // ic_sim_outline card ends at x=800 of 960, drawn in an 18dp-wide box
 
 fun createMessageListItems(messages: List<Message>, nowMillis: Long = System.currentTimeMillis()): List<MessageListItem> {
     if (messages.isEmpty()) return emptyList()

@@ -211,7 +211,7 @@ private fun SetupStep(
                 if (completed) {
                     val completedDescription = stringResource(R.string.onboarding_completed)
                     Image(
-                        painter = painterResource(R.drawable.ic_tick_single),
+                        painter = painterResource(R.drawable.ic_check),
                         contentDescription = completedDescription,
                         colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
                         modifier = Modifier.size(24.dp),
