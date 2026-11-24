@@ -191,7 +191,7 @@ fun NewMessageScreen(
 
             ComposerSurface(
                 lip = {
-                    SmsCounterLabel(counter, NewMessageTestTags.COUNTER, NewMessageTestTags.PARTS)
+                    // The SIM switch keeps away from Send; the counter sits above it
                     if (showSimSelector && selectedSimNumber != null) {
                         SimSwitch(
                             slot = selectedSimNumber,
@@ -199,6 +199,7 @@ fun NewMessageScreen(
                             description = stringResource(R.string.new_message_sim, selectedSimNumber),
                         )
                     }
+                    SmsCounterLabel(counter, NewMessageTestTags.COUNTER, NewMessageTestTags.PARTS)
                 },
             ) {
                 RecipientBar(

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -77,7 +78,7 @@ fun ComposerSurface(
                 Row(
                     modifier = Modifier
                         .height(LIP_TOUCH_HEIGHT)
-                        .padding(start = 12.dp, end = 4.dp),
+                        .padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.Bottom,
                 ) { shownLip?.invoke(this) }
@@ -88,15 +89,17 @@ fun ComposerSurface(
 }
 
 /**
- * The counter first and "2 SMS" after it, in fixed-width digits: as the count changes it only grows
- * to the start, so nothing to its end moves.
+ * The count and "2 SMS", in fixed-width digits, end-aligned in a fixed minimum width: as you type
+ * the digits change in place and the SIM switch beside it doesn't move.
  */
 @Composable
 fun SmsCounterLabel(counter: SmsCounter, counterTag: String, partsTag: String) {
     val style = MaterialTheme.typography.labelMedium.merge(TextStyle(fontFeatureSettings = "tnum"))
     Row(
-        modifier = Modifier.height(LIP_HEIGHT),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .height(LIP_HEIGHT)
+            .widthIn(min = 72.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

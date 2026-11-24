@@ -756,7 +756,7 @@ private fun MessageComposer(
     ComposerSurface(
         lip = if (!showCounter && !showSim) null else {
             {
-                if (showCounter) SmsCounterLabel(counter, ThreadDetailTestTags.COMPOSER_COUNTER, ThreadDetailTestTags.COMPOSER_PARTS)
+                // The SIM switch keeps away from Send; the counter sits above it
                 if (showSim && selectedSimNumber != null) {
                     SimSwitch(
                         slot = selectedSimNumber,
@@ -764,6 +764,7 @@ private fun MessageComposer(
                         description = stringResource(R.string.new_message_sim, selectedSimNumber),
                     )
                 }
+                if (showCounter) SmsCounterLabel(counter, ThreadDetailTestTags.COMPOSER_COUNTER, ThreadDetailTestTags.COMPOSER_PARTS)
             }
         },
         modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
