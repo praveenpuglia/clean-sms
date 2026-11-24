@@ -749,9 +749,9 @@ private fun MessageComposer(
     onSimToggle: () -> Unit,
     onSend: () -> Unit,
 ) {
-    // The lip shows only when there's something in it: a SIM to pick, or a message nearing or past one SMS
+    // The lip shows only when there's something in it: a SIM to pick, or a message being typed
     val counter = smsCounter(message)
-    val showCounter = counter.nearLimit || counter.partsText != null
+    val showCounter = message.isNotEmpty()
     val showSim = showSimSelector && selectedSimNumber != null
     ComposerSurface(
         lip = if (!showCounter && !showSim) null else {
