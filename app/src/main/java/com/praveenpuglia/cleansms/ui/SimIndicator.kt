@@ -3,6 +3,7 @@ package com.praveenpuglia.cleansms.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -64,7 +65,7 @@ fun SimIndicator(
 }
 
 /**
- * The SIM to send from, as a small tonal pill in the composer's lip; tap to switch. The touch target
+ * The SIM to send from, as a small outlined pill in the composer's lip; tap to switch. The touch target
  * is the lip's full 48dp height, while the pill sits centred in the visible part.
  */
 @Composable
@@ -83,9 +84,12 @@ fun SimSwitch(
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
     ) {
+        // Outlined like an M3 chip: a tonal fill is nearly the lip's own colour in light themes, while the
+        // outline keeps the 3:1 contrast a control's edge needs in both themes
         Surface(
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             shape = CircleShape,
             modifier = Modifier
                 .padding(bottom = (LIP_HEIGHT - SIM_PILL_HEIGHT) / 2)
