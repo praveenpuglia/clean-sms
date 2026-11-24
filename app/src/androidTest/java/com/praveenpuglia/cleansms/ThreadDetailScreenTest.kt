@@ -53,6 +53,7 @@ class ThreadDetailScreenTest {
                     onHighlightFinished = { highlightFinished = true },
                     onToggleStar = {},
                     onReportSpam = {},
+                    onDelete = {},
                 )
             }
         }
@@ -97,6 +98,7 @@ class ThreadDetailScreenTest {
                     onHighlightFinished = {},
                     onToggleStar = {},
                     onReportSpam = {},
+                    onDelete = {},
                 )
             }
         }
@@ -138,6 +140,7 @@ class ThreadDetailScreenTest {
                     onHighlightFinished = {},
                     onToggleStar = {},
                     onReportSpam = {},
+                    onDelete = {},
                 )
             }
         }

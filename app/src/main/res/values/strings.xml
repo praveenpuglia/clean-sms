@@ -173,6 +173,8 @@
     <string name="thread_star">Star</string>
     <string name="thread_unstar">Unstar</string>
     <string name="thread_starred">Starred</string>
+    <string name="thread_delete">Delete</string>
+    <string name="thread_delete_title">Delete this message?</string>
     <string name="trai_report_title">Report to TRAI?</string>
     <string name="trai_report_body">This sends a complaint by SMS to 1909, TRAI\'s free spam helpline, from the number that got this message. Your operator will reply with a complaint number.</string>
     <string name="trai_report_body_sim">This sends a complaint by SMS to 1909, TRAI\'s free spam helpline, from SIM %1$d, the number that got this message. Your operator will reply with a complaint number.</string>

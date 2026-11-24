@@ -27,7 +27,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Any received message can be reported to TRAI's 1909 from its menu, after confirming the exact complaint. */
+/**
+ * Any received message can be reported to TRAI's 1909 from its menu, after confirming the exact complaint.
+ * Any message can be deleted from the same menu.
+ */
 @RunWith(AndroidJUnit4::class)
 class TraiReportFlowTest {
     @get:Rule
@@ -86,6 +89,21 @@ class TraiReportFlowTest {
             openMenu(mine)
             composeRule.onNodeWithTag(ThreadDetailTestTags.STAR).assertIsDisplayed()
             composeRule.onNodeWithTag(ThreadDetailTestTags.REPORT_SPAM).assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun deleteFromTheMessageMenuRemovesOnlyThatMessageAfterConfirming() {
+        val keep = insert(SPAMMER, "Keep me", System.currentTimeMillis() - 1_000)
+        val gone = insert(SPAMMER, "Delete me", System.currentTimeMillis())
+        launch(SPAMMER).use {
+            openMenu(gone)
+            composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE).performClick()
+            composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE_DIALOG).assertIsDisplayed()
+            composeRule.onNodeWithTag(ThreadDetailTestTags.DELETE_CONFIRM).performClick()
+            composeRule.waitUntil(5_000) { composeRule.onAllNodesWithTag(ThreadDetailTestTags.message(gone)).fetchSemanticsNodes().isEmpty() }
+            composeRule.onNodeWithTag(ThreadDetailTestTags.message(keep)).assertIsDisplayed()
+            assertEquals(listOf("Keep me"), awaitBodies(SPAMMER))
         }
     }
 
