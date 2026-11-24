@@ -99,6 +99,7 @@ import com.praveenpuglia.cleansms.SpamDetector
 import com.praveenpuglia.cleansms.ui.ComposerTopShadow
 import com.praveenpuglia.cleansms.ui.ContactAvatar
 import com.praveenpuglia.cleansms.ui.SimIndicator
+import com.praveenpuglia.cleansms.ui.SimIndicatorEndInset
 import com.praveenpuglia.cleansms.ui.SimSelectorButton
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -449,7 +450,7 @@ private fun MessageBubble(
                                     painterResource(R.drawable.ic_warning),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(METADATA_ICON_SIZE),
+                                    modifier = Modifier.size(WARNING_ICON_SIZE),
                                 )
                                 Text(
                                     stringResource(failedText),
@@ -479,7 +480,7 @@ private fun MessageBubble(
                     // it, the visible dots line up with the visible end of the time row below and sit level
                     // with the first line of text. Insets measured from the artwork: the dots end 7.5dp inside
                     // their 18dp icon, the SIM card outline 4.5dp inside its 18dp glyph; text ends flush.
-                    val rowEndInset = if (message.simSlot != null) SIM_GLYPH_END_INSET else 0.dp
+                    val rowEndInset = if (message.simSlot != null) SimIndicatorEndInset else 0.dp
                     menu(
                         Modifier.align(Alignment.TopEnd),
                         topPadding + firstLineMiddle - MENU_ICON_SIZE / 2,
@@ -818,9 +819,10 @@ private const val STATUS_FAILED = 64
 private val MESSAGE_FONT_SIZE = 15.sp
 private val MESSAGE_LINE_HEIGHT = 17.sp
 private val MENU_ICON_SIZE = 18.dp
-private val METADATA_ICON_SIZE = 16.dp // M3 inline metadata icons (star, delivery state, warning)
+private val METADATA_ICON_SIZE = 16.dp // M3 inline metadata icons (star, delivery state)
+// The warning triangle fills its whole artboard, so it reads bigger than the star or ticks at the same size
+private val WARNING_ICON_SIZE = 13.dp
 private val MENU_DOTS_END_INSET = 7.5.dp // ic_more_vert dots end at x=14 of 24
-private val SIM_GLYPH_END_INSET = 3.dp // ic_sim_outline card ends at x=800 of 960, drawn in an 18dp-wide box
 
 fun createMessageListItems(messages: List<Message>, nowMillis: Long = System.currentTimeMillis()): List<MessageListItem> {
     if (messages.isEmpty()) return emptyList()

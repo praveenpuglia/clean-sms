@@ -26,6 +26,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.praveenpuglia.cleansms.R
 
+/** The inline SIM badge next to timestamps: small enough to sit with 11-12sp text. */
+val SimIndicatorSize = 14.dp
+
+/** Space between the badge's edge and its card outline (Material Symbols sim_card spans x=160..800 of 960). */
+val SimIndicatorEndInset = SimIndicatorSize * (160f / 960f)
+
 @Composable
 fun SimIndicator(
     slot: Int?,
@@ -36,10 +42,10 @@ fun SimIndicator(
     SimGlyph(
         slot = slot,
         color = color,
-        width = 18.dp,
-        height = 17.dp,
-        fontSize = 8.5.sp,
-        topPadding = 2.dp,
+        width = SimIndicatorSize,
+        height = SimIndicatorSize,
+        fontSize = 7.sp,
+        topPadding = 1.dp,
         modifier = modifier.clearAndSetSemantics {
             if (description != null) contentDescription = description
         },
