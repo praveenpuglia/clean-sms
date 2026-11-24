@@ -3,23 +3,12 @@ package com.praveenpuglia.cleansms.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.indication
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Surface
-import androidx.compose.material3.ripple
-import androidx.compose.runtime.remember
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -65,8 +54,8 @@ fun SimIndicator(
 }
 
 /**
- * The SIM to send from, as a small outlined pill in the composer's lip; tap to switch. The touch target
- * is the lip's full 48dp height, while the pill sits centred in the visible part.
+ * The SIM to send from, as the composer field's leading icon (a 48dp icon button, like a text field's
+ * leading icon); tap to switch.
  */
 @Composable
 fun SimSwitch(
@@ -75,50 +64,27 @@ fun SimSwitch(
     description: String,
     modifier: Modifier = Modifier,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    Box(
-        contentAlignment = Alignment.BottomCenter,
-        modifier = modifier
-            .fillMaxHeight()
-            .widthIn(min = 48.dp)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description },
+    IconButton(
+        onClick = onClick,
+        colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        modifier = modifier.semantics { contentDescription = description },
     ) {
-        // Outlined like an M3 chip: a tonal fill is nearly the lip's own colour in light themes, while the
-        // outline keeps the 3:1 contrast a control's edge needs in both themes
-        Surface(
-            color = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            shape = CircleShape,
-            modifier = Modifier
-                .padding(bottom = (LIP_HEIGHT - SIM_PILL_HEIGHT) / 2)
-                .height(SIM_PILL_HEIGHT)
-                .clip(CircleShape)
-                .indication(interaction, ripple()),
-        ) {
-            Crossfade(
-                targetState = slot,
-                animationSpec = tween(160),
-                label = "sim_slot_switch",
-                modifier = Modifier.padding(horizontal = 12.dp),
-            ) { currentSlot ->
-                Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    SimGlyph(
-                        slot = currentSlot,
-                        color = LocalContentColor.current,
-                        width = 18.dp,
-                        height = 18.dp,
-                        fontSize = 9.sp,
-                        topPadding = 1.5.dp,
-                    )
-                }
-            }
+        Crossfade(
+            targetState = slot,
+            animationSpec = tween(160),
+            label = "sim_slot_switch",
+        ) { currentSlot ->
+            SimGlyph(
+                slot = currentSlot,
+                color = LocalContentColor.current,
+                width = 24.dp,
+                height = 24.dp,
+                fontSize = 11.sp,
+                topPadding = 2.dp,
+            )
         }
     }
 }
-
-private val SIM_PILL_HEIGHT = 28.dp
 
 @Composable
 private fun SimGlyph(

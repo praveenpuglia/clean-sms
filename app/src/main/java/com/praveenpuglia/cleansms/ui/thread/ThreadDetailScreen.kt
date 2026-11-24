@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import com.praveenpuglia.cleansms.ui.newmessage.smsCounter
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -34,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -100,8 +98,7 @@ import com.praveenpuglia.cleansms.SpamDetector
 import com.praveenpuglia.cleansms.ui.ContactAvatar
 import com.praveenpuglia.cleansms.ui.SimIndicator
 import com.praveenpuglia.cleansms.ui.SimIndicatorEndInset
-import com.praveenpuglia.cleansms.ui.SimSwitch
-import com.praveenpuglia.cleansms.ui.ComposerSurface
+import com.praveenpuglia.cleansms.ui.ComposerBar
 import com.praveenpuglia.cleansms.ui.SmsCounterLabel
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -749,68 +746,39 @@ private fun MessageComposer(
     onSimToggle: () -> Unit,
     onSend: () -> Unit,
 ) {
-    // The lip shows only when there's something in it: a SIM to pick, or a message being typed
     val counter = smsCounter(message)
-    val showCounter = message.isNotEmpty()
-    val showSim = showSimSelector && selectedSimNumber != null
-    ComposerSurface(
-        lip = if (!showCounter && !showSim) null else {
-            {
-                // The SIM switch keeps away from Send; the counter sits above it
-                if (showSim && selectedSimNumber != null) {
-                    SimSwitch(
-                        slot = selectedSimNumber,
-                        onClick = onSimToggle,
-                        description = stringResource(R.string.new_message_sim, selectedSimNumber),
-                    )
-                }
-                if (showCounter) SmsCounterLabel(counter, ThreadDetailTestTags.COMPOSER_COUNTER, ThreadDetailTestTags.COMPOSER_PARTS)
-            }
+    ComposerBar(
+        // The counter rides in the field's lip once there's something typed
+        lip = if (message.isEmpty()) null else {
+            { SmsCounterLabel(counter, ThreadDetailTestTags.COMPOSER_COUNTER, ThreadDetailTestTags.COMPOSER_PARTS) }
         },
+        simSlot = selectedSimNumber?.takeIf { showSimSelector },
+        onSimToggle = onSimToggle,
+        sendEnabled = true,
+        onSend = onSend,
+        sendTestTag = ThreadDetailTestTags.SEND,
         modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
     ) {
-        // Bottom-aligned, so Send stays by the last line (and the thumb) as the text grows
-        Row(
+        BasicTextField(
+            value = message,
+            onValueChange = onMessageChange,
+            maxLines = 4,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 60.dp)
-                .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            BasicTextField(
-                value = message,
-                onValueChange = onMessageChange,
-                maxLines = 4,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-                    .padding(vertical = 2.dp)
-                    .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
-                decorationBox = { input ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (message.isEmpty()) {
-                            Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        input()
+                .weight(1f)
+                .padding(vertical = 12.dp)
+                .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
+            decorationBox = { input ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (message.isEmpty()) {
+                        Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                },
-            )
-            FilledIconButton(
-                onClick = onSend,
-                modifier = Modifier
-                    .padding(start = 8.dp, bottom = 2.dp)
-                    .size(40.dp)
-                    .testTag(ThreadDetailTestTags.SEND),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_send),
-                    contentDescription = stringResource(R.string.new_message_send),
-                )
-            }
-        }
+                    input()
+                }
+            },
+        )
     }
 }
 

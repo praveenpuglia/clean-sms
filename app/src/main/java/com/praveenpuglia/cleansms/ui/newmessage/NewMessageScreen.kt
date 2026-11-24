@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -52,8 +51,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.praveenpuglia.cleansms.ContactSuggestion
 import com.praveenpuglia.cleansms.R
 import com.praveenpuglia.cleansms.ui.ContactAvatar
-import com.praveenpuglia.cleansms.ui.SimSwitch
-import com.praveenpuglia.cleansms.ui.ComposerSurface
+import com.praveenpuglia.cleansms.ui.ComposerBar
 import com.praveenpuglia.cleansms.ui.SmsCounterLabel
 
 object NewMessageTestTags {
@@ -189,140 +187,111 @@ fun NewMessageScreen(
                 }
             }
 
-            ComposerSurface(
-                lip = {
-                    // The SIM switch keeps away from Send; the counter sits above it
-                    if (showSimSelector && selectedSimNumber != null) {
-                        SimSwitch(
-                            slot = selectedSimNumber,
-                            onClick = onSimToggle,
-                            description = stringResource(R.string.new_message_sim, selectedSimNumber),
-                        )
-                    }
-                    SmsCounterLabel(counter, NewMessageTestTags.COUNTER, NewMessageTestTags.PARTS)
-                },
+            ComposerBar(
+                lip = { SmsCounterLabel(counter, NewMessageTestTags.COUNTER, NewMessageTestTags.PARTS) },
+                simSlot = selectedSimNumber?.takeIf { showSimSelector },
+                onSimToggle = onSimToggle,
+                sendEnabled = message.isNotBlank() && recipients.isNotEmpty(),
+                onSend = onSend,
+                sendTestTag = NewMessageTestTags.SEND,
             ) {
-                RecipientBar(
+                RecipientField(
                     recipients = recipients,
                     recipientQuery = recipientQuery,
-                    sendEnabled = message.isNotBlank() && recipients.isNotEmpty(),
                     recipientFocus = recipientFocus,
                     onRecipientQueryChange = onRecipientQueryChange,
                     onRecipientRemoved = onRecipientRemoved,
                     onRemoveLastRecipient = onRemoveLastRecipient,
-                    onSend = onSend,
                 )
             }
         }
     }
 }
 
+/** "To:", the recipient chips and the recipient input, inside the composer field. */
 @Composable
-private fun RecipientBar(
+private fun RowScope.RecipientField(
     recipients: List<ContactSuggestion>,
     recipientQuery: String,
-    sendEnabled: Boolean,
     recipientFocus: FocusRequester,
     onRecipientQueryChange: (String) -> Unit,
     onRecipientRemoved: (ContactSuggestion) -> Unit,
     onRemoveLastRecipient: () -> Boolean,
-    onSend: () -> Unit,
 ) {
+    Text(
+        stringResource(R.string.new_message_to),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+        maxLines = 1,
+        modifier = Modifier.padding(end = 4.dp),
+    )
+    val scroll = rememberScrollState()
+    LaunchedEffect(recipients.size) { scroll.animateScrollTo(scroll.maxValue) }
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 56.dp)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .weight(1f)
+            .horizontalScroll(scroll)
+            .testTag(NewMessageTestTags.RECIPIENTS),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            stringResource(R.string.new_message_to),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        val scroll = rememberScrollState()
-        LaunchedEffect(recipients.size) { scroll.animateScrollTo(scroll.maxValue) }
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(scroll)
-                .testTag(NewMessageTestTags.RECIPIENTS),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            recipients.forEach { recipient ->
-                InputChip(
-                    selected = false,
-                    onClick = { onRecipientRemoved(recipient) },
-                    label = { Text(if (recipient.isRawNumber) recipient.phoneNumber else recipient.name) },
-                    avatar = {
-                        ContactAvatar(
-                            label = recipient.name,
-                            photoUri = recipient.photoUri,
-                            size = 24.dp,
-                            background = MaterialTheme.colorScheme.primary,
-                            foreground = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    },
-                    trailingIcon = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close),
-                            contentDescription = stringResource(
-                                R.string.new_message_remove_recipient,
-                                if (recipient.isRawNumber) recipient.phoneNumber else recipient.name,
-                            ),
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                )
-            }
-            BasicTextField(
-                value = recipientQuery,
-                onValueChange = onRecipientQueryChange,
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                modifier = Modifier
-                    .width(112.dp)
-                    .height(40.dp)
-                    .focusRequester(recipientFocus)
-                    .onPreviewKeyEvent {
-                        it.type == KeyEventType.KeyDown &&
-                            it.key == Key.Backspace &&
-                            onRemoveLastRecipient()
-                    }
-                    .testTag(NewMessageTestTags.RECIPIENT_INPUT),
-                decorationBox = { input ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (recipientQuery.isEmpty()) {
-                            Text(
-                                stringResource(R.string.new_message_add_recipient),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                            )
-                        }
-                        input()
-                    }
+        recipients.forEach { recipient ->
+            InputChip(
+                selected = false,
+                onClick = { onRecipientRemoved(recipient) },
+                label = { Text(if (recipient.isRawNumber) recipient.phoneNumber else recipient.name) },
+                avatar = {
+                    ContactAvatar(
+                        label = recipient.name,
+                        photoUri = recipient.photoUri,
+                        size = 24.dp,
+                        background = MaterialTheme.colorScheme.primary,
+                        foreground = MaterialTheme.colorScheme.onPrimary,
+                    )
+                },
+                trailingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(
+                            R.string.new_message_remove_recipient,
+                            if (recipient.isRawNumber) recipient.phoneNumber else recipient.name,
+                        ),
+                        modifier = Modifier.size(18.dp),
+                    )
                 },
             )
         }
-
-        FilledIconButton(
-            onClick = onSend,
-            enabled = sendEnabled,
+        BasicTextField(
+            value = recipientQuery,
+            onValueChange = onRecipientQueryChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             modifier = Modifier
-                .size(40.dp)
-                .testTag(NewMessageTestTags.SEND),
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_send),
-                contentDescription = stringResource(R.string.new_message_send),
-            )
-        }
+                .width(112.dp)
+                .height(40.dp)
+                .focusRequester(recipientFocus)
+                .onPreviewKeyEvent {
+                    it.type == KeyEventType.KeyDown &&
+                        it.key == Key.Backspace &&
+                        onRemoveLastRecipient()
+                }
+                .testTag(NewMessageTestTags.RECIPIENT_INPUT),
+            decorationBox = { input ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (recipientQuery.isEmpty()) {
+                        Text(
+                            stringResource(R.string.new_message_add_recipient),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                        )
+                    }
+                    input()
+                }
+            },
+        )
     }
 }
 
