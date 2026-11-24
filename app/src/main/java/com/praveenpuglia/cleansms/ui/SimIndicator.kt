@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +27,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.praveenpuglia.cleansms.R
 
+/** The inline SIM badge next to timestamps: small enough to sit with 11-12sp text. */
+val SimIndicatorSize = 14.dp
+
+/** Space between the badge's edge and its card outline (Material Symbols sim_card spans x=160..800 of 960). */
+val SimIndicatorEndInset = SimIndicatorSize * (160f / 960f)
+
 @Composable
 fun SimIndicator(
     slot: Int?,
@@ -36,25 +43,30 @@ fun SimIndicator(
     SimGlyph(
         slot = slot,
         color = color,
-        width = 18.dp,
-        height = 17.dp,
-        fontSize = 8.5.sp,
-        topPadding = 2.dp,
+        width = SimIndicatorSize,
+        height = SimIndicatorSize,
+        fontSize = 7.sp,
+        topPadding = 1.dp,
         modifier = modifier.clearAndSetSemantics {
             if (description != null) contentDescription = description
         },
     )
 }
 
+/**
+ * The SIM to send from, as the composer field's leading icon (a 48dp icon button, like a text field's
+ * leading icon); tap to switch.
+ */
 @Composable
-fun SimSelectorButton(
+fun SimSwitch(
     slot: Int,
     onClick: () -> Unit,
     description: String,
     modifier: Modifier = Modifier,
 ) {
-    FilledTonalIconButton(
+    IconButton(
         onClick = onClick,
+        colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         modifier = modifier.semantics { contentDescription = description },
     ) {
         Crossfade(
@@ -65,10 +77,10 @@ fun SimSelectorButton(
             SimGlyph(
                 slot = currentSlot,
                 color = LocalContentColor.current,
-                width = 32.dp,
-                height = 32.dp,
-                fontSize = 10.sp,
-                topPadding = 3.dp,
+                width = 24.dp,
+                height = 24.dp,
+                fontSize = 11.sp,
+                topPadding = 2.dp,
             )
         }
     }

@@ -1,6 +1,8 @@
 package com.praveenpuglia.cleansms
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -107,7 +109,10 @@ class ThreadDetailActivity : AppCompatActivity() {
                     onAvatarClick = ::openContactFromHeader,
                     onCall = ::openDialer,
                     onMessageChange = { messageText = it },
-                    onSimToggle = { selectedSimIndex = (selectedSimIndex + 1) % availableSims.size },
+                    onSimToggle = {
+                        selectedSimIndex = (selectedSimIndex + 1) % availableSims.size
+                        availableSims.getOrNull(selectedSimIndex)?.let { SimSlots.announceSwitch(this, it) }
+                    },
                     onSend = {
                         val address = contactAddress
                         val body = messageText.trim()
@@ -120,6 +125,8 @@ class ThreadDetailActivity : AppCompatActivity() {
                     onToggleStar = { starredIds = StarredMessages.toggle(this, it.id) },
                     onReportSpam = ::reportSpam,
                     onDelete = ::deleteMessage,
+                    onForward = { startActivity(NewMessageActivity.forwardIntent(this, it.body)) },
+                    onCopy = ::copyMessage,
                 )
             }
         }
@@ -225,6 +232,11 @@ class ThreadDetailActivity : AppCompatActivity() {
                 Toast.makeText(this@ThreadDetailActivity, getString(R.string.toast_message_send_failed, error.message.orEmpty()), Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /** Android shows its own "copied" confirmation, so there's no toast. */
+    private fun copyMessage(message: Message) {
+        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(getString(R.string.thread_copy), message.body))
     }
 
     /** Needs the default SMS role; without it the provider deletes nothing and we say so. */

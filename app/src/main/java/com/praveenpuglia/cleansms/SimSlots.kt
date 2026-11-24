@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 
 object SimSlots {
@@ -25,6 +26,24 @@ object SimSlots {
         if (sims.size <= 1) return 0
         val defaultId = SubscriptionManager.getDefaultSmsSubscriptionId()
         return sims.indexOfFirst { it.subscriptionId == defaultId }.coerceAtLeast(0)
+    }
+
+    private var switchToast: Toast? = null
+
+    /**
+     * Says which SIM a message will now go from. The SIM badge's number is small, so this names the
+     * slot and carrier. A new switch replaces the last toast instead of queueing behind it.
+     */
+    fun announceSwitch(context: Context, sim: SubscriptionInfo) {
+        val slot = sim.simSlotIndex + 1
+        val carrier = sim.displayName?.toString()?.takeIf(String::isNotBlank)
+        val text = if (carrier != null) {
+            context.getString(R.string.toast_sim_switched_carrier, slot, carrier)
+        } else {
+            context.getString(R.string.toast_sim_switched, slot)
+        }
+        switchToast?.cancel()
+        switchToast = Toast.makeText(context.applicationContext, text, Toast.LENGTH_SHORT).also(Toast::show)
     }
 
     fun resolver(context: Context) = SimSlotResolver { id ->

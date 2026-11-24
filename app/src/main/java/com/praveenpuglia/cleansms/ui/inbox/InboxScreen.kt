@@ -90,6 +90,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -469,7 +470,7 @@ private fun InboxHeader(
                     selected = true,
                     onClick = { onUnreadOnlyChange(false) },
                     label = { Text(stringResource(R.string.main_unread), fontSize = 12.sp) },
-                    trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.main_clear_unread), modifier = Modifier.size(14.dp)) },
+                    trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.main_clear_unread), modifier = Modifier.size(InputChipDefaults.IconSize)) },
                     modifier = Modifier.padding(start = 28.dp, top = 6.dp).height(32.dp).testTag(MainInboxTestTags.UNREAD_CHIP),
                 )
             }

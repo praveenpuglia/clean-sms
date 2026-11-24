@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms.ui.thread
 
 import android.text.style.URLSpan
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -10,8 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import com.praveenpuglia.cleansms.ui.newmessage.smsCounter
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -32,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,6 +53,12 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -89,10 +95,11 @@ import com.praveenpuglia.cleansms.MessageCategory
 import com.praveenpuglia.cleansms.MessageListItem
 import com.praveenpuglia.cleansms.R
 import com.praveenpuglia.cleansms.SpamDetector
-import com.praveenpuglia.cleansms.ui.ComposerTopShadow
 import com.praveenpuglia.cleansms.ui.ContactAvatar
 import com.praveenpuglia.cleansms.ui.SimIndicator
-import com.praveenpuglia.cleansms.ui.SimSelectorButton
+import com.praveenpuglia.cleansms.ui.SimIndicatorEndInset
+import com.praveenpuglia.cleansms.ui.ComposerBar
+import com.praveenpuglia.cleansms.ui.SmsCounterLabel
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import java.util.Locale
@@ -104,11 +111,15 @@ object ThreadDetailTestTags {
     const val COMPOSER = "thread_composer"
     const val COMPOSER_INPUT = "thread_composer_input"
     const val SEND = "thread_send"
+    const val COMPOSER_COUNTER = "thread_composer_counter"
+    const val COMPOSER_PARTS = "thread_composer_parts"
     const val STAR = "thread_star"
     const val REPORT_SPAM = "thread_report_spam"
     const val REPORT_DIALOG = "thread_report_dialog"
     const val REPORT_CONFIRM = "thread_report_confirm"
     const val DELETE = "thread_delete"
+    const val FORWARD = "thread_forward"
+    const val COPY = "thread_copy"
     const val DELETE_DIALOG = "thread_delete_dialog"
     const val DELETE_CONFIRM = "thread_delete_confirm"
     fun messageMenu(id: Long) = "thread_message_menu_$id"
@@ -141,6 +152,8 @@ fun ThreadDetailScreen(
     onToggleStar: (Message) -> Unit,
     onReportSpam: (Message) -> Unit,
     onDelete: (Message) -> Unit,
+    onForward: (Message) -> Unit,
+    onCopy: (Message) -> Unit,
 ) {
     val listItems = remember(messages) { createMessageListItems(messages) }
     // TRAI takes complaints for 7 days, from the number that got the message (see TraiReport)
@@ -241,6 +254,8 @@ fun ThreadDetailScreen(
                                 onToggleStar = { onToggleStar(item.message) },
                                 onReport = { pendingReport = item.message },
                                 onDelete = { pendingDelete = item.message },
+                                onForward = { onForward(item.message) },
+                                onCopy = { onCopy(item.message) },
                             )
                         }
                     }
@@ -340,6 +355,8 @@ private fun MessageBubble(
     onToggleStar: () -> Unit,
     onReport: () -> Unit,
     onDelete: () -> Unit,
+    onForward: () -> Unit,
+    onCopy: () -> Unit,
 ) {
     val incoming = message.type == TelephonyMessageType.INCOMING
     val spam = incoming && SpamDetector.isSpam(message.body)
@@ -373,6 +390,8 @@ private fun MessageBubble(
             onToggleStar = onToggleStar,
             onReport = onReport,
             onDelete = onDelete,
+            onForward = onForward,
+            onCopy = onCopy,
             modifier = modifier,
         )
     }
@@ -415,7 +434,7 @@ private fun MessageBubble(
                                     tint = contentColor,
                                     modifier = Modifier
                                         .padding(end = 4.dp)
-                                        .size(12.dp)
+                                        .size(METADATA_ICON_SIZE)
                                         .testTag(ThreadDetailTestTags.starred(message.id)),
                                 )
                             }
@@ -432,7 +451,7 @@ private fun MessageBubble(
                                     painterResource(R.drawable.ic_warning),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(12.dp),
+                                    modifier = Modifier.size(WARNING_ICON_SIZE),
                                 )
                                 Text(
                                     stringResource(failedText),
@@ -443,12 +462,12 @@ private fun MessageBubble(
                             } else if (sent) {
                                 val delivered = message.status == STATUS_COMPLETE
                                 Icon(
-                                    painterResource(if (delivered) R.drawable.ic_tick_double else R.drawable.ic_tick_single),
+                                    painterResource(if (delivered) R.drawable.ic_done_all else R.drawable.ic_check),
                                     contentDescription = stringResource(if (delivered) R.string.thread_delivered_status else R.string.thread_sent_status),
                                     tint = contentColor,
                                     modifier = Modifier
                                         .padding(end = 4.dp)
-                                        .size(11.dp),
+                                        .size(METADATA_ICON_SIZE),
                                 )
                             }
                             Text(formatMessageTime(message.date), color = contentColor, fontSize = 11.sp)
@@ -462,7 +481,7 @@ private fun MessageBubble(
                     // it, the visible dots line up with the visible end of the time row below and sit level
                     // with the first line of text. Insets measured from the artwork: the dots end 7.5dp inside
                     // their 18dp icon, the SIM card outline 4.5dp inside its 18dp glyph; text ends flush.
-                    val rowEndInset = if (message.simSlot != null) SIM_GLYPH_END_INSET else 0.dp
+                    val rowEndInset = if (message.simSlot != null) SimIndicatorEndInset else 0.dp
                     menu(
                         Modifier.align(Alignment.TopEnd),
                         topPadding + firstLineMiddle - MENU_ICON_SIZE / 2,
@@ -494,6 +513,8 @@ private fun MessageMenu(
     onToggleStar: () -> Unit,
     onReport: () -> Unit,
     onDelete: () -> Unit,
+    onForward: () -> Unit,
+    onCopy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -517,15 +538,6 @@ private fun MessageMenu(
                 .indication(interaction, ripple(bounded = false, radius = 16.dp)),
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(if (starred) R.string.thread_unstar else R.string.thread_star)) },
-                leadingIcon = { Icon(painterResource(if (starred) R.drawable.ic_star else R.drawable.ic_star_outline), contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onToggleStar()
-                },
-                modifier = Modifier.testTag(ThreadDetailTestTags.STAR),
-            )
             if (report != ReportOption.Hidden) {
                 DropdownMenuItem(
                     text = {
@@ -548,15 +560,47 @@ private fun MessageMenu(
                     modifier = Modifier.testTag(ThreadDetailTestTags.REPORT_SPAM),
                 )
             }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.thread_delete)) },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onDelete()
-                },
-                modifier = Modifier.testTag(ThreadDetailTestTags.DELETE),
-            )
+            // Common, well-understood actions sit in one row of icons to keep the menu short. Long-press
+            // shows each one's name; screen readers read it.
+            Row(Modifier.padding(horizontal = 4.dp)) {
+                val act = { action: () -> Unit -> { expanded = false; action() } }
+                MenuAction(
+                    icon = if (starred) R.drawable.ic_star else R.drawable.ic_star_outline,
+                    label = stringResource(if (starred) R.string.thread_unstar else R.string.thread_star),
+                    testTag = ThreadDetailTestTags.STAR,
+                    onClick = act(onToggleStar),
+                )
+                MenuAction(R.drawable.ic_forward, stringResource(R.string.thread_forward), ThreadDetailTestTags.FORWARD, onClick = act(onForward))
+                MenuAction(R.drawable.ic_copy, stringResource(R.string.thread_copy), ThreadDetailTestTags.COPY, onClick = act(onCopy))
+                MenuAction(
+                    icon = R.drawable.ic_delete,
+                    label = stringResource(R.string.thread_delete),
+                    testTag = ThreadDetailTestTags.DELETE,
+                    tint = MaterialTheme.colorScheme.error,
+                    onClick = act(onDelete),
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MenuAction(
+    @DrawableRes icon: Int,
+    label: String,
+    testTag: String,
+    // M3 menus and standard icon buttons draw icons in onSurfaceVariant, like the Report item's icon
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onClick: () -> Unit,
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.testTag(testTag)) {
+            Icon(painterResource(icon), contentDescription = label, tint = tint)
         }
     }
 }
@@ -702,62 +746,39 @@ private fun MessageComposer(
     onSimToggle: () -> Unit,
     onSend: () -> Unit,
 ) {
-    Column {
-        ComposerTopShadow()
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 60.dp)
-                    .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BasicTextField(
-                    value = message,
-                    onValueChange = onMessageChange,
-                    maxLines = 4,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
-                    decorationBox = { input ->
-                        Box(contentAlignment = Alignment.CenterStart) {
-                            if (message.isEmpty()) {
-                                Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            input()
-                        }
-                    },
-                )
-                Text(message.length.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                if (showSimSelector && selectedSimNumber != null) {
-                    SimSelectorButton(
-                        slot = selectedSimNumber,
-                        onClick = onSimToggle,
-                        description = stringResource(R.string.new_message_sim, selectedSimNumber),
-                    )
+    val counter = smsCounter(message)
+    ComposerBar(
+        // The counter rides in the field's lip once there's something typed
+        lip = if (message.isEmpty()) null else {
+            { SmsCounterLabel(counter, ThreadDetailTestTags.COMPOSER_COUNTER, ThreadDetailTestTags.COMPOSER_PARTS) }
+        },
+        simSlot = selectedSimNumber?.takeIf { showSimSelector },
+        onSimToggle = onSimToggle,
+        sendEnabled = true,
+        onSend = onSend,
+        sendTestTag = ThreadDetailTestTags.SEND,
+        modifier = Modifier.testTag(ThreadDetailTestTags.COMPOSER),
+    ) {
+        BasicTextField(
+            value = message,
+            onValueChange = onMessageChange,
+            maxLines = 4,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = 12.dp)
+                .testTag(ThreadDetailTestTags.COMPOSER_INPUT),
+            decorationBox = { input ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (message.isEmpty()) {
+                        Text(stringResource(R.string.thread_message_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    input()
                 }
-                FilledIconButton(
-                    onClick = onSend,
-                    modifier = Modifier
-                        .padding(start = 4.dp)
-                        .size(40.dp)
-                        .testTag(ThreadDetailTestTags.SEND),
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_send),
-                        contentDescription = stringResource(R.string.new_message_send),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
+            },
+        )
     }
 }
 
@@ -777,8 +798,10 @@ private const val STATUS_FAILED = 64
 private val MESSAGE_FONT_SIZE = 15.sp
 private val MESSAGE_LINE_HEIGHT = 17.sp
 private val MENU_ICON_SIZE = 18.dp
+private val METADATA_ICON_SIZE = 16.dp // M3 inline metadata icons (star, delivery state)
+// The warning triangle fills its whole artboard, so it reads bigger than the star or ticks at the same size
+private val WARNING_ICON_SIZE = 13.dp
 private val MENU_DOTS_END_INSET = 7.5.dp // ic_more_vert dots end at x=14 of 24
-private val SIM_GLYPH_END_INSET = 4.5.dp // ic_sim_outline ends at x≈18.3 of 24, drawn 17dp wide in an 18dp box
 
 fun createMessageListItems(messages: List<Message>, nowMillis: Long = System.currentTimeMillis()): List<MessageListItem> {
     if (messages.isEmpty()) return emptyList()

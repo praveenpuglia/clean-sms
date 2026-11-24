@@ -1,5 +1,7 @@
 package com.praveenpuglia.cleansms
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
@@ -63,6 +65,7 @@ class NewMessageActivity : AppCompatActivity() {
                     onMessageChange = { messageText = it },
                     onSimToggle = {
                         selectedSimIndex = (selectedSimIndex + 1) % availableSims.size
+                        availableSims.getOrNull(selectedSimIndex)?.let { SimSlots.announceSwitch(this, it) }
                     },
                     onSend = ::sendMessage,
                 )
@@ -77,6 +80,7 @@ class NewMessageActivity : AppCompatActivity() {
     }
 
     private fun handleIncomingIntent(restoreBody: Boolean) {
+        if (restoreBody) intent?.getStringExtra(EXTRA_SMS_BODY)?.takeIf(String::isNotBlank)?.let { messageText = it }
         intent?.data?.let { uri ->
             if (uri.scheme?.startsWith("sms") != true && uri.scheme?.startsWith("mms") != true) return
 
@@ -253,8 +257,14 @@ class NewMessageActivity : AppCompatActivity() {
         return digits.length >= 5 && digits.toSet().size > 1 && input.matches(Regex("^[+()0-9 -]{5,}"))
     }
 
-    private companion object {
-        const val STATE_RECIPIENT_QUERY = "recipient_query"
-        const val STATE_MESSAGE = "message"
+    companion object {
+        /** A new message with [body] filled in, waiting for a recipient. */
+        fun forwardIntent(context: Context, body: String): Intent =
+            Intent(context, NewMessageActivity::class.java).putExtra(EXTRA_SMS_BODY, body)
+
+        // The extra other SMS apps use for a prefilled body; it carries any text, unlike a URI query.
+        private const val EXTRA_SMS_BODY = "sms_body"
+        private const val STATE_RECIPIENT_QUERY = "recipient_query"
+        private const val STATE_MESSAGE = "message"
     }
 }

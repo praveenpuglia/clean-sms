@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols Outlined "sim_card" (weight 400, 24px), card outline only: the app draws the SIM slot number inside -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <!-- Inset card outline to leave room for digit; use medium emphasis stroke -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="?attr/colorOnSurfaceVariant"
-        android:strokeWidth="1.6"
-        android:pathData="M8,3.5h5l4,4v9.5a1.5,1.5 0 0 1 -1.5,1.5H8a1.5,1.5 0 0 1 -1.5,-1.5V5a1.5,1.5 0 0 1 1.5,-1.5zM13,3.5v3a1.5,1.5 0 0 0 1.5,1.5h3" />
+    android:viewportWidth="960"
+    android:viewportHeight="960"
+    android:tint="?attr/colorControlNormal">
+    <group android:translateY="960">
+        <path
+            android:fillColor="@android:color/white"
+            android:pathData="M240-80q-33 0-56.5-23.5T160-160v-480l240-240h320q33 0 56.5 23.5T800-800v640q0 33-23.5 56.5T720-80H240Zm0-80h480v-640H434L240-606v446Zm0 0h480-480Z" />
+    </group>
 </vector>

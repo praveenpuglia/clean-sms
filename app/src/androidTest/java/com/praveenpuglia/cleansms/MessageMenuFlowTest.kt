@@ -1,6 +1,7 @@
 package com.praveenpuglia.cleansms
 
 import android.app.Activity
+import android.content.ClipboardManager
 import android.content.ContentUris
 import android.content.ContentValues
 import android.os.Build
@@ -9,7 +10,10 @@ import android.os.SystemClock
 import android.provider.Telephony
 import androidx.lifecycle.Lifecycle
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -20,6 +24,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.praveenpuglia.cleansms.ui.newmessage.NewMessageTestTags
 import com.praveenpuglia.cleansms.ui.thread.ThreadDetailTestTags
 import java.util.concurrent.TimeUnit
 import org.junit.After
@@ -33,11 +38,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Any received message can be reported to TRAI's 1909 from its menu, after confirming the exact complaint.
- * Any message can be deleted from the same menu.
+ * A message's menu: reporting any received message to TRAI's 1909 after confirming the exact complaint,
+ * and the row of actions every message has (star, forward, copy, delete).
  */
 @RunWith(AndroidJUnit4::class)
-class TraiReportFlowTest {
+class MessageMenuFlowTest {
     @get:Rule
     val composeRule = createEmptyComposeRule()
 
@@ -138,6 +143,35 @@ class TraiReportFlowTest {
 
         assertTrue(kept in StarredMessages.ids(context))
         assertFalse(goneElsewhere in StarredMessages.ids(context))
+    }
+
+    @Test
+    fun forwardOpensANewMessageWithTheWholeTextWaitingForARecipient() {
+        // "&" and "%" would be cut or mangled if the body travelled in a URI query
+        val body = "Gate code 4412 & parking B2, map: https://maps.example/?q=a&z=17, 100% sure"
+        val id = insert(SPAMMER, body, System.currentTimeMillis())
+        launch(SPAMMER).use {
+            openMenu(id)
+            composeRule.onNodeWithTag(ThreadDetailTestTags.FORWARD).performClick()
+            composeRule.waitUntil(5_000) { composeRule.onAllNodesWithTag(NewMessageTestTags.BODY).fetchSemanticsNodes().isNotEmpty() }
+            composeRule.onNodeWithTag(NewMessageTestTags.BODY).assertTextEquals(body)
+            composeRule.waitUntil(5_000) { runCatching { composeRule.onNodeWithTag(NewMessageTestTags.RECIPIENT_INPUT).assertIsFocused() }.isSuccess }
+            composeRule.onNodeWithContentDescription(context.getString(R.string.settings_back)).performClick()
+        }
+    }
+
+    @Test
+    fun copyPutsTheMessageTextOnTheClipboard() {
+        val body = "Wifi password: tulip-42"
+        val id = insert(SPAMMER, body, System.currentTimeMillis())
+        launch(SPAMMER).use {
+            openMenu(id)
+            composeRule.onNodeWithTag(ThreadDetailTestTags.COPY).performClick()
+            composeRule.runOnIdle {
+                val clip = context.getSystemService(ClipboardManager::class.java).primaryClip
+                assertEquals(body, clip?.getItemAt(0)?.text?.toString())
+            }
+        }
     }
 
     private fun delete(messageId: Long) {

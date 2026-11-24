@@ -20,6 +20,9 @@ class NewMessageSmsCounterTest {
             "₹".repeat(71) to SmsCounter("63", "2 SMS"),
             "₹".repeat(134) to SmsCounter("0", "2 SMS"),
             "₹".repeat(135) to SmsCounter("66", "3 SMS"),
+            // GSM extended characters take two slots each
+            "€".repeat(80) to SmsCounter("160 / 160", nearLimit = true),
+            "a".repeat(159) + "€" to SmsCounter("145", "2 SMS"),
         ).forEach { (message, expected) -> assertEquals(expected, smsCounter(message)) }
     }
 }

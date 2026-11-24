@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -28,6 +27,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -51,9 +52,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.praveenpuglia.cleansms.ContactSuggestion
 import com.praveenpuglia.cleansms.R
-import com.praveenpuglia.cleansms.ui.ComposerTopShadow
 import com.praveenpuglia.cleansms.ui.ContactAvatar
-import com.praveenpuglia.cleansms.ui.SimSelectorButton
+import com.praveenpuglia.cleansms.ui.ComposerBar
+import com.praveenpuglia.cleansms.ui.SmsCounterLabel
 
 object NewMessageTestTags {
     const val BODY = "new_message_body"
@@ -74,16 +75,19 @@ fun smsCounter(text: String): SmsCounter {
     val unicode = text.any { it !in GSM_BASIC && it !in GSM_EXTENDED }
     val singleLimit = if (unicode) 70 else 160
     val multipartLimit = if (unicode) 67 else 153
+    // GSM extended characters (€, [, ], {, }, ...) take two of the 160 slots: an escape plus the character.
+    // ponytail: ignores that the pair is never split across parts, which can make the last part one slot off.
+    val units = if (unicode) text.length else text.length + text.count { it in GSM_EXTENDED }
     if (text.isEmpty()) return SmsCounter("0 / $singleLimit")
-    if (text.length <= singleLimit) {
+    if (units <= singleLimit) {
         return SmsCounter(
-            counterText = "${text.length} / $singleLimit",
-            nearLimit = text.length > singleLimit * 0.9,
+            counterText = "$units / $singleLimit",
+            nearLimit = units > singleLimit * 0.9,
         )
     }
 
-    val parts = ((text.length - 1) / multipartLimit) + 1
-    val usedInCurrentPart = ((text.length - 1) % multipartLimit) + 1
+    val parts = ((units - 1) / multipartLimit) + 1
+    val usedInCurrentPart = ((units - 1) % multipartLimit) + 1
     return SmsCounter(
         counterText = (multipartLimit - usedInCurrentPart).toString(),
         partsText = "$parts SMS",
@@ -112,10 +116,12 @@ fun NewMessageScreen(
     onSend: () -> Unit,
 ) {
     val bodyFocus = androidx.compose.runtime.remember { FocusRequester() }
+    val recipientFocus = androidx.compose.runtime.remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
-        bodyFocus.requestFocus()
+        // A forwarded or shared message arrives with its text but nobody to send it to: start there
+        if (message.isNotEmpty() && recipients.isEmpty()) recipientFocus.requestFocus() else bodyFocus.requestFocus()
         keyboard?.show()
     }
 
@@ -183,164 +189,115 @@ fun NewMessageScreen(
                 }
             }
 
-            CounterRow(counter)
-            ComposerTopShadow()
-            Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-                RecipientBar(
+            ComposerBar(
+                lip = { SmsCounterLabel(counter, NewMessageTestTags.COUNTER, NewMessageTestTags.PARTS) },
+                simSlot = selectedSimNumber?.takeIf { showSimSelector },
+                onSimToggle = onSimToggle,
+                sendEnabled = message.isNotBlank() && recipients.isNotEmpty(),
+                onSend = onSend,
+                sendTestTag = NewMessageTestTags.SEND,
+            ) {
+                RecipientField(
                     recipients = recipients,
                     recipientQuery = recipientQuery,
-                    selectedSimNumber = selectedSimNumber,
-                    showSimSelector = showSimSelector,
-                    sendEnabled = message.isNotBlank() && recipients.isNotEmpty(),
+                    recipientFocus = recipientFocus,
                     onRecipientQueryChange = onRecipientQueryChange,
                     onRecipientRemoved = onRecipientRemoved,
                     onRemoveLastRecipient = onRemoveLastRecipient,
-                    onSimToggle = onSimToggle,
-                    onSend = onSend,
                 )
             }
         }
     }
 }
 
+/** "To:", the recipient chips and the recipient input, inside the composer field. */
 @Composable
-private fun CounterRow(counter: SmsCounter) {
-    val color = when {
-        counter.partsText != null -> MaterialTheme.colorScheme.tertiary
-        counter.nearLimit -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        counter.partsText?.let {
-            Text(it, color = color, fontSize = 12.sp, modifier = Modifier.testTag(NewMessageTestTags.PARTS))
-            Spacer(Modifier.width(8.dp))
-        }
-        Text(counter.counterText, color = color, fontSize = 12.sp, modifier = Modifier.testTag(NewMessageTestTags.COUNTER))
-    }
-}
-
-@Composable
-private fun RecipientBar(
+private fun RowScope.RecipientField(
     recipients: List<ContactSuggestion>,
     recipientQuery: String,
-    selectedSimNumber: Int?,
-    showSimSelector: Boolean,
-    sendEnabled: Boolean,
+    recipientFocus: FocusRequester,
     onRecipientQueryChange: (String) -> Unit,
     onRecipientRemoved: (ContactSuggestion) -> Unit,
     onRemoveLastRecipient: () -> Boolean,
-    onSimToggle: () -> Unit,
-    onSend: () -> Unit,
 ) {
+    Text(
+        stringResource(R.string.new_message_to),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+        maxLines = 1,
+        modifier = Modifier.padding(end = 4.dp),
+    )
+    val scroll = rememberScrollState()
+    // Show the newest chip: follow the row's end whenever its width changes. (Keying on the chip count
+    // read maxValue before the new chip was laid out and stopped short.)
+    LaunchedEffect(scroll) { snapshotFlow { scroll.maxValue }.collectLatest { scroll.animateScrollTo(it) } }
+    // Only the chips scroll; the input after them is always in view, however many recipients there are
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 56.dp)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .weight(1f, fill = false)
+            .horizontalScroll(scroll)
+            .testTag(NewMessageTestTags.RECIPIENTS),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            stringResource(R.string.new_message_to),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        val scroll = rememberScrollState()
-        LaunchedEffect(recipients.size) { scroll.animateScrollTo(scroll.maxValue) }
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(scroll)
-                .testTag(NewMessageTestTags.RECIPIENTS),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            recipients.forEach { recipient ->
-                InputChip(
-                    selected = false,
-                    onClick = { onRecipientRemoved(recipient) },
-                    label = { Text(if (recipient.isRawNumber) recipient.phoneNumber else recipient.name) },
-                    avatar = {
-                        ContactAvatar(
-                            label = recipient.name,
-                            photoUri = recipient.photoUri,
-                            size = 24.dp,
-                            background = MaterialTheme.colorScheme.primary,
-                            foreground = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    },
-                    trailingIcon = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close),
-                            contentDescription = stringResource(
-                                R.string.new_message_remove_recipient,
-                                if (recipient.isRawNumber) recipient.phoneNumber else recipient.name,
-                            ),
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                )
-            }
-            BasicTextField(
-                value = recipientQuery,
-                onValueChange = onRecipientQueryChange,
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                modifier = Modifier
-                    .width(112.dp)
-                    .height(40.dp)
-                    .onPreviewKeyEvent {
-                        it.type == KeyEventType.KeyDown &&
-                            it.key == Key.Backspace &&
-                            onRemoveLastRecipient()
-                    }
-                    .testTag(NewMessageTestTags.RECIPIENT_INPUT),
-                decorationBox = { input ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (recipientQuery.isEmpty()) {
-                            Text(
-                                stringResource(R.string.new_message_add_recipient),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                            )
-                        }
-                        input()
-                    }
+        recipients.forEach { recipient ->
+            InputChip(
+                selected = false,
+                onClick = { onRecipientRemoved(recipient) },
+                label = { Text(if (recipient.isRawNumber) recipient.phoneNumber else recipient.name) },
+                avatar = {
+                    ContactAvatar(
+                        label = recipient.name,
+                        photoUri = recipient.photoUri,
+                        size = 24.dp,
+                        background = MaterialTheme.colorScheme.primary,
+                        foreground = MaterialTheme.colorScheme.onPrimary,
+                    )
+                },
+                trailingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(
+                            R.string.new_message_remove_recipient,
+                            if (recipient.isRawNumber) recipient.phoneNumber else recipient.name,
+                        ),
+                        modifier = Modifier.size(18.dp),
+                    )
                 },
             )
         }
-
-        if (showSimSelector && selectedSimNumber != null) {
-            SimSelectorButton(
-                slot = selectedSimNumber,
-                onClick = onSimToggle,
-                description = stringResource(R.string.new_message_sim, selectedSimNumber),
-            )
-        }
-        FilledIconButton(
-            onClick = onSend,
-            enabled = sendEnabled,
-            modifier = Modifier
-                .size(40.dp)
-                .testTag(NewMessageTestTags.SEND),
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_send),
-                contentDescription = stringResource(R.string.new_message_send),
-                modifier = Modifier.size(20.dp),
-            )
-        }
     }
+    BasicTextField(
+        value = recipientQuery,
+        onValueChange = onRecipientQueryChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        modifier = Modifier
+            .width(112.dp)
+            .height(40.dp)
+            .focusRequester(recipientFocus)
+            .onPreviewKeyEvent {
+                it.type == KeyEventType.KeyDown &&
+                    it.key == Key.Backspace &&
+                    onRemoveLastRecipient()
+            }
+            .testTag(NewMessageTestTags.RECIPIENT_INPUT),
+        decorationBox = { input ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (recipientQuery.isEmpty()) {
+                    Text(
+                        stringResource(R.string.new_message_add_recipient),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                    )
+                }
+                input()
+            }
+        },
+    )
 }
 
 @Composable

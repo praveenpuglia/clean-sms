@@ -1,6 +1,10 @@
 package com.praveenpuglia.cleansms
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.hasAnyAncestor
@@ -25,6 +29,7 @@ class ThreadDetailScreenTest {
     @Test
     fun personalThreadRendersBothDirectionsComposerAndTargetHighlight() {
         var highlightFinished = false
+        var draft by mutableStateOf("")
         val messages = listOf(
             message(1, "Hello", type = 1),
             message(2, "On my way", type = 2),
@@ -37,7 +42,7 @@ class ThreadDetailScreenTest {
                     contactPhotoUri = null,
                     category = MessageCategory.PERSONAL,
                     messages = messages,
-                    messageText = "Reply",
+                    messageText = draft,
                     showComposer = true,
                     selectedSimNumber = 2,
                     showSimSelector = true,
@@ -54,6 +59,8 @@ class ThreadDetailScreenTest {
                     onToggleStar = {},
                     onReportSpam = {},
                     onDelete = {},
+                    onForward = {},
+                    onCopy = {},
                 )
             }
         }
@@ -65,6 +72,12 @@ class ThreadDetailScreenTest {
         composeRule.onNodeWithTag(ThreadDetailTestTags.message(1)).assertIsDisplayed()
         composeRule.onNodeWithTag(ThreadDetailTestTags.message(2)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Sent").assertIsDisplayed()
+        // The SMS counter appears once there's text, and shows the SMS count for long messages
+        composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER_COUNTER).assertDoesNotExist()
+        draft = "Reply"
+        composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER_COUNTER).assertTextEquals("5 / 160")
+        draft = "a".repeat(200)
+        composeRule.onNodeWithTag(ThreadDetailTestTags.COMPOSER_PARTS).assertTextEquals("2 SMS")
         // Highlight is ~800ms of animation on the test clock; advance it instead of waiting on wall time.
         composeRule.mainClock.advanceTimeBy(2_000)
         composeRule.waitForIdle()
@@ -99,6 +112,8 @@ class ThreadDetailScreenTest {
                     onToggleStar = {},
                     onReportSpam = {},
                     onDelete = {},
+                    onForward = {},
+                    onCopy = {},
                 )
             }
         }
@@ -141,6 +156,8 @@ class ThreadDetailScreenTest {
                     onToggleStar = {},
                     onReportSpam = {},
                     onDelete = {},
+                    onForward = {},
+                    onCopy = {},
                 )
             }
         }

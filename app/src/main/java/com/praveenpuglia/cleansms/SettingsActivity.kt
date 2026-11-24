@@ -344,7 +344,7 @@ private data class ThemeOption(
 private val themeOptions = listOf(
     ThemeOption(AppSettings.THEME_LIGHT, R.string.settings_theme_light, R.drawable.ic_sun),
     ThemeOption(AppSettings.THEME_DARK, R.string.settings_theme_dark, R.drawable.ic_moon),
-    ThemeOption(AppSettings.THEME_SYSTEM, R.string.settings_theme_system, R.drawable.ic_computer),
+    ThemeOption(AppSettings.THEME_SYSTEM, R.string.settings_theme_system, R.drawable.ic_brightness_auto),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
